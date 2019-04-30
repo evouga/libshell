@@ -33,8 +33,12 @@ Compile this project using the standard cmake routine:
     cmake ..
     make
 
-This procedure will build both the library and an example program, which performs a few iterations of a static solve on an example mesh.
+This procedure will build both the library and an example program, which performs a few iterations of a static solve on an rest-flat bunny mesh.
 
 ## Dependencies
 
 The library itself depends only on Eigen. The example program includes a viewer which uses libigl.
+
+## Compiling on Windows
+
+Due to poor interoperation of the Eigen library with the MSVC compiler, Release mode compilation of the derivative code on Windows can take forever (over 8 hours). To solve this issue add EIGEN_STRONG_INLINE=inline to your preprocessor macros when building libshell.

@@ -154,7 +154,7 @@ double elasticEnergy(
 {
     int nfaces = mesh.nFaces();
     int nedges = mesh.nEdges();
-    int nverts = curPos.rows();
+    int nverts = (int)curPos.rows();
 
     if (derivative)
     {

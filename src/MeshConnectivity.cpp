@@ -16,7 +16,7 @@ MeshConnectivity::MeshConnectivity()
 MeshConnectivity::MeshConnectivity(const Eigen::MatrixXi &F) : F(F)
 {
     std::map<std::pair<int, int>, Eigen::Vector2i > edgeFaces;
-    int nfaces = F.rows();
+    int nfaces = (int)F.rows();
     for(int i=0; i<nfaces; i++)
     {
         for(int j=0; j<3; j++)
@@ -44,7 +44,7 @@ MeshConnectivity::MeshConnectivity(const Eigen::MatrixXi &F) : F(F)
         }
     }
     
-    int nedges = edgeFaces.size();
+    int nedges = (int)edgeFaces.size();
     FE.resize(nfaces, 3);
     FEorient.resize(nfaces, 3);
     EV.resize(nedges, 2);
@@ -106,6 +106,9 @@ int MeshConnectivity::oppositeVertexIndex(int edge, int faceidx) const
         if(F(face, j) != edgeVertex(edge, 0) && F(face, j) != edgeVertex(edge, 1))
             return j;
     }        
+
+    // unreachable
+    return -1;
 }
 
 int MeshConnectivity::oppositeVertex(int edge, int faceidx) const

@@ -10,8 +10,8 @@ public:
     MeshConnectivity();
     MeshConnectivity(const Eigen::MatrixXi &F);    
     
-    int nFaces() const {return F.rows();}
-    int nEdges() const {return EV.rows();}
+    int nFaces() const {return (int)F.rows();}
+    int nEdges() const {return (int)EV.rows();}
     int faceVertex(int face, int vertidx) const {return F(face,vertidx);}
     int faceEdge(int face, int vertidx) const {return FE(face,vertidx);} // opposite vertex vertidx
     int faceEdgeOrientation(int face, int vertidx) const { return FEorient(face, vertidx); } // face = edgeFace(faceEdge(face, i), faceEdgeOrientation(face, i))
