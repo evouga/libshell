@@ -49,12 +49,4 @@ Eigen::Matrix2d firstFundamentalForm(
     Eigen::Matrix<double, 4, 9> *derivative, // F(face, i)
     std::vector <Eigen::Matrix<double, 9, 9> > *hessian);
 
-
-void testAngle();
-void testFaceNormals(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
-void testAltitudes(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
-
-void testFirstFundamentalForm(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F);
-
-
 #endif
