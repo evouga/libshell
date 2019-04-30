@@ -11,7 +11,9 @@ The shell's current pose is represented as a triangle mesh, as well as, optional
 Three options are implemented for how the bending energy is discretized, all based on Grinspun et al's discrete shape operator:
 
 MidedgeAngleSinFormulation: bending energy is roughly sin(theta/2) for edge turning angle theta.
+
 MidedgeAngleTanFormulation: energy is roughly tan(theta/2) instead. The main difference of this formulation from the previous one is that the bending energy diverges for 180-degree bent hinges.
+
 MidedgeAverageFormulation: eschews the normal directors of Grinspun et al completely, instead assuming that the normal direction on an edge is always the mean of the neighboring face normals.
 
 For more details see:
