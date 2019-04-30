@@ -22,7 +22,7 @@ Chen et al "Physical simulation of environmentally induced thin shell deformatio
 
 ## Material Model
 
-The code assumes a St. Venant-Kirchoff material with constant thickness. You can specify the thickness and Lame parameters.
+The code assumes a St. Venant-Kirchhoff material with constant thickness. You can specify the thickness and Lame parameters.
 
 ## Compile
 
