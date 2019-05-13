@@ -12,7 +12,7 @@ option(LIBIGL_WITH_VIEWER            "Use OpenGL viewer"  ON)
 find_package(LIBIGL QUIET)
 
 # Add your project files
-file(GLOB LIBFILES src/*.cpp src/SecondFundamentalForm/*.cpp)
+file(GLOB LIBFILES src/*.cpp src/SecondFundamentalForm/*.cpp src/MaterialModel/*.cpp)
 add_library(${PROJECT_NAME} STATIC ${LIBFILES})
 target_include_directories(${PROJECT_NAME} PRIVATE "$ENV{EIGEN3_INCLUDE_DIR}" )
 install(TARGETS ${PROJECT_NAME} DESTINATION lib)

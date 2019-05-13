@@ -6,6 +6,8 @@
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <imgui/imgui.h>
 #include "../include/MidedgeAngleTanFormulation.h"
+#include "../include/StVKMaterial.h"
+#include "../include/NeoHookeanMaterial.h"
 
 int numSteps;
 double thickness;
@@ -57,6 +59,7 @@ int main(int argc, char *argv[])
     // set up material parameters
     double lameAlpha = 1.0;
     double lameBeta = 1.0;
+    NeoHookeanMaterial mat(lameAlpha, lameBeta);
     
     igl::opengl::glfw::Viewer viewer;
 
@@ -78,10 +81,12 @@ int main(int argc, char *argv[])
             ImGui::InputInt("Num Steps", &numSteps);
             if (ImGui::Button("Optimize Some Step", ImVec2(-1,0)))
             {
+                Eigen::VectorXd thicknesses(mesh.nFaces());
+                thicknesses.setConstant(thickness);
                 double reg = 1e-6;
                 for (int j = 1; j <= numSteps; j++)
                 {
-                    takeOneStep(mesh, curPos, edgeDOFs, lameAlpha, lameBeta, thickness, abar, bbar, sff, reg);
+                    takeOneStep(mesh, curPos, edgeDOFs, mat, thicknesses, abar, bbar, sff, reg);
                     repaint(viewer);                
                 }
             }

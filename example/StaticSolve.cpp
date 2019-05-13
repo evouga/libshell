@@ -2,20 +2,21 @@
 #include "../include/ElasticShell.h"
 #include <iostream>
 #include <Eigen/SparseCore>
+#include "../include/MeshConnectivity.h"
+#include "../include/SecondFundamentalFormDiscretization.h"
 
 void takeOneStep(const MeshConnectivity &mesh, 
     Eigen::MatrixXd &curPos, 
     Eigen::VectorXd &curEdgeDOFs, 
-    double lameAlpha,
-    double lameBeta,
-    double thickness,
+    const MaterialModel &mat,
+    const Eigen::VectorXd &thicknesses,
     const std::vector<Eigen::Matrix2d> &abars,
     const std::vector<Eigen::Matrix2d> &bbars,
     const SecondFundamentalFormDiscretization &sff, 
     double &reg)
 {
     
-    int nverts = curPos.rows();
+    int nverts = (int)curPos.rows();
     int nedges = mesh.nEdges();
     int nedgedofs = sff.numExtraDOFs();
 
@@ -25,8 +26,8 @@ void takeOneStep(const MeshConnectivity &mesh,
     {
         Eigen::VectorXd derivative;
         std::vector<Eigen::Triplet<double> > hessian;
-        
-        double energy = elasticEnergy(mesh, curPos, curEdgeDOFs, lameAlpha, lameBeta, thickness, abars, bbars, sff, &derivative, &hessian);
+                
+        double energy = elasticEnergy(mesh, curPos, curEdgeDOFs, mat, thicknesses, abars, bbars, sff, &derivative, &hessian);
         
         Eigen::SparseMatrix<double> H(3 * nverts + nedgedofs * nedges, 3 * nverts + nedgedofs * nedges);
         H.setFromTriplets(hessian.begin(), hessian.end());
@@ -50,7 +51,7 @@ void takeOneStep(const MeshConnectivity &mesh,
 
 
 
-            double newenergy = elasticEnergy(mesh, newPos, newEdgeDofs, lameAlpha, lameBeta, thickness, abars, bbars, sff, &derivative, NULL);
+            double newenergy = elasticEnergy(mesh, newPos, newEdgeDofs, mat, thicknesses, abars, bbars, sff, &derivative, NULL);
             force = -derivative;
 
             double forceResidual = force.norm();
@@ -60,7 +61,7 @@ void takeOneStep(const MeshConnectivity &mesh,
                 std::cout << "Old energy: " << energy << " new energy: " << newenergy << " force residual " << forceResidual << " pos change " << descentDir.segment(0, 3 * nverts).norm() << " theta change " << descentDir.segment(3 * nverts, nedgedofs*nedges).norm() << std::endl;
                 curPos = newPos;
                 curEdgeDOFs = newEdgeDofs;
-                reg = std::max(1e-6, reg / 2.0);
+                reg /= 2.0;
                 break;
             }
             else

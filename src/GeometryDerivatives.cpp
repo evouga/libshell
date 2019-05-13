@@ -13,6 +13,13 @@ Eigen::Matrix3d crossMatrix(Eigen::Vector3d v)
     return ret;
 }
 
+Eigen::Matrix2d adjugate(Eigen::Matrix2d M)
+{
+    Eigen::Matrix2d ret;
+    ret << M(1, 1), -M(0, 1), -M(1, 0), M(0, 0);
+    return ret;
+}
+
 double angle(const Eigen::Vector3d &v, const Eigen::Vector3d &w, const Eigen::Vector3d &axis,
     Eigen::Matrix<double, 1, 6> *derivative, // v, w
     Eigen::Matrix<double, 6, 6> *hessian

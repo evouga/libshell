@@ -7,6 +7,7 @@
 class MeshConnectivity;
 
 Eigen::Matrix3d crossMatrix(Eigen::Vector3d v);
+Eigen::Matrix2d adjugate(Eigen::Matrix2d M);
 
 /*
 * Signed angle between two vectors, as measured on the oriented plane with normal axis (which should be perpendicular to both vectors)

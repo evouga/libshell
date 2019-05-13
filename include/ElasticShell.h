@@ -2,10 +2,12 @@
 #define ELASTICSHELL_H
 
 #include <Eigen/Core>
-#include "MeshConnectivity.h"
 #include <vector>
 #include <Eigen/Sparse>
-#include "SecondFundamentalFormDiscretization.h"
+
+class MeshConnectivity;
+class MaterialModel;
+class SecondFundamentalFormDiscretization;
 
 /*
  * Computes the elastic energy of a shell and, optionally, the derivative and Hessian of the shell elastic energy.
@@ -14,7 +16,9 @@
  * - mesh:          data structure encoding connectivity information about the mesh. This data structure is used instead of a raw list
                     of faces so that (expensive) computation of connectivity data structures does not need to be repeated with every call.
  * - curPos:        |V| x 3 matrix of the current positions of the mesh vertices.
- * - edgeDOFs:      extra degrees of freedom needed depending on the choice of second fundamental form discretization (director angles, e.g.)
+ * - edgeDOFs:      extra degrees of freedom needed depending on the choice of second fundamental form discretization (director angles, e.g.).
+ * - mat:           Material model (e.g. StVKMaterial for St. Venant-Kirchhoff) defining the elastic energy density of the shell.
+ * - thicknesses:   |F| x 1 list of triangle thicknesses.
  * - abars, bbars:  first and second fundamental forms, in the barycentric coordinates of each mesh face, encoding the shell rest state.
                     If you have explicit rest geometry, you can compute these using the *FundamentalForms calls below. Alternatively you
                     can set the forms directly (zero matrices for bbar if you want a flat rest state, for instance).
@@ -32,7 +36,8 @@ double elasticEnergy(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &edgeDOFs,
-    double lameAlpha, double lameBeta, double thickness,
+    const MaterialModel &mat, 
+    const Eigen::VectorXd &thicknesses,
     const std::vector<Eigen::Matrix2d> &abars,
     const std::vector<Eigen::Matrix2d> &bbars,
     const SecondFundamentalFormDiscretization &sff,
@@ -44,5 +49,15 @@ double elasticEnergy(
  */
 void firstFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, std::vector<Eigen::Matrix2d> &abars);
 void secondFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, const Eigen::VectorXd &edgeDOFs, const SecondFundamentalFormDiscretization &sff, std::vector<Eigen::Matrix2d> &bbars);
+
+double testFiniteDifferences(
+    const MeshConnectivity &mesh,
+    const Eigen::MatrixXd &curPos,
+    const Eigen::VectorXd &edgeDOFs,
+    const MaterialModel &mat, 
+    const Eigen::VectorXd &thicknesses,
+    const std::vector<Eigen::Matrix2d> &abars,
+    const std::vector<Eigen::Matrix2d> &bbars,
+    const SecondFundamentalFormDiscretization &sff);
 
 #endif

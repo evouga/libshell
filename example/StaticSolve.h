@@ -5,14 +5,14 @@
 #include <vector>
 
 class MeshConnectivity;
+class MaterialModel;
 class SecondFundamentalFormDiscretization;
 
 void takeOneStep(const MeshConnectivity &mesh,
     Eigen::MatrixXd &curPos,
     Eigen::VectorXd &curEdgeDOFs,
-    double lameAlpha,
-    double lameBeta,
-    double thickness,
+    const MaterialModel &mat,
+    const Eigen::VectorXd &thicknesses,
     const std::vector<Eigen::Matrix2d> &abars,
     const std::vector<Eigen::Matrix2d> &bbars,
     const SecondFundamentalFormDiscretization &sff,
