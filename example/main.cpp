@@ -52,9 +52,10 @@ int main(int argc, char *argv[])
 
     // initialize second fundamental forms to rest flat
     std::vector<Eigen::Matrix2d> bbar;
-    bbar.resize(mesh.nFaces());
+    secondFundamentalForms(mesh, curPos, edgeDOFs, sff, bbar);
+    /*bbar.resize(mesh.nFaces());
     for (int i = 0; i < mesh.nFaces(); i++)
-        bbar[i].setZero();
+        bbar[i].setZero();*/
 
     // set up material parameters
     double lameAlpha = 1.0;
@@ -86,6 +87,8 @@ int main(int argc, char *argv[])
                 double reg = 1e-6;
                 for (int j = 1; j <= numSteps; j++)
                 {
+                    testFiniteDifferences(mesh, curPos, edgeDOFs, mat, thicknesses, abar, bbar, sff);
+                    return;
                     takeOneStep(mesh, curPos, edgeDOFs, mat, thicknesses, abar, bbar, sff, reg);
                     repaint(viewer);                
                 }
