@@ -50,7 +50,14 @@ double elasticEnergy(
 void firstFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, std::vector<Eigen::Matrix2d> &abars);
 void secondFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, const Eigen::VectorXd &edgeDOFs, const SecondFundamentalFormDiscretization &sff, std::vector<Eigen::Matrix2d> &bbars);
 
-double testFiniteDifferences(
+void testStretchingFiniteDifferences(
+    const MeshConnectivity &mesh,
+    const Eigen::MatrixXd &curPos,
+    const MaterialModel &mat,
+    const Eigen::VectorXd &thicknesses,
+    const std::vector<Eigen::Matrix2d> &abars);
+
+void testBendingFiniteDifferences(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &edgeDOFs,

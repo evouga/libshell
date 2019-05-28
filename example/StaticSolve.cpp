@@ -36,7 +36,7 @@ void takeOneStep(const MeshConnectivity &mesh,
         Eigen::SparseMatrix<double> I(freeDOFs, freeDOFs);
         I.setIdentity();
         H += reg * I;                
-        std::cout << "solving" << std::endl;
+        std::cout << "solving, original force residual: " << force.norm() << std::endl;
         Eigen::SimplicialLLT<Eigen::SparseMatrix<double> > solver(H);
         if (solver.info() == Eigen::Success)
         {
@@ -58,7 +58,7 @@ void takeOneStep(const MeshConnectivity &mesh,
 
             if (newenergy <= energy)
             {
-                std::cout << "Old energy: " << energy << " new energy: " << newenergy << " force residual " << forceResidual << " pos change " << descentDir.segment(0, 3 * nverts).norm() << " theta change " << descentDir.segment(3 * nverts, nedgedofs*nedges).norm() << std::endl;
+                std::cout << "Old energy: " << energy << " new energy: " << newenergy << " force residual " << forceResidual << " pos change " << descentDir.segment(0, 3 * nverts).norm() << " theta change " << descentDir.segment(3 * nverts, nedgedofs*nedges).norm() << " lambda " << reg << std::endl;
                 curPos = newPos;
                 curEdgeDOFs = newEdgeDofs;
                 reg /= 2.0;
@@ -66,12 +66,12 @@ void takeOneStep(const MeshConnectivity &mesh,
             }
             else
             {
-                std::cout << "Not a descent direction; old energy: " << energy << " new energy: " << newenergy << " lambda now: " << reg << std::endl;        
+                std::cout << "Not a descent direction; old energy: " << energy << " new energy: " << newenergy << " lambda now: " << 2.0*reg << std::endl;        
             }
         }
         else
         {
-            std::cout << "Matrix not positive-definite" << std::endl;
+            std::cout << "Matrix not positive-definite, lambda now " << reg << std::endl;
         }
 
         reg *= 2.0;

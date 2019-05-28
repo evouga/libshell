@@ -156,8 +156,56 @@ void secondFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd 
     }
 }
 
+void testStretchingFiniteDifferences(
+    const MeshConnectivity &mesh,
+    const Eigen::MatrixXd &curPos,
+    const MaterialModel &mat,
+    const Eigen::VectorXd &thicknesses,
+    const std::vector<Eigen::Matrix2d> &abars)
+{
+    int nfaces = mesh.nFaces();
+    int nedges = mesh.nEdges();
+    int nverts = (int)curPos.rows();
 
-double testFiniteDifferences(
+    Eigen::MatrixXd testpos = curPos;
+    testpos.setRandom();
+    
+    int numtests = 100;
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> facegen(0,nfaces-1);
+    double pert = 1e-6;
+    
+    for (int i = 0; i < numtests; i++)
+    {
+
+        int face = facegen(rng);
+        std::cout << "Face " << face << std::endl;
+        Eigen::Matrix<double, 1, 9> deriv;
+        Eigen::Matrix<double, 9, 9> hess;
+        double result = mat.stretchingEnergy(mesh, testpos, thicknesses[face], abars[face], face, &deriv, &hess);
+
+        for (int j = 0; j < 3; j++)
+        {
+            for (int k = 0; k < 3; k++)
+            {
+                Eigen::MatrixXd pertpos = testpos;
+                pertpos(mesh.faceVertex(face, j), k) += pert;
+                Eigen::Matrix<double, 1, 9> pertderiv;
+                double newresult = mat.stretchingEnergy(mesh, pertpos, thicknesses[face], abars[face], face, &pertderiv, NULL);
+                double findiff = (newresult - result) / pert;
+                std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k) << std::endl;
+                Eigen::Matrix<double, 1, 9> derivdiff = (pertderiv - deriv) / pert;
+                std::cout << derivdiff << std::endl;
+                std::cout << "//" << std::endl;
+                std::cout << hess.row(3 * j + k) << std::endl << std::endl;
+            }
+        }
+    } 
+}
+
+
+void testBendingFiniteDifferences(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &edgeDOFs,
@@ -173,7 +221,6 @@ double testFiniteDifferences(
 
     Eigen::MatrixXd testpos = curPos;
     testpos.setRandom();
-
     Eigen::VectorXd testedge = edgeDOFs;
     testedge.setRandom();
     
@@ -240,6 +287,5 @@ double testFiniteDifferences(
                 std::cout << hess.row(18 + nedgedofs * j + k) << std::endl << std::endl;
             }            
         }
-    }
-    return 0;
+    } 
 }
