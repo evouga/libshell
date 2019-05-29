@@ -29,7 +29,7 @@ double elasticEnergy(
 
     if (derivative)
     {
-        derivative->resize(3 * nverts + nedges);
+        derivative->resize(3 * nverts + sff.numExtraDOFs() * nedges);
         derivative->setZero();
     }
     if (hessian)

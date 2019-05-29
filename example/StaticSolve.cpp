@@ -29,7 +29,7 @@ void takeOneStep(const MeshConnectivity &mesh,
                 
         double energy = elasticEnergy(mesh, curPos, curEdgeDOFs, mat, thicknesses, abars, bbars, sff, &derivative, &hessian);
         
-        Eigen::SparseMatrix<double> H(3 * nverts + nedgedofs * nedges, 3 * nverts + nedgedofs * nedges);
+        Eigen::SparseMatrix<double> H(freeDOFs, freeDOFs);        
         H.setFromTriplets(hessian.begin(), hessian.end());
 
         Eigen::VectorXd force = -derivative;

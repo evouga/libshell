@@ -15,7 +15,7 @@ double NeoHookeanMaterial::stretchingEnergy(
     Eigen::Matrix<double, 1, 9> *derivative, // F(face, i)
     Eigen::Matrix<double, 9, 9> *hessian) const
 {
-    double coeff1 = thickness * lameAlpha_ / 2.0;
+    double coeff1 = thickness * lameBeta_ / 2.0;
     Eigen::Matrix2d abaradj = adjugate(abar);
     Eigen::Matrix<double, 4, 9> aderiv;
     std::vector<Eigen::Matrix<double, 9, 9> > ahess;
@@ -24,7 +24,7 @@ double NeoHookeanMaterial::stretchingEnergy(
     double rtdetabar = sqrt(abar.determinant());
     double result = coeff1 * rtdetabar * ((abaradj * a).trace() / abar.determinant() - 2.0 - std::log(a.determinant()) + std::log(abar.determinant()));
 
-    double coeff2 = thickness * lameBeta_ / 2.0;
+    double coeff2 = thickness * lameAlpha_ / 2.0;
     result += coeff2 * rtdetabar * 0.5 * (std::log(a.determinant()) - std::log(abar.determinant()))* (std::log(a.determinant()) - std::log(abar.determinant()));
 
     if (derivative)
@@ -114,8 +114,8 @@ double NeoHookeanMaterial::bendingEnergy(
     Eigen::MatrixXd *derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
     Eigen::MatrixXd *hessian) const
 {
-    double coeff1 = thickness * thickness*thickness *lameAlpha_ / 24.0;
-    double coeff2 = thickness * thickness*thickness * lameBeta_ / 24.0;
+    double coeff1 = thickness * thickness*thickness *lameBeta_ / 24.0;
+    double coeff2 = thickness * thickness*thickness * lameAlpha_ / 24.0;
     int nedgedofs = sff.numExtraDOFs();
     Eigen::Matrix2d abarinv = abar.inverse();
     Eigen::MatrixXd bderiv(4, 18 + 3*nedgedofs);
