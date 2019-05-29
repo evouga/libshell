@@ -26,7 +26,9 @@ For more details see:
 
 ## Material Model
 
-The code assumes a St. Venant-Kirchhoff material with constant thickness. You can specify the thickness and Lame parameters.
+Both a St. Venant-Kirchhoff and Neo-Hookean material model are implemented; you select these independently of the second fundamental form discretization by passing in a `MaterialModel` to the elastic energy computation. Each material model assumes uniform Lamé parameters over the entire surface (but you can specify different thicknesses for each triangle). 
+
+See the example program for the formulas that convert Young's modulus and Poisson's ratio to Lamé parameters. Note that the 2D formulas are *not* the same as the 3D ones found on e.g. Wikipedia.
 
 ## Compile
 
