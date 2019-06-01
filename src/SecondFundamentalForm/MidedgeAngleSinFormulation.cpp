@@ -241,8 +241,8 @@ Eigen::Matrix2d MidedgeAngleSinFormulation::secondFundamentalForm(
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &extraDOFs,
     int face,
-    Eigen::MatrixXd *derivative, 
-    std::vector<Eigen::MatrixXd> *hessian) const
+    Eigen::Matrix<double, 4, 18 + 3*numExtraDOFs> *derivative, 
+    std::vector<Eigen::Matrix<double, 18 + 3*numExtraDOFs, 18 + 3*numExtraDOFs> > *hessian)
 {
     if (derivative)
     {
@@ -294,12 +294,9 @@ Eigen::Matrix2d MidedgeAngleSinFormulation::secondFundamentalForm(
     return result;
 }
 
-int MidedgeAngleSinFormulation::numExtraDOFs() const
-{
-    return 1;
-}
+constexpr int MidedgeAngleSinFormulation::numExtraDOFs;
 
-void MidedgeAngleSinFormulation::initializeExtraDOFs(Eigen::VectorXd &extraDOFs, const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos) const
+void MidedgeAngleSinFormulation::initializeExtraDOFs(Eigen::VectorXd &extraDOFs, const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos)
 {
     extraDOFs.resize(mesh.nEdges());
     extraDOFs.setZero();

@@ -11,7 +11,8 @@
  * as defined by the surface fundamental forms).
  */
 
-class StVKMaterial : public MaterialModel
+template <class SFF>
+class StVKMaterial : public MaterialModel<SFF>
 {
 public:
     StVKMaterial(double lameAlpha, double lameBeta) : lameAlpha_(lameAlpha), lameBeta_(lameBeta) {}
@@ -37,9 +38,8 @@ public:
         double thickness,
         const Eigen::Matrix2d &abar, const Eigen::Matrix2d &bbar,
         int face,
-        const SecondFundamentalFormDiscretization &sff,
-        Eigen::MatrixXd *derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
-        Eigen::MatrixXd *hessian) const;
+        Eigen::Matrix<double, 1, 18 + 3*SFF::numExtraDOFs> *derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
+        Eigen::Matrix<double, 18 + 3*SFF::numExtraDOFs, 18 + 3*SFF::numExtraDOFs> *hessian) const;
 
 
 };

@@ -166,8 +166,8 @@ Eigen::Matrix2d MidedgeAverageFormulation::secondFundamentalForm(
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &extraDOFs,
     int face,
-    Eigen::MatrixXd *derivative, 
-    std::vector<Eigen::MatrixXd > *hessian) const
+    Eigen::Matrix<double, 4, 18> *derivative, 
+    std::vector<Eigen::Matrix<double, 18, 18> > *hessian)
 {
     if (derivative)
     {
@@ -219,12 +219,9 @@ Eigen::Matrix2d MidedgeAverageFormulation::secondFundamentalForm(
     return result;
 }
 
-int MidedgeAverageFormulation::numExtraDOFs() const
-{
-    return 0;
-}
+constexpr int MidedgeAverageFormulation::numExtraDOFs;
 
-void MidedgeAverageFormulation::initializeExtraDOFs(Eigen::VectorXd &extraDOFs, const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos) const
+void MidedgeAverageFormulation::initializeExtraDOFs(Eigen::VectorXd &extraDOFs, const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos)
 {
     extraDOFs.resize(0);
 }

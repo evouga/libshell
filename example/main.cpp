@@ -33,6 +33,51 @@ void lameParameters(double &alpha, double &beta)
     beta = young / 2.0 / (1.0 + poisson);
 }
 
+template <class SFF>
+void runSimulation(igl::opengl::glfw::Viewer &viewer, 
+    const MeshConnectivity &mesh, 
+    Eigen::MatrixXd &curPos, 
+    const Eigen::VectorXd &thicknesses,
+    double lameAlpha,
+    double lameBeta,
+    int matid)
+{
+    // initialize default edge DOFs (edge director angles)
+    Eigen::VectorXd edgeDOFs;
+    SFF::initializeExtraDOFs(edgeDOFs, mesh, curPos);
+    // initialize first fundamental forms to those of input mesh
+    std::vector<Eigen::Matrix2d> abar;
+    ElasticShell<SFF>::firstFundamentalForms(mesh, curPos, abar);
+
+    // initialize second fundamental forms to rest flat
+    std::vector<Eigen::Matrix2d> bbar;
+    bbar.resize(mesh.nFaces());
+    for (int i = 0; i < mesh.nFaces(); i++)
+        bbar[i].setZero();
+
+    MaterialModel<SFF> *mat;
+    switch (matid)
+    {
+    case 0:
+        mat = new NeoHookeanMaterial<SFF>(lameAlpha, lameBeta);
+        break;
+    case 1:
+        mat = new StVKMaterial<SFF>(lameAlpha, lameBeta);
+        break;
+    default:
+        assert(false);
+    }
+
+    double reg = 1e-6;
+    for (int j = 1; j <= numSteps; j++)
+    {
+        takeOneStep(mesh, curPos, edgeDOFs, *mat, thicknesses, abar, bbar, reg);
+        repaint(viewer);
+    }
+
+    delete mat;
+}
+
 int main(int argc, char *argv[])
 {    
     numSteps = 30;
@@ -59,18 +104,6 @@ int main(int argc, char *argv[])
     // initial position
     curPos = origV;
 
-    // initialize first fundamental forms to those of input mesh
-    std::vector<Eigen::Matrix2d> abar;
-    firstFundamentalForms(mesh, curPos, abar);
-
-    // initialize second fundamental forms to rest flat
-    std::vector<Eigen::Matrix2d> bbar;
-    bbar.resize(mesh.nFaces());
-    for (int i = 0; i < mesh.nFaces(); i++)
-        bbar[i].setZero();
-
-    
-    
     igl::opengl::glfw::Viewer viewer;
 
     // Attach a menu plugin
@@ -103,50 +136,23 @@ int main(int argc, char *argv[])
             {
                 Eigen::VectorXd thicknesses(mesh.nFaces());
                 thicknesses.setConstant(thickness);
-                MaterialModel *mat;
                 double lameAlpha, lameBeta;
                 lameParameters(lameAlpha, lameBeta);
-                switch (matid)
-                {
-                case 0:
-                    mat = new NeoHookeanMaterial(lameAlpha, lameBeta);
-                    break;
-                case 1:
-                    mat = new StVKMaterial(lameAlpha, lameBeta);
-                    break;
-                default:
-                    assert(false);
-                }
 
-                SecondFundamentalFormDiscretization *sff;
                 switch (sffid)
                 {
                 case 0:
-                    sff = new MidedgeAngleTanFormulation;
+                    runSimulation<MidedgeAngleTanFormulation>(viewer, mesh, curPos, thicknesses, lameAlpha, lameBeta, matid);
                     break;
                 case 1:
-                    sff = new MidedgeAngleSinFormulation;
+                    runSimulation<MidedgeAngleSinFormulation>(viewer, mesh, curPos, thicknesses, lameAlpha, lameBeta, matid);
                     break;
                 case 2:
-                    sff = new MidedgeAverageFormulation;
+                    runSimulation<MidedgeAverageFormulation>(viewer, mesh, curPos, thicknesses, lameAlpha, lameBeta, matid);
                     break;
                 default:
                     assert(false);
                 }
-
-                // initialize default edge DOFs (edge director angles)
-                Eigen::VectorXd edgeDOFs;
-                sff->initializeExtraDOFs(edgeDOFs, mesh, curPos);
-
-                double reg = 1e-6;
-                for (int j = 1; j <= numSteps; j++)
-                {                    
-                    takeOneStep(mesh, curPos, edgeDOFs, *mat, thicknesses, abar, bbar, *sff, reg);
-                    repaint(viewer);                
-                }
-
-                delete sff;
-                delete mat;
             }
         }
     };

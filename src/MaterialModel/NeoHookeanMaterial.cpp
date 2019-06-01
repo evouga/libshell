@@ -3,10 +3,13 @@
 #include <vector>
 #include "../GeometryDerivatives.h"
 #include <Eigen/Dense>
-#include "../../include/SecondFundamentalFormDiscretization.h"
 #include <iostream>
+#include "../../include/MidedgeAngleSinFormulation.h"
+#include "../../include/MidedgeAngleTanFormulation.h"
+#include "../../include/MidedgeAverageFormulation.h"
 
-double NeoHookeanMaterial::stretchingEnergy(
+template <class SFF>
+double NeoHookeanMaterial<SFF>::stretchingEnergy(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,    
     double thickness,
@@ -103,35 +106,35 @@ double NeoHookeanMaterial::stretchingEnergy(
     return result;
 }
 
-double NeoHookeanMaterial::bendingEnergy(
+template <class SFF>
+double NeoHookeanMaterial<SFF>::bendingEnergy(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &extraDOFs,
     double thickness,
     const Eigen::Matrix2d &abar, const Eigen::Matrix2d &bbar,
     int face,
-    const SecondFundamentalFormDiscretization &sff,
-    Eigen::MatrixXd *derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
-    Eigen::MatrixXd *hessian) const
+    Eigen::Matrix<double, 1, 18 + 3*SFF::numExtraDOFs> *derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
+    Eigen::Matrix<double, 18 + 3*SFF::numExtraDOFs, 18 + 3*SFF::numExtraDOFs> *hessian) const
 {
     double coeff1 = thickness * thickness*thickness *lameBeta_ / 24.0;
     double coeff2 = thickness * thickness*thickness * lameAlpha_ / 24.0;
-    int nedgedofs = sff.numExtraDOFs();
+    constexpr int nedgedofs = SFF::numExtraDOFs;
     Eigen::Matrix2d abarinv = abar.inverse();
-    Eigen::MatrixXd bderiv(4, 18 + 3*nedgedofs);
-    std::vector<Eigen::MatrixXd > bhess;
-    Eigen::Matrix2d b = sff.secondFundamentalForm(mesh, curPos, extraDOFs, face, (derivative || hessian) ? &bderiv : NULL, hessian ? &bhess : NULL);
+    Eigen::Matrix<double, 4, 18 + 3 * nedgedofs> bderiv;
+    std::vector<Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs> > bhess;
+    Eigen::Matrix2d b = SFF::secondFundamentalForm(mesh, curPos, extraDOFs, face, (derivative || hessian) ? &bderiv : NULL, hessian ? &bhess : NULL);
     
     Eigen::Matrix<double, 4, 9> aderivsmall;
     std::vector<Eigen::Matrix<double, 9, 9> > ahesssmall;
     Eigen::Matrix2d a = firstFundamentalForm(mesh, curPos, face, (derivative || hessian) ? &aderivsmall : NULL, hessian ? &ahesssmall : NULL);
-    Eigen::MatrixXd aderiv(4, 18 + 3 * nedgedofs);
+    Eigen::Matrix<double, 4, 18 + 3 * nedgedofs> aderiv;
     if (derivative || hessian)
     {
         aderiv.setZero();
         aderiv.block(0, 0, 4, 9) = aderivsmall;
     }
-    std::vector<Eigen::MatrixXd> ahess = bhess;
+    std::vector<Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs> > ahess = bhess;
     if (hessian)
     {
         for (int i = 0; i < 4; i++)
@@ -220,7 +223,7 @@ double NeoHookeanMaterial::bendingEnergy(
     if (hessian)
     {
         hessian->setZero();               
-        Eigen::MatrixXd aadjda = aadj(0, 0) * aderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> aadjda = aadj(0, 0) * aderiv.row(0);
         aadjda += aadj(0, 1) * aderiv.row(1);
         aadjda += aadj(1, 0) * aderiv.row(2);
         aadjda += aadj(1, 1) * aderiv.row(3);
@@ -251,7 +254,7 @@ double NeoHookeanMaterial::bendingEnergy(
         double term2 = coeff1 * rtdetabar * -8.0 / a.determinant() / a.determinant() / a.determinant();
         Eigen::Matrix2d m4 = aadj * b*aadj;
         
-        Eigen::MatrixXd m4db = m4(0, 0) * bderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> m4db = m4(0, 0) * bderiv.row(0);
         m4db += m4(0, 1) * bderiv.row(1);
         m4db += m4(1, 0) * bderiv.row(2);
         m4db += m4(1, 1) * bderiv.row(3);
@@ -283,7 +286,7 @@ double NeoHookeanMaterial::bendingEnergy(
 
         double term4 = coeff1 * rtdetabar * -8.0 / a.determinant() / a.determinant() / a.determinant();
         Eigen::Matrix2d m8 = badj * a*badj;
-        Eigen::MatrixXd m8da = m8(0, 0) * aderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> m8da = m8(0, 0) * aderiv.row(0);
         m8da += m8(0, 1) * aderiv.row(1);
         m8da += m8(1, 0) * aderiv.row(2);
         m8da += m8(1, 1) * aderiv.row(3);
@@ -302,14 +305,14 @@ double NeoHookeanMaterial::bendingEnergy(
 
         double term6 = coeff1 * rtdetabar * -8.0 / a.determinant() / a.determinant() / a.determinant();
         Eigen::Matrix2d m9 = aadj * b*aadj;
-        Eigen::MatrixXd m9db = m9(0, 0) * bderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> m9db = m9(0, 0) * bderiv.row(0);
         m9db += m9(0, 1) * bderiv.row(1);
         m9db += m9(1, 0) * bderiv.row(2);
         m9db += m9(1, 1) * bderiv.row(3);
         *hessian += term6 * m9db.transpose() * aadjda;
 
         Eigen::Matrix2d m10 = badj * a*badj;
-        Eigen::MatrixXd m10da = m10(0, 0) * aderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> m10da = m10(0, 0) * aderiv.row(0);
         m10da += m10(0, 1) * aderiv.row(1);
         m10da += m10(1, 0) * aderiv.row(2);
         m10da += m10(1, 1) * aderiv.row(3);
@@ -333,7 +336,7 @@ double NeoHookeanMaterial::bendingEnergy(
 
         double term9 = coeff1 * rtdetabar * 4.0 / a.determinant() / a.determinant();
         Eigen::Matrix2d m13 = aadj * bbar * abaradj / abar.determinant();
-        Eigen::MatrixXd m13db = m13(0, 0) * bderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> m13db = m13(0, 0) * bderiv.row(0);
         m13db += m13(0, 1) * bderiv.row(1);
         m13db += m13(1, 0) * bderiv.row(2);
         m13db += m13(1, 1) * bderiv.row(3);
@@ -355,7 +358,7 @@ double NeoHookeanMaterial::bendingEnergy(
 
         double term11 = coeff1 * rtdetabar * 4.0 / a.determinant() / a.determinant();
         Eigen::Matrix2d m16 = badj * abar * bbaradj / abar.determinant();
-        Eigen::MatrixXd m16da = m16(0, 0) * aderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> m16da = m16(0, 0) * aderiv.row(0);
         m16da += m16(0, 1) * aderiv.row(1);
         m16da += m16(1, 0) * aderiv.row(2);
         m16da += m16(1, 1) * aderiv.row(3);
@@ -399,12 +402,12 @@ double NeoHookeanMaterial::bendingEnergy(
         *hessian += term14 * aadj(1, 1) * bhess[3];
 
         double term15 = coeff2 * rtdetabar * 4.0 * (abaradj*bbar / abar.determinant() - aadj * b / a.determinant()).trace() / a.determinant() / a.determinant();
-        Eigen::MatrixXd badjda = badj(0, 0) * aderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> badjda = badj(0, 0) * aderiv.row(0);
         badjda += badj(0, 1) * aderiv.row(1);
         badjda += badj(1, 0) * aderiv.row(2);
         badjda += badj(1, 1) * aderiv.row(3);
         *hessian += term15 * aadjda.transpose() * badjda;
-        Eigen::MatrixXd aadjdb = aadj(0, 0) * bderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> aadjdb = aadj(0, 0) * bderiv.row(0);
         aadjdb += aadj(0, 1) * bderiv.row(1);
         aadjdb += aadj(1, 0) * bderiv.row(2);
         aadjdb += aadj(1, 1) * bderiv.row(3);
@@ -446,3 +449,7 @@ double NeoHookeanMaterial::bendingEnergy(
     return result;
 }
 
+// instantions
+template class NeoHookeanMaterial<MidedgeAngleSinFormulation>;
+template class NeoHookeanMaterial<MidedgeAngleTanFormulation>;
+template class NeoHookeanMaterial<MidedgeAverageFormulation>;

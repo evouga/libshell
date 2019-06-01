@@ -3,9 +3,12 @@
 #include <vector>
 #include "../GeometryDerivatives.h"
 #include <Eigen/Dense>
-#include "../../include/SecondFundamentalFormDiscretization.h"
+#include "../../include/MidedgeAngleSinFormulation.h"
+#include "../../include/MidedgeAngleTanFormulation.h"
+#include "../../include/MidedgeAverageFormulation.h"
 
-double StVKMaterial::stretchingEnergy(
+template <class SFF>
+double StVKMaterial<SFF>::stretchingEnergy(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,    
     double thickness,
@@ -69,23 +72,23 @@ double StVKMaterial::stretchingEnergy(
     return result;
 }
 
-double StVKMaterial::bendingEnergy(
+template <class SFF>
+double StVKMaterial<SFF>::bendingEnergy(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &extraDOFs,
     double thickness,
     const Eigen::Matrix2d &abar, const Eigen::Matrix2d &bbar,
     int face,
-    const SecondFundamentalFormDiscretization &sff,
-    Eigen::MatrixXd *derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
-    Eigen::MatrixXd *hessian) const
+    Eigen::Matrix<double, 1, 18 + 3*SFF::numExtraDOFs> *derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
+    Eigen::Matrix<double, 18 + 3*SFF::numExtraDOFs, 18 + 3*SFF::numExtraDOFs> *hessian) const
 {
     double coeff = thickness*thickness*thickness / 12.0;
-    int nedgedofs = sff.numExtraDOFs();
+    constexpr int nedgedofs = SFF::numExtraDOFs;
     Eigen::Matrix2d abarinv = abar.inverse();
-    Eigen::MatrixXd bderiv(4, 18 + 3*nedgedofs);
-    std::vector<Eigen::MatrixXd > bhess;
-    Eigen::Matrix2d b = sff.secondFundamentalForm(mesh, curPos, extraDOFs, face, (derivative || hessian) ? &bderiv : NULL, hessian ? &bhess : NULL);
+    Eigen::Matrix<double, 4, 18 + 3*nedgedofs> bderiv;
+    std::vector<Eigen::Matrix<double, 18 + 3*nedgedofs, 18 + 3*nedgedofs> > bhess;
+    Eigen::Matrix2d b = SFF::secondFundamentalForm(mesh, curPos, extraDOFs, face, (derivative || hessian) ? &bderiv : NULL, hessian ? &bhess : NULL);
     Eigen::Matrix2d M = abarinv * (b - bbar);
     double dA = 0.5 * sqrt(abar.determinant());
 
@@ -109,7 +112,7 @@ double StVKMaterial::bendingEnergy(
     if (hessian)
     {
         hessian->setZero();
-        Eigen::MatrixXd inner = abarinv(0,0) * bderiv.row(0);
+        Eigen::Matrix<double, 1, 18 + 3*nedgedofs> inner = abarinv(0,0) * bderiv.row(0);
         inner += abarinv(1,0) * bderiv.row(1);
         inner += abarinv(0,1) * bderiv.row(2);
         inner += abarinv(1,1) * bderiv.row(3);
@@ -118,10 +121,10 @@ double StVKMaterial::bendingEnergy(
         *hessian += coeff * dA * lameAlpha_ * M.trace() * abarinv(1,0) * bhess[1];
         *hessian += coeff * dA * lameAlpha_ * M.trace() * abarinv(0,1) * bhess[2];
         *hessian += coeff * dA * lameAlpha_ * M.trace() * abarinv(1,1) * bhess[3];        
-        Eigen::MatrixXd inner00 = abarinv(0, 0) * bderiv.row(0) + abarinv(0, 1) * bderiv.row(2);        
-        Eigen::MatrixXd inner01 = abarinv(0, 0) * bderiv.row(1) + abarinv(0, 1) * bderiv.row(3);
-        Eigen::MatrixXd inner10 = abarinv(1, 0) * bderiv.row(0) + abarinv(1, 1) * bderiv.row(2);
-        Eigen::MatrixXd inner11 = abarinv(1, 0) * bderiv.row(1) + abarinv(1, 1) * bderiv.row(3);
+        Eigen::Matrix<double, 1, 18 + 3*nedgedofs> inner00 = abarinv(0, 0) * bderiv.row(0) + abarinv(0, 1) * bderiv.row(2);        
+        Eigen::Matrix<double, 1, 18 + 3*nedgedofs> inner01 = abarinv(0, 0) * bderiv.row(1) + abarinv(0, 1) * bderiv.row(3);
+        Eigen::Matrix<double, 1, 18 + 3*nedgedofs> inner10 = abarinv(1, 0) * bderiv.row(0) + abarinv(1, 1) * bderiv.row(2);
+        Eigen::Matrix<double, 1, 18 + 3*nedgedofs> inner11 = abarinv(1, 0) * bderiv.row(1) + abarinv(1, 1) * bderiv.row(3);
         *hessian += coeff * dA * 2.0 * lameBeta_ * inner00.transpose() * inner00;
         *hessian += coeff * dA * 2.0 * lameBeta_ * inner01.transpose() * inner10;
         *hessian += coeff * dA * 2.0 * lameBeta_ * inner10.transpose() * inner01;
@@ -136,3 +139,7 @@ double StVKMaterial::bendingEnergy(
     return result;
 }
 
+// instantions
+template class StVKMaterial<MidedgeAngleSinFormulation>;
+template class StVKMaterial<MidedgeAngleTanFormulation>;
+template class StVKMaterial<MidedgeAverageFormulation>;

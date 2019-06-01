@@ -9,17 +9,19 @@
 #include <vector>
 #include "../include/MeshConnectivity.h"
 #include "../include/MaterialModel.h"
-#include "../include/SecondFundamentalFormDiscretization.h"
+#include "../include/MidedgeAngleSinFormulation.h"
+#include "../include/MidedgeAngleTanFormulation.h"
+#include "../include/MidedgeAverageFormulation.h"
 
-double elasticEnergy(
+template <class SFF>
+double ElasticShell<SFF>::elasticEnergy(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &extraDOFs,
-    const MaterialModel &mat,
+    const MaterialModel<SFF> &mat,
     const Eigen::VectorXd &thicknesses,
     const std::vector<Eigen::Matrix2d> &abars, 
     const std::vector<Eigen::Matrix2d> &bbars,
-    const SecondFundamentalFormDiscretization &sff,
     Eigen::VectorXd *derivative, // positions, then thetas
     std::vector<Eigen::Triplet<double> > *hessian)
 {
@@ -29,7 +31,7 @@ double elasticEnergy(
 
     if (derivative)
     {
-        derivative->resize(3 * nverts + sff.numExtraDOFs() * nedges);
+        derivative->resize(3 * nverts + SFF::numExtraDOFs * nedges);
         derivative->setZero();
     }
     if (hessian)
@@ -70,12 +72,12 @@ double elasticEnergy(
     
     
     // bending terms
-    int nedgedofs = sff.numExtraDOFs();
+    constexpr int nedgedofs = SFF::numExtraDOFs;
     for (int i = 0; i < nfaces; i++)
     {
-        Eigen::MatrixXd deriv(1, 18 + 3 * nedgedofs);
-        Eigen::MatrixXd hess(18 + 3 * nedgedofs, 18 + 3 * nedgedofs);
-        result += mat.bendingEnergy(mesh, curPos, extraDOFs, thicknesses[i], abars[i], bbars[i], i, sff, derivative ? &deriv : NULL, hessian ? &hess : NULL);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> deriv;
+        Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs> hess;
+        result += mat.bendingEnergy(mesh, curPos, extraDOFs, thicknesses[i], abars[i], bbars[i], i, derivative ? &deriv : NULL, hessian ? &hess : NULL);
         if (derivative)
         {
             for (int j = 0; j < 3; j++)
@@ -136,7 +138,8 @@ double elasticEnergy(
     return result;
 }
 
-void firstFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, std::vector<Eigen::Matrix2d> &abars)
+template <class SFF>
+void ElasticShell<SFF>::firstFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, std::vector<Eigen::Matrix2d> &abars)
 {
     int nfaces = mesh.nFaces();
     abars.resize(nfaces);
@@ -146,20 +149,22 @@ void firstFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &
     }
 }
 
-void secondFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, const Eigen::VectorXd &edgeDOFs, const SecondFundamentalFormDiscretization &sff, std::vector<Eigen::Matrix2d> &bbars)
+template <class SFF>
+void ElasticShell<SFF>::secondFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, const Eigen::VectorXd &edgeDOFs, std::vector<Eigen::Matrix2d> &bbars)
 {
     int nfaces = mesh.nFaces();
     bbars.resize(nfaces);
     for (int i = 0; i < nfaces; i++)
     {
-        bbars[i] = sff.secondFundamentalForm(mesh, curPos, edgeDOFs, i, NULL, NULL);
+        bbars[i] = SFF::secondFundamentalForm(mesh, curPos, edgeDOFs, i, NULL, NULL);
     }
 }
 
-void testStretchingFiniteDifferences(
+template <class SFF>
+void ElasticShell<SFF>::testStretchingFiniteDifferences(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,
-    const MaterialModel &mat,
+    const MaterialModel<SFF> &mat,
     const Eigen::VectorXd &thicknesses,
     const std::vector<Eigen::Matrix2d> &abars)
 {
@@ -204,16 +209,15 @@ void testStretchingFiniteDifferences(
     } 
 }
 
-
-void testBendingFiniteDifferences(
+template <class SFF>
+void ElasticShell<SFF>::testBendingFiniteDifferences(
     const MeshConnectivity &mesh,
     const Eigen::MatrixXd &curPos,
     const Eigen::VectorXd &edgeDOFs,
-    const MaterialModel &mat,
+    const MaterialModel<SFF> &mat,
     const Eigen::VectorXd &thicknesses,
     const std::vector<Eigen::Matrix2d> &abars,
-    const std::vector<Eigen::Matrix2d> &bbars,
-    const SecondFundamentalFormDiscretization &sff)
+    const std::vector<Eigen::Matrix2d> &bbars)
 {
     int nfaces = mesh.nFaces();
     int nedges = mesh.nEdges();
@@ -229,16 +233,16 @@ void testBendingFiniteDifferences(
     std::mt19937 rng(dev());
     std::uniform_int_distribution<std::mt19937::result_type> facegen(0,nfaces-1);
     double pert = 1e-6;
-    int nedgedofs = sff.numExtraDOFs();
+    constexpr int nedgedofs = SFF::numExtraDOFs;
 
     for (int i = 0; i < numtests; i++)
     {
         
         int face = facegen(rng);
         std::cout << "Face " << face << std::endl;
-        Eigen::MatrixXd deriv(1, 18 + 3 * nedgedofs);
-        Eigen::MatrixXd hess(18 + 3 * nedgedofs, 18 + 3 * nedgedofs);
-        double result = mat.bendingEnergy(mesh, testpos, testedge, thicknesses[face], abars[face], bbars[face], face, sff, &deriv, &hess);
+        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> deriv;
+        Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs> hess;
+        double result = mat.bendingEnergy(mesh, testpos, testedge, thicknesses[face], abars[face], bbars[face], face, &deriv, &hess);
 
         for (int j = 0; j < 3; j++)
         {
@@ -246,8 +250,8 @@ void testBendingFiniteDifferences(
             {
                 Eigen::MatrixXd pertpos = testpos;
                 pertpos(mesh.faceVertex(face, j), k) += pert;
-                Eigen::MatrixXd pertderiv(1, 18 + 3 * nedgedofs);
-                double newresult = mat.bendingEnergy(mesh, pertpos, testedge, thicknesses[face], abars[face], bbars[face], face, sff, &pertderiv, NULL);
+                Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> pertderiv;
+                double newresult = mat.bendingEnergy(mesh, pertpos, testedge, thicknesses[face], abars[face], bbars[face], face, &pertderiv, NULL);
                 double findiff = (newresult - result) / pert;
                 std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k) << std::endl;
                 Eigen::MatrixXd derivdiff = (pertderiv - deriv) / pert;
@@ -262,8 +266,8 @@ void testBendingFiniteDifferences(
                 {
                     Eigen::MatrixXd pertpos = testpos;
                     pertpos(oppidx, k) += pert;
-                    Eigen::MatrixXd pertderiv(1, 18 + 3 * nedgedofs);
-                    double newresult = mat.bendingEnergy(mesh, pertpos, testedge, thicknesses[face], abars[face], bbars[face], face, sff, &pertderiv, NULL);
+                    Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> pertderiv;
+                    double newresult = mat.bendingEnergy(mesh, pertpos, testedge, thicknesses[face], abars[face], bbars[face], face, &pertderiv, NULL);
                     double findiff = (newresult - result) / pert;
                     Eigen::MatrixXd derivdiff = (pertderiv - deriv) / pert;
 
@@ -277,8 +281,8 @@ void testBendingFiniteDifferences(
             {
                 Eigen::VectorXd pertedge = testedge;
                 pertedge[nedgedofs * mesh.faceEdge(face, j) + k] += pert;
-                Eigen::MatrixXd pertderiv(1, 18 + 3 * nedgedofs);
-                double newresult = mat.bendingEnergy(mesh, testpos, pertedge, thicknesses[face], abars[face], bbars[face], face, sff, &pertderiv, NULL);
+                Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> pertderiv;
+                double newresult = mat.bendingEnergy(mesh, testpos, pertedge, thicknesses[face], abars[face], bbars[face], face, &pertderiv, NULL);
                 double findiff = (newresult - result) / pert;
                 std::cout << findiff << " " << deriv(0, 18 + nedgedofs * j + k) << std::endl;
                 Eigen::MatrixXd derivdiff = (pertderiv - deriv) / pert;
@@ -289,3 +293,8 @@ void testBendingFiniteDifferences(
         }
     } 
 }
+
+// instantions
+template class ElasticShell<MidedgeAngleSinFormulation>;
+template class ElasticShell<MidedgeAngleTanFormulation>;
+template class ElasticShell<MidedgeAverageFormulation>;
