@@ -43,7 +43,7 @@ This procedure will build both the library and an example program, which perform
 
 ## Dependencies
 
-The library itself depends only on Eigen. The example program includes a viewer which uses libigl.
+The library itself depends only on Eigen (set the environment variable `EIGEN3_INCLUDE_DIR` to point to your Eigen folder). The example program includes a viewer which uses libigl.
 
 ## Compiling on Windows
 
