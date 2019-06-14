@@ -5,7 +5,7 @@
 
 /*
 * Neo-Hookean nonlinear material model, with energy density
-* W = alpha/2.0 (tr[M] - 2 - log det M) + beta/2.0 (log det M / 2)^2
+* W = beta/2.0 (tr[M] - 2 - log det M) + alpha/2.0 (log det M / 2)^2
 * where M = gbar^-1 g, and g and gbar are the current and rest metrics of the 
 * shell volume (which vary in the thickness direction as defined by the surface 
 * fundamental forms).
