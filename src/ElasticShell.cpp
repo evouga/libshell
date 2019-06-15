@@ -29,6 +29,11 @@ double ElasticShell<SFF>::elasticEnergy(
     int nedges = mesh.nEdges();
     int nverts = (int)curPos.rows();
 
+    if (curPos.cols() != 3 || extraDOFs.size() != SFF::numExtraDOFs * nedges || thicknesses.size() != nfaces || abars.size() != nfaces || bbars.size() != nfaces)
+    {
+        return std::numeric_limits<double>::infinity();
+    }
+
     if (derivative)
     {
         derivative->resize(3 * nverts + SFF::numExtraDOFs * nedges);
