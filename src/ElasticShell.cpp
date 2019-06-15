@@ -87,10 +87,10 @@ double ElasticShell<SFF>::elasticEnergy(
         {
             for (int j = 0; j < 3; j++)
             {
-                derivative->segment<3>(3 * mesh.faceVertex(i, j)) += deriv.block<1,3>(0, 3 * j).transpose();
+                derivative->segment<3>(3 * mesh.faceVertex(i, j)) += deriv.template block<1,3>(0, 3 * j).transpose();
                 int oppidx = mesh.vertexOppositeFaceEdge(i, j);
                 if(oppidx != -1)
-                    derivative->segment<3>(3 * oppidx) += deriv.block<1,3>(0, 9 + 3 * j).transpose();
+                    derivative->segment<3>(3 * oppidx) += deriv.template block<1,3>(0, 9 + 3 * j).transpose();
                 for (int k = 0; k < nedgedofs; k++)
                 {
                     (*derivative)[3 * nverts + nedgedofs * mesh.faceEdge(i, j) + k] += deriv(0, 18 + nedgedofs *j + k);
