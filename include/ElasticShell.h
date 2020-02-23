@@ -4,7 +4,6 @@
 #include <Eigen/Core>
 #include <vector>
 #include <Eigen/Sparse>
-
 #include "MaterialModel.h"
 
 class MeshConnectivity;
@@ -53,22 +52,6 @@ public:
     static void firstFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, std::vector<Eigen::Matrix2d> &abars);
 
     static void secondFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, const Eigen::VectorXd &edgeDOFs, std::vector<Eigen::Matrix2d> &bbars);
-
-    static void testStretchingFiniteDifferences(
-        const MeshConnectivity &mesh,
-        const Eigen::MatrixXd &curPos,
-        const MaterialModel<SFF> &mat,
-        const Eigen::VectorXd &thicknesses,
-        const std::vector<Eigen::Matrix2d> &abars);
-
-    static void testBendingFiniteDifferences(
-        const MeshConnectivity &mesh,
-        const Eigen::MatrixXd &curPos,
-        const Eigen::VectorXd &edgeDOFs,
-        const MaterialModel<SFF> &mat,
-        const Eigen::VectorXd &thicknesses,
-        const std::vector<Eigen::Matrix2d> &abars,
-        const std::vector<Eigen::Matrix2d> &bbars);
 };
 
 #endif

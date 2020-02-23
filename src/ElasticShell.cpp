@@ -7,6 +7,7 @@
 #include <random>
 #include <iostream>
 #include <vector>
+#include <map>
 #include "../include/MeshConnectivity.h"
 #include "../include/MaterialModel.h"
 #include "../include/MidedgeAngleSinFormulation.h"
@@ -163,140 +164,6 @@ void ElasticShell<SFF>::secondFundamentalForms(const MeshConnectivity &mesh, con
     {
         bbars[i] = SFF::secondFundamentalForm(mesh, curPos, edgeDOFs, i, NULL, NULL);
     }
-}
-
-template <class SFF>
-void ElasticShell<SFF>::testStretchingFiniteDifferences(
-    const MeshConnectivity &mesh,
-    const Eigen::MatrixXd &curPos,
-    const MaterialModel<SFF> &mat,
-    const Eigen::VectorXd &thicknesses,
-    const std::vector<Eigen::Matrix2d> &abars)
-{
-    int nfaces = mesh.nFaces();
-    int nedges = mesh.nEdges();
-    int nverts = (int)curPos.rows();
-
-    Eigen::MatrixXd testpos = curPos;
-    testpos.setRandom();
-    
-    int numtests = 100;
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> facegen(0,nfaces-1);
-    double pert = 1e-6;
-    
-    for (int i = 0; i < numtests; i++)
-    {
-
-        int face = facegen(rng);
-        std::cout << "Face " << face << std::endl;
-        Eigen::Matrix<double, 1, 9> deriv;
-        Eigen::Matrix<double, 9, 9> hess;
-        double result = mat.stretchingEnergy(mesh, testpos, thicknesses[face], abars[face], face, &deriv, &hess);
-
-        for (int j = 0; j < 3; j++)
-        {
-            for (int k = 0; k < 3; k++)
-            {
-                Eigen::MatrixXd pertpos = testpos;
-                pertpos(mesh.faceVertex(face, j), k) += pert;
-                Eigen::Matrix<double, 1, 9> pertderiv;
-                double newresult = mat.stretchingEnergy(mesh, pertpos, thicknesses[face], abars[face], face, &pertderiv, NULL);
-                double findiff = (newresult - result) / pert;
-                std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k) << std::endl;
-                Eigen::Matrix<double, 1, 9> derivdiff = (pertderiv - deriv) / pert;
-                std::cout << derivdiff << std::endl;
-                std::cout << "//" << std::endl;
-                std::cout << hess.row(3 * j + k) << std::endl << std::endl;
-            }
-        }
-    } 
-}
-
-template <class SFF>
-void ElasticShell<SFF>::testBendingFiniteDifferences(
-    const MeshConnectivity &mesh,
-    const Eigen::MatrixXd &curPos,
-    const Eigen::VectorXd &edgeDOFs,
-    const MaterialModel<SFF> &mat,
-    const Eigen::VectorXd &thicknesses,
-    const std::vector<Eigen::Matrix2d> &abars,
-    const std::vector<Eigen::Matrix2d> &bbars)
-{
-    int nfaces = mesh.nFaces();
-    int nedges = mesh.nEdges();
-    int nverts = (int)curPos.rows();
-
-    Eigen::MatrixXd testpos = curPos;
-    testpos.setRandom();
-    Eigen::VectorXd testedge = edgeDOFs;
-    testedge.setRandom();
-    
-    int numtests = 100;
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> facegen(0,nfaces-1);
-    double pert = 1e-6;
-    constexpr int nedgedofs = SFF::numExtraDOFs;
-
-    for (int i = 0; i < numtests; i++)
-    {
-        
-        int face = facegen(rng);
-        std::cout << "Face " << face << std::endl;
-        Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> deriv;
-        Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs> hess;
-        double result = mat.bendingEnergy(mesh, testpos, testedge, thicknesses[face], abars[face], bbars[face], face, &deriv, &hess);
-
-        for (int j = 0; j < 3; j++)
-        {
-            for (int k = 0; k < 3; k++)
-            {
-                Eigen::MatrixXd pertpos = testpos;
-                pertpos(mesh.faceVertex(face, j), k) += pert;
-                Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> pertderiv;
-                double newresult = mat.bendingEnergy(mesh, pertpos, testedge, thicknesses[face], abars[face], bbars[face], face, &pertderiv, NULL);
-                double findiff = (newresult - result) / pert;
-                std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k) << std::endl;
-                Eigen::MatrixXd derivdiff = (pertderiv - deriv) / pert;
-                std::cout << derivdiff << std::endl;
-                std::cout << "//" << std::endl;
-                std::cout << hess.row(3 * j + k) << std::endl << std::endl;                                
-            }
-            int oppidx = mesh.vertexOppositeFaceEdge(face, j);
-            if (oppidx != -1)
-            {
-                for (int k = 0; k < 3; k++)
-                {
-                    Eigen::MatrixXd pertpos = testpos;
-                    pertpos(oppidx, k) += pert;
-                    Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> pertderiv;
-                    double newresult = mat.bendingEnergy(mesh, pertpos, testedge, thicknesses[face], abars[face], bbars[face], face, &pertderiv, NULL);
-                    double findiff = (newresult - result) / pert;
-                    Eigen::MatrixXd derivdiff = (pertderiv - deriv) / pert;
-
-                    std::cout << "opp (" << j << ", " << k << ") " << findiff << " " << deriv(0, 9 + 3 * j + k) << std::endl;
-                    std::cout << derivdiff << std::endl;
-                    std::cout << "//" << std::endl;
-                    std::cout << hess.row(9 + 3 * j + k) << std::endl << std::endl;
-                }
-            }
-            for (int k = 0; k < nedgedofs; k++)
-            {
-                Eigen::VectorXd pertedge = testedge;
-                pertedge[nedgedofs * mesh.faceEdge(face, j) + k] += pert;
-                Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> pertderiv;
-                double newresult = mat.bendingEnergy(mesh, testpos, pertedge, thicknesses[face], abars[face], bbars[face], face, &pertderiv, NULL);
-                double findiff = (newresult - result) / pert;
-                std::cout << findiff << " " << deriv(0, 18 + nedgedofs * j + k) << std::endl;
-                Eigen::MatrixXd derivdiff = (pertderiv - deriv) / pert;
-                std::cout << derivdiff << std::endl;
-                std::cout << "//" << std::endl;
-                std::cout << hess.row(18 + nedgedofs * j + k) << std::endl << std::endl;
-            }            
-        }
-    } 
 }
 
 // instantions

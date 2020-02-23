@@ -25,6 +25,10 @@ add_library(${PROJECT_NAME} STATIC ${LIBFILES})
 target_include_directories(${PROJECT_NAME} PRIVATE "$ENV{EIGEN3_INCLUDE_DIR}" )
 install(TARGETS ${PROJECT_NAME} DESTINATION lib)
 
-file(GLOB TESTFILES example/*.cpp)
-add_executable(test_${PROJECT_NAME} ${TESTFILES})
-target_link_libraries(test_${PROJECT_NAME} ${PROJECT_NAME} igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+file(GLOB EXAMPLEFILES example/*.cpp)
+add_executable(example_${PROJECT_NAME} ${EXAMPLEFILES})
+target_link_libraries(example_${PROJECT_NAME} ${PROJECT_NAME} igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
+
+file(GLOB TESTFILES tests/*.cpp)
+add_executable(tests_${PROJECT_NAME} ${TESTFILES})
+target_link_libraries(tests_${PROJECT_NAME} ${PROJECT_NAME} igl::core)
