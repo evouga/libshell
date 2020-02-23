@@ -115,13 +115,13 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
     double coeff = std::sqrt(detabar) * pow(thickness, 3) / 24;
 
     Matrix2d M = aadj*b / deta - abaradj * bbar / detabar;
-    double result = 2 * coeff * (lameBeta_*(M * M).trace() + lameAlpha_*pow(M.trace(), 2));
+    double result = coeff * (lameBeta_*(M * M).trace() + 0.5 * lameAlpha_*pow(M.trace(), 2));
 
     if (derivative)
     {
         derivative->setZero();
 
-        double term1 = lameBeta_ * 4.0 / pow(deta, 2);
+        double term1 = lameBeta_ * 2.0 / pow(deta, 2);
 
         Matrix2d m1 = aadj * b*aadj;
         *derivative += term1 * m1(0, 0) * bderiv.row(0);
@@ -135,13 +135,13 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *derivative += term1 * m2(1, 0) * aderiv.row(2);
         *derivative += term1 * m2(1, 1) * aderiv.row(3);
 
-       double term2 = lameBeta_ * -4.0 / pow(deta, 3) * (aadj*b*aadj*b).trace();
+       double term2 = lameBeta_ * -2.0 / pow(deta, 3) * (aadj*b*aadj*b).trace();
         *derivative += term2 * aadj(0, 0) * aderiv.row(0);
         *derivative += term2 * aadj(0, 1) * aderiv.row(1);
         *derivative += term2 * aadj(1, 0) * aderiv.row(2);
         *derivative += term2 * aadj(1, 1) * aderiv.row(3);
 
-        double term3 = lameBeta_ * -4.0 / deta;
+        double term3 = lameBeta_ * -2.0 / deta;
         Matrix2d m3 = aadj * bbar * abaradj / detabar;
         *derivative += term3 * m3(0, 0) * bderiv.row(0);
         *derivative += term3 * m3(0, 1) * bderiv.row(1);
@@ -154,7 +154,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *derivative += term3 * m4(1, 0) * aderiv.row(2);
         *derivative += term3 * m4(1, 1) * aderiv.row(3);
 
-        double term4 = lameBeta_ * 4.0 / pow(deta, 2) * (aadj*b*abaradj*bbar).trace() / detabar;
+        double term4 = lameBeta_ * 2.0 / pow(deta, 2) * (aadj*b*abaradj*bbar).trace() / detabar;
         *derivative += term4 * aadj(0, 0) * aderiv.row(0);
         *derivative += term4 * aadj(0, 1) * aderiv.row(1);
         *derivative += term4 * aadj(1, 0) * aderiv.row(2);
@@ -162,7 +162,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
 
         // end term 1
 
-        double term5 = lameAlpha_ * 4.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() * -1.0 / deta;
+        double term5 = lameAlpha_ * (abaradj*bbar / detabar - aadj * b / deta).trace() * -1.0 / deta;
         *derivative += term5 * badj(0, 0) * aderiv.row(0);
         *derivative += term5 * badj(0, 1) * aderiv.row(1);
         *derivative += term5 * badj(1, 0) * aderiv.row(2);
@@ -173,7 +173,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *derivative += term5 * aadj(1, 0) * bderiv.row(2);
         *derivative += term5 * aadj(1, 1) * bderiv.row(3);
 
-        double term6 = lameAlpha_ * 4.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() * 1.0 / pow(deta, 2) * (aadj*b).trace();
+        double term6 = lameAlpha_ * (abaradj*bbar / detabar - aadj * b / deta).trace() * 1.0 / pow(deta, 2) * (aadj*b).trace();
         *derivative += term6 * aadj(0, 0) * aderiv.row(0);
         *derivative += term6 * aadj(0, 1) * aderiv.row(1);
         *derivative += term6 * aadj(1, 0) * aderiv.row(2);
@@ -190,7 +190,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         aadjda += aadj(1, 0) * aderiv.row(2);
         aadjda += aadj(1, 1) * aderiv.row(3);
 
-        double term1 = lameBeta_ * 4.0 / pow(deta, 2);
+        double term1 = lameBeta_ * 2.0 / pow(deta, 2);
         Matrix2d m1 = aadj * b*aadj;
         *hessian += term1 * m1(0, 0) * bhess[0];
         *hessian += term1 * m1(0, 1) * bhess[1];
@@ -213,7 +213,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term1 * -(m3(1, 0) * aderiv.row(0).transpose() + m3(1, 1) * aderiv.row(2).transpose()) * bderiv.row(2);
         *hessian += term1 * (m3(0, 0) * aderiv.row(0).transpose() + m3(0, 1) * aderiv.row(2).transpose()) * bderiv.row(3);
 
-        double term2 = lameBeta_ * -8.0 / pow(deta, 3);
+        double term2 = lameBeta_ * -4.0 / pow(deta, 3);
         Matrix2d m4 = aadj * b*aadj;
 
         Matrix<double, 1, 18 + 3 * nedgedofs> m4db = m4(0, 0) * bderiv.row(0);
@@ -222,7 +222,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         m4db += m4(1, 1) * bderiv.row(3);
         *hessian += term2 * aadjda.transpose() * m4db;
 
-        double term3 = lameBeta_ * 4.0 / pow(deta, 2);
+        double term3 = lameBeta_ * 2.0 / pow(deta, 2);
         Matrix2d m5 = badj * a*badj;
         *hessian += term3 * m5(0, 0) * ahess[0];
         *hessian += term3 * m5(0, 1) * ahess[1];
@@ -246,7 +246,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term3 * -(m7(1, 0) * bderiv.row(0).transpose() + m7(1, 1) * bderiv.row(2).transpose()) * aderiv.row(2);
         *hessian += term3 * (m7(0, 0) * bderiv.row(0).transpose() + m7(0, 1) * bderiv.row(2).transpose()) * aderiv.row(3);
 
-        double term4 = lameBeta_ * -8.0 / pow(deta, 3);
+        double term4 = lameBeta_ * -4.0 / pow(deta, 3);
         Matrix2d m8 = badj * a*badj;
         Matrix<double, 1, 18 + 3 * nedgedofs> m8da = m8(0, 0) * aderiv.row(0);
         m8da += m8(0, 1) * aderiv.row(1);
@@ -254,7 +254,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         m8da += m8(1, 1) * aderiv.row(3);
         *hessian += term4 * aadjda.transpose() * m8da;
 
-        double term5 = lameBeta_ * -4.0 / pow(deta, 3) * (aadj*b*aadj*b).trace();
+        double term5 = lameBeta_ * -2.0 / pow(deta, 3) * (aadj*b*aadj*b).trace();
         *hessian += term5 * aadj(0, 0) * ahess[0];
         *hessian += term5 * aadj(0, 1) * ahess[1];
         *hessian += term5 * aadj(1, 0) * ahess[2];
@@ -265,7 +265,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term5 * -aderiv.row(2).transpose() * aderiv.row(2);
         *hessian += term5 * aderiv.row(0).transpose() * aderiv.row(3);
 
-        double term6 = lameBeta_ * -8.0 / pow(deta, 3);
+        double term6 = lameBeta_ * -4.0 / pow(deta, 3);
         Matrix2d m9 = aadj * b*aadj;
         Matrix<double, 1, 18 + 3 * nedgedofs> m9db = m9(0, 0) * bderiv.row(0);
         m9db += m9(0, 1) * bderiv.row(1);
@@ -280,10 +280,10 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         m10da += m10(1, 1) * aderiv.row(3);
         *hessian += term6 * m10da.transpose() * aadjda;
 
-        double term7 = lameBeta_ * 12.0 / pow(deta, 4) * (aadj*b*aadj*b).trace();
+        double term7 = lameBeta_ * 6.0 / pow(deta, 4) * (aadj*b*aadj*b).trace();
         *hessian += term7 * aadjda.transpose() * aadjda;
 
-        double term8 = lameBeta_ * -4.0 / deta;
+        double term8 = lameBeta_ * -2.0 / deta;
         Matrix2d m11 = abar * bbaradj / detabar;
         *hessian += term8 * (m11(1, 0) * aderiv.row(1).transpose() + m11(1, 1) * aderiv.row(3).transpose()) * bderiv.row(0);
         *hessian += term8 * -(m11(0, 0) * aderiv.row(1).transpose() + m11(0, 1) * aderiv.row(3).transpose()) * bderiv.row(1);
@@ -296,7 +296,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term8 * m12(1, 0) * bhess[2];
         *hessian += term8 * m12(1, 1) * bhess[3];
 
-        double term9 = lameBeta_ * 4.0 / pow(deta, 2);
+        double term9 = lameBeta_ * 2.0 / pow(deta, 2);
         Matrix2d m13 = aadj * bbar * abaradj / detabar;
         Matrix<double, 1, 18 + 3 * nedgedofs> m13db = m13(0, 0) * bderiv.row(0);
         m13db += m13(0, 1) * bderiv.row(1);
@@ -305,7 +305,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
 
         *hessian += term9 * aadjda.transpose() * m13db;
 
-        double term10 = lameBeta_ * -4.0 / deta;
+        double term10 = lameBeta_ * -2.0 / deta;
         Matrix2d m14 = bbar * abaradj / detabar;
         *hessian += term10 * (m14(1, 0) * bderiv.row(1).transpose() + m14(1, 1) * bderiv.row(3).transpose()) * aderiv.row(0);
         *hessian += term10 * -(m14(0, 0) * bderiv.row(1).transpose() + m14(0, 1) * bderiv.row(3).transpose()) * aderiv.row(1);
@@ -318,7 +318,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term10 * m15(1, 0) * ahess[2];
         *hessian += term10 * m15(1, 1) * ahess[3];
 
-        double term11 = lameBeta_ * 4.0 / pow(deta, 2);
+        double term11 = lameBeta_ * 2.0 / pow(deta, 2);
         Matrix2d m16 = badj * abar * bbaradj / detabar;
         Matrix<double, 1, 18 + 3 * nedgedofs> m16da = m16(0, 0) * aderiv.row(0);
         m16da += m16(0, 1) * aderiv.row(1);
@@ -330,7 +330,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term11 * m16da.transpose() * aadjda;
         *hessian += term11 * m13db.transpose() * aadjda;
 
-        double term12 = lameBeta_ * 4.0 / pow(deta, 2) * (aadj*b*abaradj*bbar).trace() / detabar;
+        double term12 = lameBeta_ * 2.0 / pow(deta, 2) * (aadj*b*abaradj*bbar).trace() / detabar;
         *hessian += term12 * aderiv.row(3).transpose() * aderiv.row(0);
         *hessian += term12 * -aderiv.row(1).transpose() * aderiv.row(1);
         *hessian += term12 * -aderiv.row(2).transpose() * aderiv.row(2);
@@ -340,12 +340,12 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term12 * aadj(1, 0) * ahess[2];
         *hessian += term12 * aadj(1, 1) * ahess[3];
 
-        double term13 = lameBeta_ * -8.0 / pow(deta, 2) / deta * (aadj*b*abaradj*bbar).trace() / detabar;
+        double term13 = lameBeta_ * -4.0 / pow(deta, 2) / deta * (aadj*b*abaradj*bbar).trace() / detabar;
         *hessian += term13 * aadjda.transpose() * aadjda;
 
         // end term 1
 
-        double term14 = lameAlpha_ * -4.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / deta;
+        double term14 = lameAlpha_ * -1.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / deta;
         *hessian += term14 * bderiv.row(3).transpose() * aderiv.row(0);
         *hessian += term14 * -bderiv.row(1).transpose() * aderiv.row(1);
         *hessian += term14 * -bderiv.row(2).transpose() * aderiv.row(2);
@@ -363,7 +363,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term14 * aadj(1, 0) * bhess[2];
         *hessian += term14 * aadj(1, 1) * bhess[3];
 
-        double term15 = lameAlpha_ * 4.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / pow(deta, 2);
+        double term15 = lameAlpha_ * 1.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / pow(deta, 2);
         Matrix<double, 1, 18 + 3 * nedgedofs> badjda = badj(0, 0) * aderiv.row(0);
         badjda += badj(0, 1) * aderiv.row(1);
         badjda += badj(1, 0) * aderiv.row(2);
@@ -375,7 +375,7 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         aadjdb += aadj(1, 1) * bderiv.row(3);
         *hessian += term15 * aadjda.transpose() * aadjdb;
 
-        double term16 = lameAlpha_ * 4.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / pow(deta, 2) * (aadj*b).trace();
+        double term16 = lameAlpha_ * 1.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / pow(deta, 2) * (aadj*b).trace();
         *hessian += term16 * aadj(0, 0) * ahess[0];
         *hessian += term16 * aadj(1, 0) * ahess[1];
         *hessian += term16 * aadj(0, 1) * ahess[2];
@@ -385,26 +385,26 @@ double NeoHookeanMaterial<SFF>::bendingEnergy(
         *hessian += term16 * -aderiv.row(2).transpose() * aderiv.row(2);
         *hessian += term16 * aderiv.row(0).transpose() * aderiv.row(3);
 
-        double term17 = lameAlpha_ * 4.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / pow(deta, 2);
+        double term17 = lameAlpha_ * 1.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / pow(deta, 2);
         *hessian += term17 * aadjdb.transpose() * aadjda;
         *hessian += term17 * badjda.transpose() * aadjda;
 
-        double term18 = lameAlpha_ * -8.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / pow(deta, 3) * (aadj*b).trace();
+        double term18 = lameAlpha_ * -2.0 * (abaradj*bbar / detabar - aadj * b / deta).trace() / pow(deta, 3) * (aadj*b).trace();
         *hessian += term18 * aadjda.transpose() * aadjda;
 
-        double term19 = lameAlpha_ * 4.0 / pow(deta, 2);
+        double term19 = lameAlpha_ / pow(deta, 2);
         *hessian += term19 * badjda.transpose() * badjda;
         *hessian += term19 * badjda.transpose() * aadjdb;
         *hessian += term19 * aadjdb.transpose() * badjda;
         *hessian += term19 * aadjdb.transpose() * aadjdb;
 
-        double term20 = lameAlpha_ * -4.0 / pow(deta, 3) * (aadj*b).trace();
+        double term20 = lameAlpha_ * -1.0 / pow(deta, 3) * (aadj*b).trace();
         *hessian += term20 * aadjda.transpose() * badjda;
         *hessian += term20 * aadjda.transpose() * aadjdb;
         *hessian += term20 * badjda.transpose() * aadjda;
         *hessian += term20 * aadjdb.transpose() * aadjda;
 
-        double term21 = lameAlpha_ * 4.0 / pow(deta, 4) * (aadj*b).trace() * (aadj*b).trace();
+        double term21 = lameAlpha_ / pow(deta, 4) * (aadj*b).trace() * (aadj*b).trace();
         *hessian += term21 * aadjda.transpose() * aadjda;
 
         *hessian *= coeff;
