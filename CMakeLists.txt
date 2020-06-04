@@ -22,7 +22,11 @@ endif()
 
 file(GLOB LIBFILES src/*.cpp src/SecondFundamentalForm/*.cpp src/MaterialModel/*.cpp)
 add_library(${PROJECT_NAME} STATIC ${LIBFILES})
-target_include_directories(${PROJECT_NAME} PRIVATE "$ENV{EIGEN3_INCLUDE_DIR}" )
+if(LIBIGL_FOUND)
+	target_link_libraries(${PROJECT_NAME} igl::core)
+else()
+	target_include_directories(${PROJECT_NAME} PRIVATE "$ENV{EIGEN3_INCLUDE_DIR}" )
+endif()
 install(TARGETS ${PROJECT_NAME} DESTINATION lib)
 
 file(GLOB EXAMPLEFILES example/*.cpp)

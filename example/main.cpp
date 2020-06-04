@@ -92,7 +92,20 @@ int main(int argc, char *argv[])
     
     Eigen::MatrixXd origV;
     Eigen::MatrixXi F;
-    if (!igl::readOBJ("bunny.obj", origV, F))
+
+    std::vector<std::string> prefixes = { "./", "./example/", "../", "../example/" };
+
+    bool found = false;
+    for (auto& it : prefixes)
+    {
+        std::string fname = it + std::string("bunny.obj");
+        if (igl::readOBJ(fname, origV, F))
+        {
+            found = true;
+            break;            
+        }
+    }
+    if (!found)
     {
         std::cerr << "Could not read example bunny.obj file" << std::endl;
         return -1;
