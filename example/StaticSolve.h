@@ -39,11 +39,33 @@ void takeOneStep(const MeshConnectivity &mesh,
         Eigen::SparseMatrix<double> I(freeDOFs, freeDOFs);
         I.setIdentity();
         H += reg * I;
+        
+        Eigen::VectorXd maxvals(freeDOFs);
+        maxvals.setZero();
+        for (int k = 0; k < H.outerSize(); ++k)
+        {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(H, k); it; ++it)
+            {
+                maxvals[it.row()] = std::max(maxvals[it.row()], std::fabs(it.value()));
+            }
+        }
+        std::vector<Eigen::Triplet<double> > Dcoeffs;
+        for (int i = 0; i < freeDOFs; i++)
+        {
+            double val = (maxvals[i] == 0.0 ? 1.0 : 1.0 / std::sqrt(maxvals[i]));            
+            Dcoeffs.push_back({ i,i, val });
+        }
+        Eigen::SparseMatrix<double> D(freeDOFs, freeDOFs);
+        D.setFromTriplets(Dcoeffs.begin(), Dcoeffs.end());
+
+        Eigen::SparseMatrix<double> DHDT = D * H * D.transpose();
+
         std::cout << "solving, original force residual: " << force.norm() << std::endl;
-        Eigen::SimplicialLLT<Eigen::SparseMatrix<double> > solver(H);
+        Eigen::SimplicialLLT<Eigen::SparseMatrix<double> > solver(DHDT);
         if (solver.info() == Eigen::Success)
         {
-            Eigen::VectorXd descentDir = solver.solve(force);
+            Eigen::VectorXd rhs = D * force;
+            Eigen::VectorXd descentDir = D * solver.solve(rhs);
             std::cout << "solved" << std::endl;
             Eigen::MatrixXd newPos = curPos;
             for (int i = 0; i < nverts; i++)
