@@ -8,13 +8,14 @@
 #include "../include/MidedgeAngleSinFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
 #include "../include/StVKMaterial.h"
+#include "../include/TensionFieldStVKMaterial.h"
 #include "../include/NeoHookeanMaterial.h"
 #include "findiff.h"
 #include <random>
 
 std::default_random_engine rng;
 
-const int nummats = 2;
+const int nummats = 3;
 const int numsff = 3;    
 
 
@@ -135,6 +136,10 @@ void differenceTest(const MeshConnectivity &mesh,
             std::cout << "StVKMaterial, ";
             mat = new StVKMaterial<SFF>(lameAlpha, lameBeta);
             break;
+        case 2:
+            std::cout << "TensionFieldStVKMaterial, ";
+            mat = new TensionFieldStVKMaterial<SFF>(lameAlpha, lameBeta);
+            break;
         default:
             assert(false);
         }
@@ -188,6 +193,9 @@ void getHessian(const MeshConnectivity &mesh,
         break;
     case 1:
         mat = new StVKMaterial<SFF>(lameAlpha, lameBeta);
+        break;
+    case 2:
+        mat = new TensionFieldStVKMaterial<SFF>(lameAlpha, lameBeta);
         break;
     default:
         assert(false);
@@ -254,6 +262,9 @@ void consistencyTests(const MeshConnectivity &mesh, const Eigen::MatrixXd &restP
                 {
                     for (int l = 0; l < numsff; l++)
                     {
+                        // ignore TensionField material
+                        if (i == 2 || k == 2)
+                            continue;
                         int idx1 = i * numsff + j;
                         int idx2 = k * numsff + l;
                         if (idx2 <= idx1)

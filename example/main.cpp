@@ -9,6 +9,7 @@
 #include "../include/MidedgeAngleSinFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
 #include "../include/StVKMaterial.h"
+#include "../include/TensionFieldStVKMaterial.h"
 #include "../include/NeoHookeanMaterial.h"
 
 int numSteps;
@@ -63,6 +64,9 @@ void runSimulation(igl::opengl::glfw::Viewer &viewer,
         break;
     case 1:
         mat = new StVKMaterial<SFF>(lameAlpha, lameBeta);
+        break;
+    case 2:
+        mat = new TensionFieldStVKMaterial<SFF>(lameAlpha, lameBeta);
         break;
     default:
         assert(false);
