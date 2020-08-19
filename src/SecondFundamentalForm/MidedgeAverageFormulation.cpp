@@ -56,11 +56,20 @@ static Eigen::Vector3d secondFundamentalFormEntries(
     }
 
     Eigen::Vector3d qs[3];
+    Eigen::Vector3d mvec[3];
+    Eigen::Vector3d qvec[3];
     double mnorms[3];
     for (int i = 0; i < 3; i++)
     {
         qs[i] = curPos.row(mesh.faceVertex(face, i)).transpose();
-        mnorms[i] = (oppNormals[i] + cNormal).norm();
+        mvec[i] = oppNormals[i] + cNormal;
+        mnorms[i] = mvec[i].norm();
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        int ip1 = (i + 1) % 3;
+        int ip2 = (i + 2) % 3;
+        qvec[i] = qs[ip1] + qs[ip2] - 2.0 * qs[i];
     }
 
     for (int i = 0; i < 3; i++)
@@ -70,21 +79,21 @@ static Eigen::Vector3d secondFundamentalFormEntries(
         II[i] = (qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i];
         if (derivative)
         {
-            derivative->block(i, 3*i, 1, 3) += -2.0 * oppNormals[i].transpose() / mnorms[i];
-            derivative->block(i, 3*ip1, 1, 3) += 1.0 * oppNormals[i].transpose() / mnorms[i];
-            derivative->block(i, 3*ip2, 1, 3) += 1.0 * oppNormals[i].transpose() / mnorms[i];
+            derivative->block<1,3>(i, 3*i) += -2.0 * oppNormals[i].transpose() / mnorms[i];
+            derivative->block<1,3>(i, 3*ip1) += 1.0 * oppNormals[i].transpose() / mnorms[i];
+            derivative->block<1,3>(i, 3*ip2) += 1.0 * oppNormals[i].transpose() / mnorms[i];
             
-            derivative->block(i, 9 + 3*i, 1, 3) += (qs[ip1] + qs[ip2] - 2.0*qs[i]).transpose() / mnorms[i] * dn[i].block(0, 0, 3, 3);
-            derivative->block(i, 3*ip2, 1, 3) += (qs[ip1] + qs[ip2] - 2.0*qs[i]).transpose() / mnorms[i] * dn[i].block(0, 3, 3, 3);
-            derivative->block(i, 3*ip1, 1, 3) += (qs[ip1] + qs[ip2] - 2.0*qs[i]).transpose() / mnorms[i] * dn[i].block(0, 6, 3, 3);
+            derivative->block<1,3>(i, 9 + 3*i) += qvec[i].transpose() / mnorms[i] * dn[i].block<3,3>(0, 0);
+            derivative->block<1,3>(i, 3*ip2) += qvec[i].transpose() / mnorms[i] * dn[i].block<3,3>(0, 3);
+            derivative->block<1,3>(i, 3*ip1) += qvec[i].transpose() / mnorms[i] * dn[i].block<3,3>(0, 6);
 
-            derivative->block(i, 9 + 3*i, 1, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 0, 3, 3);
-            derivative->block(i, 3*ip2, 1, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 3, 3, 3);
-            derivative->block(i, 3*ip1, 1, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 6, 3, 3);
+            derivative->block<1,3>(i, 9 + 3*i) += -qvec[i].dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * mvec[i].transpose() * dn[i].block<3,3>(0, 0);
+            derivative->block<1,3>(i, 3*ip2) += -qvec[i].dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * mvec[i].transpose() * dn[i].block<3,3>(0, 3);
+            derivative->block<1,3>(i, 3*ip1) += -qvec[i].dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * mvec[i].transpose() * dn[i].block<3,3>(0, 6);
 
-            derivative->block(i, 0, 1, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 0, 3, 3);
-            derivative->block(i, 3, 1, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 3, 3, 3);
-            derivative->block(i, 6, 1, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 6, 3, 3);
+            derivative->block<1,3>(i, 0) += -qvec[i].dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * mvec[i].transpose() * dcn.block<3,3>(0, 0);
+            derivative->block<1,3>(i, 3) += -qvec[i].dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * mvec[i].transpose() * dcn.block<3,3>(0, 3);
+            derivative->block<1,3>(i, 6) += -qvec[i].dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * mvec[i].transpose() * dcn.block<3,3>(0, 6);
         }
         if (hessian)
         {
@@ -93,64 +102,84 @@ static Eigen::Vector3d secondFundamentalFormEntries(
 
             int miidx[3];
             miidx[0] = 9 + 3 * i;
-            miidx[1] = 3 * ((i + 2) % 3);
-            miidx[2] = 3 * ((i + 1) % 3);
+            miidx[1] = 3 * ip2;
+            miidx[2] = 3 * ip1;
+
+            Eigen::Matrix3d dnij[3];
+            for (int j = 0; j < 3; j++)
+                dnij[j] = dn[i].block<3, 3>(0, 3 * j);
 
             for (int j = 0; j < 3; j++)
-            {
-                (*hessian)[i].block(miidx[j], 3 * ip1, 3, 3) += dn[i].block(0, 3 * j, 3, 3).transpose() / mnorms[i];
-                (*hessian)[i].block(miidx[j], 3 * ip2, 3, 3) += dn[i].block(0, 3 * j, 3, 3).transpose() / mnorms[i];
-                (*hessian)[i].block(miidx[j], 3 * i, 3, 3) += -2.0 * dn[i].block(0, 3 * j, 3, 3).transpose() / mnorms[i];
+            {                
 
-                (*hessian)[i].block(miidx[j], 3 * ip1, 3, 3) += -dn[i].block(0, 3 * j, 3, 3).transpose() / mnorms[i] / mnorms[i] / mnorms[i] *  (oppNormals[i] + cNormal)*oppNormals[i].transpose();
-                (*hessian)[i].block(miidx[j], 3 * ip2, 3, 3) += -dn[i].block(0, 3 * j, 3, 3).transpose() / mnorms[i] / mnorms[i] / mnorms[i] *  (oppNormals[i] + cNormal)*oppNormals[i].transpose();
-                (*hessian)[i].block(miidx[j], 3 * i, 3, 3) += 2.0 * dn[i].block(0, 3 * j, 3, 3).transpose() / mnorms[i] / mnorms[i] / mnorms[i] *  (oppNormals[i] + cNormal)*oppNormals[i].transpose();
+                (*hessian)[i].block<3, 3>(miidx[j], 3 * ip1) += (1.0 / mnorms[i]) * dnij[j].transpose();
+                (*hessian)[i].block<3, 3>(miidx[j], 3 * ip2) += (1.0 / mnorms[i]) * dnij[j].transpose();
+                (*hessian)[i].block<3, 3>(miidx[j], 3 * i) += (-2.0 / mnorms[i]) * dnij[j].transpose();
 
-                (*hessian)[i].block(3 * j, 3 * ip1, 3, 3) += -dcn.block(0, 3 * j, 3, 3).transpose() / mnorms[i] / mnorms[i] / mnorms[i] *  (oppNormals[i] + cNormal)*oppNormals[i].transpose();
-                (*hessian)[i].block(3 * j, 3 * ip2, 3, 3) += -dcn.block(0, 3 * j, 3, 3).transpose() / mnorms[i] / mnorms[i] / mnorms[i] *  (oppNormals[i] + cNormal)*oppNormals[i].transpose();
-                (*hessian)[i].block(3 * j, 3 * i, 3, 3) += 2.0 * dcn.block(0, 3 * j, 3, 3).transpose() / mnorms[i] / mnorms[i] / mnorms[i] *  (oppNormals[i] + cNormal)*oppNormals[i].transpose();
+                Eigen::Matrix3d term3 = (dnij[j].transpose() * mvec[i]) * oppNormals[i].transpose();
 
-                (*hessian)[i].block(3 * ip1, miidx[j], 3, 3) += dn[i].block(0, 3 * j, 3, 3) / mnorms[i];
-                (*hessian)[i].block(3 * ip2, miidx[j], 3, 3) += dn[i].block(0, 3 * j, 3, 3) / mnorms[i];
-                (*hessian)[i].block(3 * i, miidx[j], 3, 3) += -2.0 * dn[i].block(0, 3 * j, 3, 3) / mnorms[i];
+                (*hessian)[i].block<3, 3>(miidx[j], 3 * ip1) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term3;
+                (*hessian)[i].block<3, 3>(miidx[j], 3 * ip2) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term3;
+                (*hessian)[i].block<3, 3>(miidx[j], 3 * i) += (2.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term3;
+
+                Eigen::Matrix3d term4 = (dcn.block<3, 3>(0, 3 * j).transpose() * mvec[i]) * oppNormals[i].transpose();
+
+                (*hessian)[i].block<3, 3>(3 * j, 3 * ip1) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term4;
+                (*hessian)[i].block<3, 3>(3 * j, 3 * ip2) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term4;
+                (*hessian)[i].block<3, 3>(3 * j, 3 * i) += (2.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term4;
+
+                (*hessian)[i].block<3, 3>(3 * ip1, miidx[j]) += (1.0 / mnorms[i]) * dnij[j];
+                (*hessian)[i].block<3, 3>(3 * ip2, miidx[j]) += (1.0 / mnorms[i]) * dnij[j];
+                (*hessian)[i].block<3, 3>(3 * i, miidx[j]) += (-2.0 / mnorms[i]) * dnij[j];
 
                 for (int k = 0; k < 3; k++)
                 {
-                    (*hessian)[i].block(miidx[j], miidx[k], 3, 3) += -dn[i].block(0, 3 * j, 3, 3).transpose() / mnorms[i] / mnorms[i] / mnorms[i] *  (oppNormals[i] + cNormal) * (qs[ip1] + qs[ip2] - 2.0*qs[i]).transpose() * dn[i].block(0, 3 * k, 3, 3);                    
-                    (*hessian)[i].block(3 * j, miidx[k], 3, 3) += -dcn.block(0, 3 * j, 3, 3).transpose() / mnorms[i] / mnorms[i] / mnorms[i] *  (oppNormals[i] + cNormal) * (qs[ip1] + qs[ip2] - 2.0*qs[i]).transpose() * dn[i].block(0, 3 * k, 3, 3);
+                    (*hessian)[i].block<3, 3>(miidx[j], miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * (dnij[j].transpose() * mvec[i]) * (qvec[i].transpose() * dnij[k]);
+                    (*hessian)[i].block<3, 3>(3 * j, miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * (dcn.block<3, 3>(0, 3 * j).transpose() * mvec[i]) * (qvec[i].transpose() * dnij[k]);
                 }
 
-                (*hessian)[i].block(3 * ip1, miidx[j], 3, 3) += -1.0 / mnorms[i] / mnorms[i] / mnorms[i] *  oppNormals[i] * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 3 * j, 3, 3);
-                (*hessian)[i].block(3 * ip2, miidx[j], 3, 3) += -1.0 / mnorms[i] / mnorms[i] / mnorms[i] *  oppNormals[i] * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 3 * j, 3, 3);
-                (*hessian)[i].block(3 * i, miidx[j], 3, 3) += 2.0 / mnorms[i] / mnorms[i] / mnorms[i] *  oppNormals[i] * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 3 * j, 3, 3);
+                Eigen::Vector3d dnijm = dnij[j] * mvec[i];
 
-                (*hessian)[i].block(3 * ip1, 3 * j, 3, 3) += -1.0 / mnorms[i] / mnorms[i] / mnorms[i] *  oppNormals[i] * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 3 * j, 3, 3);
-                (*hessian)[i].block(3 * ip2, 3 * j, 3, 3) += -1.0 / mnorms[i] / mnorms[i] / mnorms[i] *  oppNormals[i] * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 3 * j, 3, 3);
-                (*hessian)[i].block(3 * i, 3 * j, 3, 3) += 2.0 / mnorms[i] / mnorms[i] / mnorms[i] *  oppNormals[i] * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 3 * j, 3, 3);
+                Eigen::Matrix3d term1 = oppNormals[i] * dnijm.transpose();
+                (*hessian)[i].block<3, 3>(3 * ip1, miidx[j]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term1;
+                (*hessian)[i].block<3, 3>(3 * ip2, miidx[j]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term1;
+                (*hessian)[i].block<3, 3>(3 * i, miidx[j]) += (2.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term1;
+
+                Eigen::Vector3d dcnjm = dcn.block<3, 3>(0, 3 * j) * mvec[i];
+                
+                Eigen::Matrix3d term2 = oppNormals[i] * dcnjm.transpose();
+                (*hessian)[i].block<3, 3>(3 * ip1, 3 * j) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term2;
+                (*hessian)[i].block<3, 3>(3 * ip2, 3 * j) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term2;
+                (*hessian)[i].block<3, 3>(3 * i, 3 * j) += (2.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term2;
+
+                Eigen::Vector3d dnijTq = dnij[j].transpose() * qvec[i];
 
                 for (int k = 0; k < 3; k++)
                 {
-                    (*hessian)[i].block(miidx[j], miidx[k], 3, 3) += -dn[i].block(0, 3*j, 3, 3).transpose() * (qs[ip1] + qs[ip2] - 2.0*qs[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 3 * k, 3, 3);
-                    (*hessian)[i].block(miidx[j], 3*k, 3, 3) += -dn[i].block(0, 3*j, 3, 3).transpose() * (qs[ip1] + qs[ip2] - 2.0*qs[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 3 * k, 3, 3);
+                    (*hessian)[i].block<3, 3>(miidx[j], miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * dnijTq * (mvec[i].transpose() * dnij[k]);
+                    (*hessian)[i].block<3, 3>(miidx[j], 3 * k) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * dnijTq * (mvec[i].transpose() * dcn.block<3, 3>(0, 3 * k));
                 }
 
+                double qdoto = qvec[i].dot(oppNormals[i]);
+                Eigen::Vector3d dnijTm = dnij[j].transpose() * mvec[i];
+                Eigen::Vector3d dcnjTm = (dcn.block<3, 3>(0, 3 * j).transpose() * mvec[i]);
                 for (int k = 0; k < 3; k++)
                 {
-                    (*hessian)[i].block(miidx[j], miidx[k], 3, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * dn[i].block(0, 3 * j, 3, 3).transpose() * dn[i].block(0, 3 * k, 3, 3);
-                    (*hessian)[i].block(miidx[j], 3*k, 3, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * dn[i].block(0, 3 * j, 3, 3).transpose() * dcn.block(0, 3 * k, 3, 3);
-                    (*hessian)[i].block(3*j, miidx[k], 3, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * dcn.block(0, 3 * j, 3, 3).transpose() * dn[i].block(0, 3 * k, 3, 3);
-                    (*hessian)[i].block(3*j, 3*k, 3, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * dcn.block(0, 3 * j, 3, 3).transpose() * dcn.block(0, 3 * k, 3, 3);
+                    (*hessian)[i].block<3, 3>(miidx[j], miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dnij[j].transpose() * dnij[k];
+                    (*hessian)[i].block<3, 3>(miidx[j], 3 * k) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dnij[j].transpose() * dcn.block<3, 3>(0, 3 * k);
+                    (*hessian)[i].block<3, 3>(3 * j, miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dcn.block<3, 3>(0, 3 * j).transpose() * dnij[k];
+                    (*hessian)[i].block<3, 3>(3 * j, 3 * k) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dcn.block<3, 3>(0, 3 * j).transpose() * dcn.block<3, 3>(0, 3 * k);
 
-                    (*hessian)[i].block(miidx[j], miidx[k], 3, 3) += 3.0 * (qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] * dn[i].block(0, 3 * j, 3, 3).transpose() * (oppNormals[i] + cNormal) * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 3 * k, 3, 3);
-                    (*hessian)[i].block(miidx[j], 3 * k, 3, 3) += 3.0 * (qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] * dn[i].block(0, 3 * j, 3, 3).transpose() * (oppNormals[i] + cNormal) * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 3 * k, 3, 3);
-                    (*hessian)[i].block(3 * j, miidx[k], 3, 3) += 3.0 * (qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] * dcn.block(0, 3 * j, 3, 3).transpose() * (oppNormals[i] + cNormal) * (oppNormals[i] + cNormal).transpose() * dn[i].block(0, 3 * k, 3, 3);
-                    (*hessian)[i].block(3 * j, 3 * k, 3, 3) += 3.0 * (qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] * dcn.block(0, 3 * j, 3, 3).transpose() * (oppNormals[i] + cNormal) * (oppNormals[i] + cNormal).transpose() * dcn.block(0, 3 * k, 3, 3);
+                    (*hessian)[i].block<3, 3>(miidx[j], miidx[k]) += (3.0 / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dnijTm * (mvec[i].transpose() * dnij[k]);
+                    (*hessian)[i].block<3, 3>(miidx[j], 3 * k) += (3.0 / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dnijTm * (mvec[i].transpose() * dcn.block<3, 3>(0, 3 * k));
+                    (*hessian)[i].block<3, 3>(3 * j, miidx[k]) += (3.0 / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dcnjTm * (mvec[i].transpose() * dnij[k]);
+                    (*hessian)[i].block<3, 3>(3 * j, 3 * k) += (3.0 / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dcnjTm * (mvec[i].transpose() * dcn.block<3, 3>(0, 3 * k));
 
                     for (int l = 0; l < 3; l++)
                     {
-                        (*hessian)[i].block(miidx[j], miidx[k], 3, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal)[l] * hn[i][l].block(3 * j, 3 * k, 3, 3);
-                        (*hessian)[i].block(3*j, 3*k, 3, 3) += -(qs[ip1] + qs[ip2] - 2.0*qs[i]).dot(oppNormals[i]) / mnorms[i] / mnorms[i] / mnorms[i] * (oppNormals[i] + cNormal)[l] * hcn[l].block(3 * j, 3 * k, 3, 3);
-                        (*hessian)[i].block(miidx[j], miidx[k], 3, 3) += 1.0 / mnorms[i] * (qs[ip1] + qs[ip2] - 2.0*qs[i])[l] * hn[i][l].block(3 * j, 3 * k, 3, 3);
+                        (*hessian)[i].block<3,3>(miidx[j], miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * mvec[i][l] * hn[i][l].block<3,3>(3 * j, 3 * k);
+                        (*hessian)[i].block<3, 3>(3 * j, 3 * k) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * mvec[i][l] * hcn[l].block<3, 3>(3 * j, 3 * k);
+                        (*hessian)[i].block<3, 3>(miidx[j], miidx[k]) += (1.0 / mnorms[i]) * qvec[i][l] * hn[i][l].block<3, 3>(3 * j, 3 * k);
                     }
                 }
             }
