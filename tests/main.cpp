@@ -39,7 +39,8 @@ static void testBendingFiniteDifferences(
     const std::vector<Eigen::Matrix2d> &abars,
     const std::vector<Eigen::Matrix2d> &bbars,
     bool verbose,
-    FiniteDifferenceLog &log);
+    FiniteDifferenceLog &globalLog,
+    FiniteDifferenceLog &localLog);
 
 
 void makeSquareMesh(int dim, Eigen::MatrixXd &V, Eigen::MatrixXi &F)
@@ -152,13 +153,18 @@ void differenceTest(const MeshConnectivity &mesh,
             edgeDOFs[i] = angdist(rng);
         }
 
-        FiniteDifferenceLog log;
-        testStretchingFiniteDifferences(mesh, curPos, *mat, thicknesses, abar, verbose, log);
-        std::cout << "Stretching:" << std::endl;
-        log.printStats();
-        testBendingFiniteDifferences(mesh, curPos, edgeDOFs, *mat, thicknesses, abar, bbar, verbose, log);
-        std::cout << "Bending:" << std::endl;
-        log.printStats();
+        FiniteDifferenceLog localStretchingLog;
+        testStretchingFiniteDifferences(mesh, curPos, *mat, thicknesses, abar, verbose, localStretchingLog);
+        std::cout << "Stretching (stencil):" << std::endl;
+        localStretchingLog.printStats();
+
+        FiniteDifferenceLog globalBendingLog;
+        FiniteDifferenceLog localBendingLog;
+        testBendingFiniteDifferences(mesh, curPos, edgeDOFs, *mat, thicknesses, abar, bbar, verbose, globalBendingLog, localBendingLog);
+        std::cout << "Bending (global):" << std::endl;
+        globalBendingLog.printStats();
+        std::cout << "Bending (stencil):" << std::endl;
+        localBendingLog.printStats();
         std::cout << std::endl;
 
         delete mat;
@@ -417,9 +423,11 @@ void testBendingFiniteDifferences(
     const std::vector<Eigen::Matrix2d> &abars,
     const std::vector<Eigen::Matrix2d> &bbars,
     bool verbose,
-    FiniteDifferenceLog &log)
+    FiniteDifferenceLog &globalLog,
+    FiniteDifferenceLog &localLog)
 {
-    log.clear();
+    globalLog.clear();
+    localLog.clear();
 
     int nfaces = mesh.nFaces();
     int nedges = mesh.nEdges();
@@ -437,6 +445,66 @@ void testBendingFiniteDifferences(
     {
 
         double pert = std::pow(10.0, epsilon);
+
+        // global testing
+        {
+            Eigen::MatrixXd posPert(testpos.rows(), testpos.cols());
+            posPert.setRandom();
+
+            Eigen::VectorXd edgePert(testedge.size());
+            edgePert.setRandom();
+
+            Eigen::MatrixXd fwdpertpos = testpos + pert * posPert;
+            Eigen::MatrixXd backpertpos = testpos - pert * posPert;
+            Eigen::VectorXd fwdpertedge = testedge + pert * edgePert;
+            Eigen::VectorXd backpertedge = testedge - pert * edgePert;
+
+            Eigen::VectorXd pertVec(3 * nverts + nedgedofs * nedges);
+            for (int i = 0; i < nverts; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    pertVec[3 * i + j] = posPert(i, j);
+                }
+            }
+            for (int i = 0; i < nedgedofs * nedges; i++)
+            {
+                pertVec[3 * nverts + i] = edgePert[i];
+            }
+
+            Eigen::VectorXd deriv;
+            std::vector<Eigen::Triplet<double> > hess;
+            double result = ElasticShell<SFF>::elasticEnergy(mesh, testpos, testedge, mat, thicknesses, abars, bbars, 
+                ElasticShell<SFF>::EnergyTerm::ET_BENDING, &deriv, &hess);
+
+            Eigen::VectorXd fwdderiv;
+            Eigen::VectorXd backderiv;
+
+            double fwdnewresult = ElasticShell<SFF>::elasticEnergy(mesh, fwdpertpos, fwdpertedge, mat, thicknesses, abars, bbars, 
+                ElasticShell<SFF>::EnergyTerm::ET_BENDING, &fwdderiv, NULL);
+            double backnewresult = ElasticShell<SFF>::elasticEnergy(mesh, backpertpos, backpertedge, mat, thicknesses, abars, bbars, 
+                ElasticShell<SFF>::EnergyTerm::ET_BENDING, &backderiv, NULL);
+
+            double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
+            double direcderiv = deriv.dot(pertVec);
+            if (verbose) std::cout << "g " << findiff << " " << direcderiv << std::endl;
+            globalLog.addEntry(pert, findiff, direcderiv);
+            
+            Eigen::VectorXd diffderiv = (fwdderiv - backderiv) / 2.0 / pert;
+            Eigen::SparseMatrix<double> H(3 * nverts + nedgedofs * nedges, 3 * nverts + nedgedofs * nedges);
+            H.setFromTriplets(hess.begin(), hess.end());
+            Eigen::VectorXd derivderiv = H * pertVec;
+            if (verbose)
+            {
+                std::cout << diffderiv.transpose() << std::endl;
+                std::cout << "//" << std::endl;
+                std::cout << derivderiv.transpose() << std::endl;
+            }
+            for (int i = 0; i < 3 * nverts + nedgedofs * nedges; i++)
+            {
+                globalLog.addEntry(pert, diffderiv[i], derivderiv[i]);
+            }
+        }
 
         for (int face = 0; face < nfaces; face++)
         {
@@ -458,7 +526,7 @@ void testBendingFiniteDifferences(
                     double backnewresult = mat.bendingEnergy(mesh, backpertpos, testedge, thicknesses[face], abars[face], bbars[face], face, &backpertderiv, NULL);
                     double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
                     if(verbose) std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k) << std::endl;
-                    log.addEntry(pert, deriv(0, 3 * j + k), findiff);
+                    localLog.addEntry(pert, deriv(0, 3 * j + k), findiff);
 
                     Eigen::MatrixXd derivdiff = (fwdpertderiv - backpertderiv) / 2.0 / pert;
                     if (verbose)
@@ -469,7 +537,7 @@ void testBendingFiniteDifferences(
                     }
                     for (int l = 0; l < 18 + 3 * nedgedofs; l++)
                     {
-                        log.addEntry(pert, hess(3 * j + k, l), derivdiff(0, l));
+                        localLog.addEntry(pert, hess(3 * j + k, l), derivdiff(0, l));
                     }
                 }
     
@@ -495,10 +563,10 @@ void testBendingFiniteDifferences(
                             std::cout << "//" << std::endl;
                             std::cout << hess.row(9 + 3 * j + k) << std::endl << std::endl;
                         }
-                        log.addEntry(pert, deriv(0, 9 + 3 * j + k), findiff);
+                        localLog.addEntry(pert, deriv(0, 9 + 3 * j + k), findiff);
                         for (int l = 0; l < 18 + 3 * nedgedofs; l++)
                         {
-                            log.addEntry(pert, hess(9 + 3 * j + k, l), derivdiff(0, l));
+                            localLog.addEntry(pert, hess(9 + 3 * j + k, l), derivdiff(0, l));
                         }                        
                     }
                 }
@@ -515,7 +583,7 @@ void testBendingFiniteDifferences(
                     double backnewresult = mat.bendingEnergy(mesh, testpos, backpertedge, thicknesses[face], abars[face], bbars[face], face, &backpertderiv, NULL);
                     double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
                     if(verbose) std::cout << findiff << " " << deriv(0, 18 + nedgedofs * j + k) << std::endl;
-                    log.addEntry(pert, deriv(0, 18 + nedgedofs * j + k), findiff);
+                    localLog.addEntry(pert, deriv(0, 18 + nedgedofs * j + k), findiff);
                     
                     Eigen::MatrixXd derivdiff = (fwdpertderiv - backpertderiv) / 2.0 / pert;
                     if (verbose)
@@ -526,7 +594,7 @@ void testBendingFiniteDifferences(
                     }
                     for (int l = 0; l < 18 + 3 * nedgedofs; l++)
                     {
-                        log.addEntry(pert, hess(18 + nedgedofs * j + k, l), derivdiff(0, l));
+                        localLog.addEntry(pert, hess(18 + nedgedofs * j + k, l), derivdiff(0, l));
                     }
                 }
             }

@@ -26,6 +26,8 @@ public:
                         If you have explicit rest geometry, you can compute these using the *FundamentalForms calls below. Alternatively you
                         can set the forms directly (zero matrices for bbar if you want a flat rest state, for instance).
      * - SFF:           the choice of second fundamental form discretization.
+     * - whichTerms     optional flags offering finer-grained control over which terms to include. ET_STRETCHING includes the bending energy, and
+                        ET_BENDING the bending energy. Default is both (ET_STRETCHING | ET_BENDING).
      *
      * Outputs:
      * - returns the total elastic energy of the shell.
@@ -46,12 +48,30 @@ public:
         Eigen::VectorXd *derivative, // positions, then thetas
         std::vector<Eigen::Triplet<double> > *hessian);
 
+    static double elasticEnergy(
+        const MeshConnectivity &mesh,
+        const Eigen::MatrixXd &curPos,
+        const Eigen::VectorXd &edgeDOFs,
+        const MaterialModel<SFF> &mat,
+        const Eigen::VectorXd &thicknesses,
+        const std::vector<Eigen::Matrix2d> &abars,
+        const std::vector<Eigen::Matrix2d> &bbars,
+        int whichTerms,
+        Eigen::VectorXd *derivative, // positions, then thetas
+        std::vector<Eigen::Triplet<double> > *hessian);
+
     /*
      * Computes current fundamental forms for a given mesh. Can be used to initialize these forms from a given mesh rest state.
      */
     static void firstFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, std::vector<Eigen::Matrix2d> &abars);
 
     static void secondFundamentalForms(const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos, const Eigen::VectorXd &edgeDOFs, std::vector<Eigen::Matrix2d> &bbars);
+
+    enum EnergyTerm
+    {
+        ET_STRETCHING = 1,
+        ET_BENDING = 2
+    };
 };
 
 #endif
