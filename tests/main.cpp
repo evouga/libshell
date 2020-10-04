@@ -467,7 +467,7 @@ void testBendingFiniteDifferences(
                         std::cout << "//" << std::endl;
                         std::cout << hess.row(3 * j + k) << std::endl << std::endl;
                     }
-                    for (int l = 0; l > 18 + 3 * nedgedofs; l++)
+                    for (int l = 0; l < 18 + 3 * nedgedofs; l++)
                     {
                         log.addEntry(pert, hess(3 * j + k, l), derivdiff(0, l));
                     }

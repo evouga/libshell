@@ -116,13 +116,15 @@ static Eigen::Vector3d secondFundamentalFormEntries(
                 (*hessian)[i].block<3, 3>(miidx[j], 3 * ip2) += (1.0 / mnorms[i]) * dnij[j].transpose();
                 (*hessian)[i].block<3, 3>(miidx[j], 3 * i) += (-2.0 / mnorms[i]) * dnij[j].transpose();
 
-                Eigen::Matrix3d term3 = (dnij[j].transpose() * mvec[i]) * oppNormals[i].transpose();
+                Eigen::Vector3d dnijTm = dnij[j].transpose() * mvec[i];
+                Eigen::Vector3d dcnjTm = (dcn.block<3, 3>(0, 3 * j).transpose() * mvec[i]);
+                Eigen::Matrix3d term3 = dnijTm * oppNormals[i].transpose();
 
                 (*hessian)[i].block<3, 3>(miidx[j], 3 * ip1) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term3;
                 (*hessian)[i].block<3, 3>(miidx[j], 3 * ip2) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term3;
                 (*hessian)[i].block<3, 3>(miidx[j], 3 * i) += (2.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term3;
 
-                Eigen::Matrix3d term4 = (dcn.block<3, 3>(0, 3 * j).transpose() * mvec[i]) * oppNormals[i].transpose();
+                Eigen::Matrix3d term4 = dcnjTm * oppNormals[i].transpose();
 
                 (*hessian)[i].block<3, 3>(3 * j, 3 * ip1) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term4;
                 (*hessian)[i].block<3, 3>(3 * j, 3 * ip2) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term4;
@@ -138,16 +140,12 @@ static Eigen::Vector3d secondFundamentalFormEntries(
                     (*hessian)[i].block<3, 3>(3 * j, miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * (dcn.block<3, 3>(0, 3 * j).transpose() * mvec[i]) * (qvec[i].transpose() * dnij[k]);
                 }
 
-                Eigen::Vector3d dnijm = dnij[j] * mvec[i];
-
-                Eigen::Matrix3d term1 = oppNormals[i] * dnijm.transpose();
+                Eigen::Matrix3d term1 = oppNormals[i] * dnijTm.transpose();
                 (*hessian)[i].block<3, 3>(3 * ip1, miidx[j]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term1;
                 (*hessian)[i].block<3, 3>(3 * ip2, miidx[j]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term1;
                 (*hessian)[i].block<3, 3>(3 * i, miidx[j]) += (2.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term1;
 
-                Eigen::Vector3d dcnjm = dcn.block<3, 3>(0, 3 * j) * mvec[i];
-                
-                Eigen::Matrix3d term2 = oppNormals[i] * dcnjm.transpose();
+                Eigen::Matrix3d term2 = oppNormals[i] * dcnjTm.transpose();
                 (*hessian)[i].block<3, 3>(3 * ip1, 3 * j) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term2;
                 (*hessian)[i].block<3, 3>(3 * ip2, 3 * j) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term2;
                 (*hessian)[i].block<3, 3>(3 * i, 3 * j) += (2.0 / mnorms[i] / mnorms[i] / mnorms[i]) * term2;
@@ -159,10 +157,9 @@ static Eigen::Vector3d secondFundamentalFormEntries(
                     (*hessian)[i].block<3, 3>(miidx[j], miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * dnijTq * (mvec[i].transpose() * dnij[k]);
                     (*hessian)[i].block<3, 3>(miidx[j], 3 * k) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * dnijTq * (mvec[i].transpose() * dcn.block<3, 3>(0, 3 * k));
                 }
-
+                
                 double qdoto = qvec[i].dot(oppNormals[i]);
-                Eigen::Vector3d dnijTm = dnij[j].transpose() * mvec[i];
-                Eigen::Vector3d dcnjTm = (dcn.block<3, 3>(0, 3 * j).transpose() * mvec[i]);
+                
                 for (int k = 0; k < 3; k++)
                 {
                     (*hessian)[i].block<3, 3>(miidx[j], miidx[k]) += (-1.0 / mnorms[i] / mnorms[i] / mnorms[i]) * qdoto * dnij[j].transpose() * dnij[k];
