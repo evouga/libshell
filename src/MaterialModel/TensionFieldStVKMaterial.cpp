@@ -101,7 +101,7 @@ double TensionFieldStVKMaterial<SFF>::stretchingEnergy(
         double lambda = lambda1;
         double kstretching = kstretch1 + kstretch2 - kstretch1 * kstretch1 / (kstretch1 + kstretch2);
 
-        double result = kstretching * 0.5 * dA * lambda * lambda;
+        double result = kstretching * dA * lambda * lambda;
         if (derivative || hessian)
         {
             double denom = sqrt(T * T / 4.0 - D);
@@ -116,10 +116,10 @@ double TensionFieldStVKMaterial<SFF>::stretchingEnergy(
             {
                 derivative->setZero();
 
-                (*derivative) += kstretching * dA * lambda * mat(0, 0) * aderiv.row(0);
-                (*derivative) += kstretching * dA * lambda * mat(0, 1) * aderiv.row(1);
-                (*derivative) += kstretching * dA * lambda * mat(1, 0) * aderiv.row(2);
-                (*derivative) += kstretching * dA * lambda * mat(1, 1) * aderiv.row(3);
+                (*derivative) += 2.0 * kstretching * dA * lambda * mat(0, 0) * aderiv.row(0);
+                (*derivative) += 2.0 * kstretching * dA * lambda * mat(0, 1) * aderiv.row(1);
+                (*derivative) += 2.0 * kstretching * dA * lambda * mat(1, 0) * aderiv.row(2);
+                (*derivative) += 2.0 * kstretching * dA * lambda * mat(1, 1) * aderiv.row(3);
             }
 
             if (hessian)
@@ -133,18 +133,18 @@ double TensionFieldStVKMaterial<SFF>::stretchingEnergy(
                 rankone += mat(1, 0) * aderiv.row(2);
                 rankone += mat(1, 1) * aderiv.row(3);
 
-                (*hessian) += kstretching * dA * rankone.transpose() * rankone;
+                (*hessian) += 2.0 * kstretching * dA * rankone.transpose() * rankone;
 
-                (*hessian) += kstretching * dA * lambda * mat(0, 0) * ahess[0];
-                (*hessian) += kstretching * dA * lambda * mat(0, 1) * ahess[1];
-                (*hessian) += kstretching * dA * lambda * mat(1, 0) * ahess[2];
-                (*hessian) += kstretching * dA * lambda * mat(1, 1) * ahess[3];
+                (*hessian) += 2.0 * kstretching * dA * lambda * mat(0, 0) * ahess[0];
+                (*hessian) += 2.0 * kstretching * dA * lambda * mat(0, 1) * ahess[1];
+                (*hessian) += 2.0 * kstretching * dA * lambda * mat(1, 0) * ahess[2];
+                (*hessian) += 2.0 * kstretching * dA * lambda * mat(1, 1) * ahess[3];
 
                 //(*hessian) += dA * sign * lambda / denom * (-1.0 / 2.0 / abar.determinant()) * aderiv.row(3).transpose() * aderiv.row(0);
-                (*hessian) += kstretching * dA * sign * lambda / denom * (-1.0 / 2.0 * detAbarinv) * aderiv.row(3).transpose() * aderiv.row(0);
-                (*hessian) += kstretching * dA * sign * lambda / denom * (-1.0 / 2.0 * detAbarinv) * -1 * aderiv.row(2).transpose() * aderiv.row(1);
-                (*hessian) += kstretching * dA * sign * lambda / denom * (-1.0 / 2.0 * detAbarinv) * -1 * aderiv.row(1).transpose() * aderiv.row(2);
-                (*hessian) += kstretching * dA * sign * lambda / denom * (-1.0 / 2.0 * detAbarinv) * aderiv.row(0).transpose() * aderiv.row(3);
+                (*hessian) += 2.0 * kstretching * dA * sign * lambda / denom * (-1.0 / 2.0 * detAbarinv) * aderiv.row(3).transpose() * aderiv.row(0);
+                (*hessian) += 2.0 * kstretching * dA * sign * lambda / denom * (-1.0 / 2.0 * detAbarinv) * -1 * aderiv.row(2).transpose() * aderiv.row(1);
+                (*hessian) += 2.0 * kstretching * dA * sign * lambda / denom * (-1.0 / 2.0 * detAbarinv) * -1 * aderiv.row(1).transpose() * aderiv.row(2);
+                (*hessian) += 2.0 * kstretching * dA * sign * lambda / denom * (-1.0 / 2.0 * detAbarinv) * aderiv.row(0).transpose() * aderiv.row(3);
 
                 Eigen::Matrix<double, 1, 9> abarinvterm;
                 abarinvterm.setZero();
@@ -152,7 +152,7 @@ double TensionFieldStVKMaterial<SFF>::stretchingEnergy(
                 abarinvterm += abarinv(0, 1) * aderiv.row(1);
                 abarinvterm += abarinv(1, 0) * aderiv.row(2);
                 abarinvterm += abarinv(1, 1) * aderiv.row(3);
-                (*hessian) += kstretching * dA * sign * lambda / denom / 4.0 * abarinvterm.transpose() * abarinvterm;
+                (*hessian) += 2.0 * kstretching * dA * sign * lambda / denom / 4.0 * abarinvterm.transpose() * abarinvterm;
 
                 //Eigen::Matrix2d inner = T / 4.0 * abarinv - 1.0 / 2.0 / abar.determinant()  * adjstrain;
                 Eigen::Matrix2d inner = T / 4.0 * abarinv - 1.0 / 2.0 * detAbarinv * adjstrain;
@@ -162,7 +162,7 @@ double TensionFieldStVKMaterial<SFF>::stretchingEnergy(
                 innerVec += inner(0, 1) * aderiv.row(1);
                 innerVec += inner(1, 0) * aderiv.row(2);
                 innerVec += inner(1, 1) * aderiv.row(3);
-                (*hessian) += kstretching * -dA * sign * lambda / denom / denom / denom * innerVec.transpose() * innerVec;
+                (*hessian) += 2.0 * kstretching * -dA * sign * lambda / denom / denom / denom * innerVec.transpose() * innerVec;
 
             }
         }
