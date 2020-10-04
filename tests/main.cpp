@@ -438,6 +438,14 @@ void testBendingFiniteDifferences(
     Eigen::VectorXd testedge = edgeDOFs;
     testedge.setRandom();
 
+
+    // for global testing
+    Eigen::MatrixXd posPert(testpos.rows(), testpos.cols());
+    posPert.setRandom();
+
+    Eigen::VectorXd edgePert(testedge.size());
+    edgePert.setRandom();
+
     constexpr int nedgedofs = SFF::numExtraDOFs;
 
     std::vector<int> epsilons = {-2, -3, -4, -5, -6};
@@ -448,12 +456,6 @@ void testBendingFiniteDifferences(
 
         // global testing
         {
-            Eigen::MatrixXd posPert(testpos.rows(), testpos.cols());
-            posPert.setRandom();
-
-            Eigen::VectorXd edgePert(testedge.size());
-            edgePert.setRandom();
-
             Eigen::MatrixXd fwdpertpos = testpos + pert * posPert;
             Eigen::MatrixXd backpertpos = testpos - pert * posPert;
             Eigen::VectorXd fwdpertedge = testedge + pert * edgePert;
