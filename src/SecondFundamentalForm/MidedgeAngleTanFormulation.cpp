@@ -32,81 +32,77 @@ static double edgeTheta(
     Eigen::Vector3d n0 = (q0 - q2).cross(q1 - q2);
     Eigen::Vector3d n1 = (q1 - q3).cross(q0 - q3);
     Eigen::Vector3d axis = q1 - q0;
-    axis.normalize();
-    Eigen::Matrix<double, 1, 6> angderiv;
-    Eigen::Matrix<double, 6, 6> anghess;
+    Eigen::Matrix<double, 1, 9> angderiv;
+    Eigen::Matrix<double, 9, 9> anghess;
 
     double theta = angle(n0, n1, axis, (derivative || hessian) ? &angderiv : NULL, hessian ? &anghess : NULL);    
-    
+
     if (derivative)
     {
-        derivative->block(0, 0, 1, 3) += angderiv.block(0, 0, 1, 3) * crossMatrix(q2 - q1);
-        derivative->block(0, 3, 1, 3) += angderiv.block(0, 0, 1, 3) * crossMatrix(q0 - q2);
-        derivative->block(0, 6, 1, 3) += angderiv.block(0, 0, 1, 3) * crossMatrix(q1 - q0);
+        derivative->block<1, 3>(0, 0) += angderiv.block<1, 3>(0, 0) * crossMatrix(q2 - q1);
+        derivative->block<1, 3>(0, 3) += angderiv.block<1, 3>(0, 0) * crossMatrix(q0 - q2);
+        derivative->block<1, 3>(0, 6) += angderiv.block<1, 3>(0, 0) * crossMatrix(q1 - q0);
 
-        derivative->block(0, 0, 1, 3) += angderiv.block(0, 3, 1, 3) * crossMatrix(q1 - q3);
-        derivative->block(0, 3, 1, 3) += angderiv.block(0, 3, 1, 3) * crossMatrix(q3 - q0);
-        derivative->block(0, 9, 1, 3) += angderiv.block(0, 3, 1, 3) * crossMatrix(q0 - q1);
+        derivative->block<1, 3>(0, 0) += angderiv.block<1, 3>(0, 3) * crossMatrix(q1 - q3);
+        derivative->block<1, 3>(0, 3) += angderiv.block<1, 3>(0, 3) * crossMatrix(q3 - q0);
+        derivative->block<1, 3>(0, 9) += angderiv.block<1, 3>(0, 3) * crossMatrix(q0 - q1);
     }
 
     if (hessian)
-    {
-        hessian->block(0, 0, 3, 3) += crossMatrix(q2 - q1).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q2 - q1);
-        hessian->block(0, 3, 3, 3) += crossMatrix(q2 - q1).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q0 - q2);
-        hessian->block(0, 6, 3, 3) += crossMatrix(q2 - q1).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q1 - q0);
-        hessian->block(3, 0, 3, 3) += crossMatrix(q0 - q2).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q2 - q1);
-        hessian->block(3, 3, 3, 3) += crossMatrix(q0 - q2).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q0 - q2);
-        hessian->block(3, 6, 3, 3) += crossMatrix(q0 - q2).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q1 - q0);
-        hessian->block(6, 0, 3, 3) += crossMatrix(q1 - q0).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q2 - q1);
-        hessian->block(6, 3, 3, 3) += crossMatrix(q1 - q0).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q0 - q2);
-        hessian->block(6, 6, 3, 3) += crossMatrix(q1 - q0).transpose() * anghess.block(0, 0, 3, 3) * crossMatrix(q1 - q0);
+    {        
+        Eigen::Matrix3d vqm[3];
+        vqm[0] = crossMatrix(q0 - q2);
+        vqm[1] = crossMatrix(q1 - q0);
+        vqm[2] = crossMatrix(q2 - q1);
+        Eigen::Matrix3d wqm[3];
+        wqm[0] = crossMatrix(q0 - q1);
+        wqm[1] = crossMatrix(q1 - q3);
+        wqm[2] = crossMatrix(q3 - q0);
 
-        hessian->block(0, 0, 3, 3) += crossMatrix(q1 - q3).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q2 - q1);
-        hessian->block(0, 3, 3, 3) += crossMatrix(q1 - q3).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q0 - q2);
-        hessian->block(0, 6, 3, 3) += crossMatrix(q1 - q3).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q1 - q0);
-        hessian->block(3, 0, 3, 3) += crossMatrix(q3 - q0).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q2 - q1);
-        hessian->block(3, 3, 3, 3) += crossMatrix(q3 - q0).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q0 - q2);
-        hessian->block(3, 6, 3, 3) += crossMatrix(q3 - q0).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q1 - q0);
-        hessian->block(9, 0, 3, 3) += crossMatrix(q0 - q1).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q2 - q1);
-        hessian->block(9, 3, 3, 3) += crossMatrix(q0 - q1).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q0 - q2);
-        hessian->block(9, 6, 3, 3) += crossMatrix(q0 - q1).transpose() * anghess.block(0, 3, 3, 3) * crossMatrix(q1 - q0);
+        int vindices[3] = { 3, 6, 0 };
+        int windices[3] = { 9, 0, 3 };
 
-        hessian->block(0, 0, 3, 3) += crossMatrix(q2 - q1).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q1 - q3);
-        hessian->block(0, 3, 3, 3) += crossMatrix(q2 - q1).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q3 - q0);
-        hessian->block(0, 9, 3, 3) += crossMatrix(q2 - q1).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q0 - q1);
-        hessian->block(3, 0, 3, 3) += crossMatrix(q0 - q2).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q1 - q3);
-        hessian->block(3, 3, 3, 3) += crossMatrix(q0 - q2).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q3 - q0);
-        hessian->block(3, 9, 3, 3) += crossMatrix(q0 - q2).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q0 - q1);
-        hessian->block(6, 0, 3, 3) += crossMatrix(q1 - q0).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q1 - q3);
-        hessian->block(6, 3, 3, 3) += crossMatrix(q1 - q0).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q3 - q0);
-        hessian->block(6, 9, 3, 3) += crossMatrix(q1 - q0).transpose() * anghess.block(3, 0, 3, 3) * crossMatrix(q0 - q1);
+        for (int i = 0; i < 3; i++)
+        {            
+            for (int j = 0; j < 3; j++)
+            {
+                hessian->block<3, 3>(vindices[i], vindices[j]) += vqm[i].transpose() * anghess.block<3, 3>(0, 0) * vqm[j];
+                hessian->block<3, 3>(vindices[i], windices[j]) += vqm[i].transpose() * anghess.block<3, 3>(0, 3) * wqm[j];
+                hessian->block<3, 3>(windices[i], vindices[j]) += wqm[i].transpose() * anghess.block<3, 3>(3, 0) * vqm[j];
+                hessian->block<3, 3>(windices[i], windices[j]) += wqm[i].transpose() * anghess.block<3, 3>(3, 3) * wqm[j];
+            }
 
-        hessian->block(0, 0, 3, 3) += crossMatrix(q1 - q3).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q1 - q3);
-        hessian->block(0, 3, 3, 3) += crossMatrix(q1 - q3).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q3 - q0);
-        hessian->block(0, 9, 3, 3) += crossMatrix(q1 - q3).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q0 - q1);
-        hessian->block(3, 0, 3, 3) += crossMatrix(q3 - q0).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q1 - q3);
-        hessian->block(3, 3, 3, 3) += crossMatrix(q3 - q0).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q3 - q0);
-        hessian->block(3, 9, 3, 3) += crossMatrix(q3 - q0).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q0 - q1);
-        hessian->block(9, 0, 3, 3) += crossMatrix(q0 - q1).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q1 - q3);
-        hessian->block(9, 3, 3, 3) += crossMatrix(q0 - q1).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q3 - q0);
-        hessian->block(9, 9, 3, 3) += crossMatrix(q0 - q1).transpose() * anghess.block(3, 3, 3, 3) * crossMatrix(q0 - q1);
+            hessian->block<3, 3>(vindices[i], 3) += vqm[i].transpose() * anghess.block<3, 3>(0, 6);
+            hessian->block<3, 3>(3, vindices[i]) += anghess.block<3, 3>(6, 0) * vqm[i];
+            hessian->block<3, 3>(vindices[i], 0) += -vqm[i].transpose() * anghess.block<3, 3>(0, 6);
+            hessian->block<3, 3>(0, vindices[i]) += -anghess.block<3, 3>(6, 0) * vqm[i];
 
-        Eigen::Vector3d dang1 = angderiv.block(0, 0, 1, 3).transpose();
-        Eigen::Vector3d dang2 = angderiv.block(0, 3, 1, 3).transpose();
+            hessian->block<3, 3>(windices[i], 3) += wqm[i].transpose() * anghess.block<3, 3>(3, 6);
+            hessian->block<3, 3>(3, windices[i]) += anghess.block<3, 3>(6, 3) * wqm[i];
+            hessian->block<3, 3>(windices[i], 0) += -wqm[i].transpose() * anghess.block<3, 3>(3, 6);
+            hessian->block<3, 3>(0, windices[i]) += -anghess.block<3, 3>(6, 3) * wqm[i];
 
-        hessian->block(6, 3, 3, 3) += crossMatrix(dang1);
-        hessian->block(0, 3, 3, 3) -= crossMatrix(dang1);
-        hessian->block(0, 6, 3, 3) += crossMatrix(dang1);
-        hessian->block(3, 0, 3, 3) += crossMatrix(dang1);
-        hessian->block(3, 6, 3, 3) -= crossMatrix(dang1);
-        hessian->block(6, 0, 3, 3) -= crossMatrix(dang1);
+        }
 
-        hessian->block(9, 0, 3, 3) += crossMatrix(dang2);
-        hessian->block(3, 0, 3, 3) -= crossMatrix(dang2);
-        hessian->block(3, 9, 3, 3) += crossMatrix(dang2);
-        hessian->block(0, 3, 3, 3) += crossMatrix(dang2);
-        hessian->block(0, 9, 3, 3) -= crossMatrix(dang2);
-        hessian->block(9, 3, 3, 3) -= crossMatrix(dang2);        
+        Eigen::Vector3d dang1 = angderiv.block<1,3>(0, 0).transpose();
+        Eigen::Vector3d dang2 = angderiv.block<1,3>(0, 3).transpose();
+
+        Eigen::Matrix3d dang1mat = crossMatrix(dang1);
+        Eigen::Matrix3d dang2mat = crossMatrix(dang2);
+
+        hessian->block<3, 3>(6, 3) += dang1mat;
+        hessian->block<3, 3>(0, 3) -= dang1mat;
+        hessian->block<3, 3>(0, 6) += dang1mat;
+        hessian->block<3, 3>(3, 0) += dang1mat;
+        hessian->block<3, 3>(3, 6) -= dang1mat;
+        hessian->block<3, 3>(6, 0) -= dang1mat;
+
+        hessian->block<3, 3>(9, 0) += dang2mat;
+        hessian->block<3, 3>(3, 0) -= dang2mat;
+        hessian->block<3, 3>(3, 9) += dang2mat;
+        hessian->block<3, 3>(0, 3) += dang2mat;
+        hessian->block<3, 3>(0, 9) -= dang2mat;
+        hessian->block<3, 3>(9, 3) -= dang2mat;
     }
 
     return theta;

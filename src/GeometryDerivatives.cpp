@@ -21,38 +21,30 @@ Eigen::Matrix2d adjugate(Eigen::Matrix2d M)
 }
 
 double angle(const Eigen::Vector3d &v, const Eigen::Vector3d &w, const Eigen::Vector3d &axis,
-    Eigen::Matrix<double, 1, 6> *derivative, // v, w
-    Eigen::Matrix<double, 6, 6> *hessian
+    Eigen::Matrix<double, 1, 9> *derivative, // v, w
+    Eigen::Matrix<double, 9, 9> *hessian
 )
 {
-    double theta = 2.0 * atan2((v.cross(w).dot(axis)), v.dot(w) + v.norm() * w.norm());
+    double theta = 2.0 * atan2((v.cross(w).dot(axis) / axis.norm()), v.dot(w) + v.norm() * w.norm());
 
     if (derivative)
     {
-        derivative->segment(0, 3) = -axis.cross(v) / v.squaredNorm();
-        derivative->segment(3, 3) = axis.cross(w) / w.squaredNorm();
+        derivative->segment<3>(0) = -axis.cross(v) / v.squaredNorm() / axis.norm();
+        derivative->segment<3>(3) = axis.cross(w) / w.squaredNorm() / axis.norm();
+        derivative->segment<3>(6).setZero();
     }
     if (hessian)
     {
         hessian->setZero();
-        hessian->block(0, 0, 3, 3) += 2.0 * (axis.cross(v))*v.transpose() / v.squaredNorm() / v.squaredNorm();
-        hessian->block(3, 3, 3, 3) += -2.0 * (axis.cross(w))*w.transpose() / w.squaredNorm() / w.squaredNorm();
-        hessian->block(0, 0, 3, 3) += -crossMatrix(axis) / v.squaredNorm();
-        hessian->block(3, 3, 3, 3) += crossMatrix(axis) / w.squaredNorm();
+        hessian->block<3, 3>(0, 0) += 2.0 * (axis.cross(v)) * v.transpose() / v.squaredNorm() / v.squaredNorm() / axis.norm();
+        hessian->block<3, 3>(3, 3) += -2.0 * (axis.cross(w)) * w.transpose() / w.squaredNorm() / w.squaredNorm() / axis.norm();
+        hessian->block<3, 3>(0, 0) += -crossMatrix(axis) / v.squaredNorm() / axis.norm();
+        hessian->block<3, 3>(3, 3) += crossMatrix(axis) / w.squaredNorm() / axis.norm();
 
-        double sigma = 1.0;
-        if (v.cross(w).dot(axis) < 0)
-            sigma = -1.0;
-
-        double vwnorm = v.cross(w).norm();
-        if (vwnorm > 1e-8)
-        {
-            Eigen::Matrix3d da = sigma * (1.0 / vwnorm * Eigen::Matrix3d::Identity() - 1.0 / vwnorm / vwnorm / vwnorm * (v.cross(w)) * (v.cross(w)).transpose());
-            hessian->block(0, 0, 3, 3) += crossMatrix(v) / v.squaredNorm() * da * -crossMatrix(w);
-            hessian->block(3, 0, 3, 3) += crossMatrix(v) / v.squaredNorm() * da * crossMatrix(v);
-            hessian->block(0, 3, 3, 3) += -crossMatrix(w) / w.squaredNorm() * da * -crossMatrix(w);
-            hessian->block(3, 3, 3, 3) += -crossMatrix(w) / w.squaredNorm() * da * crossMatrix(v);
-        }
+        Eigen::Matrix3d dahat = (Eigen::Matrix3d::Identity() / axis.norm() - axis * axis.transpose() / axis.norm() / axis.norm() / axis.norm());
+        
+        hessian->block<3, 3>(0, 6) += crossMatrix(v) * dahat / v.squaredNorm();
+        hessian->block<3, 3>(3, 6) += -crossMatrix(w) * dahat / w.squaredNorm();        
     }
 
     return theta;

@@ -10,12 +10,14 @@ Eigen::Matrix3d crossMatrix(Eigen::Vector3d v);
 Eigen::Matrix2d adjugate(Eigen::Matrix2d M);
 
 /*
-* Signed angle between two vectors, as measured on the oriented plane with normal axis (which should be perpendicular to both vectors)
-* Derivatives are with respect to v then w
+* Signed angle between two vectors, as measured on the oriented plane with normal parallel to the given axis (which 
+* must be perpendicular to both vectors).
+* Derivatives are with respect to v, w, a. Note that the derivative with respect to a is always zero (but the function
+* fill a 1x9 vector for consistency with the Hessian, which *does* have non-zero blocks with respect to a.
 */
 double angle(const Eigen::Vector3d &v, const Eigen::Vector3d &w, const Eigen::Vector3d &axis,
-    Eigen::Matrix<double, 1, 6> *derivative, // v, w
-    Eigen::Matrix<double, 6, 6> *hessian
+    Eigen::Matrix<double, 1, 9> *derivative, // v, w, a
+    Eigen::Matrix<double, 9, 9> *hessian
 );
 
 /* 
