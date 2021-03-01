@@ -27,7 +27,7 @@ if(LIBIGL_FOUND)
 else()
 	target_include_directories(${PROJECT_NAME} PRIVATE "$ENV{EIGEN3_INCLUDE_DIR}" )
 endif()
-install(TARGETS ${PROJECT_NAME} DESTINATION lib)
+install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_CURRENT_LIST_DIR}/lib)
 
 file(GLOB EXAMPLEFILES example/*.cpp)
 add_executable(example_${PROJECT_NAME} ${EXAMPLEFILES})
