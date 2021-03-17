@@ -4,27 +4,30 @@
 #include <Eigen/Core>
 #include <vector>
 
-class MeshConnectivity;
+namespace LibShell {
 
-/*
- * Second fundamental form based on rotating the averaged face normals across edges by an addition per-edge angle.
- * Uses the sin discretization of curvature.
- */
+    class MeshConnectivity;
 
-class MidedgeAngleSinFormulation
-{
-public:
-    constexpr static int numExtraDOFs = 1;
+    /*
+     * Second fundamental form based on rotating the averaged face normals across edges by an addition per-edge angle.
+     * Uses the sin discretization of curvature.
+     */
 
-    static void initializeExtraDOFs(Eigen::VectorXd &extraDOFs, const MeshConnectivity &mesh, const Eigen::MatrixXd &curPos);
+    class MidedgeAngleSinFormulation
+    {
+    public:
+        constexpr static int numExtraDOFs = 1;
 
-    static Eigen::Matrix2d secondFundamentalForm(
-        const MeshConnectivity &mesh,
-        const Eigen::MatrixXd &curPos,
-        const Eigen::VectorXd &extraDOFs,
-        int face,
-        Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs> *derivative, // F(face, i), then the three vertices opposite F(face,i), then the thetas on oppositeEdge(face,i)
-        std::vector < Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> > *hessian);
+        static void initializeExtraDOFs(Eigen::VectorXd& extraDOFs, const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos);
+
+        static Eigen::Matrix2d secondFundamentalForm(
+            const MeshConnectivity& mesh,
+            const Eigen::MatrixXd& curPos,
+            const Eigen::VectorXd& extraDOFs,
+            int face,
+            Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs>* derivative, // F(face, i), then the three vertices opposite F(face,i), then the thetas on oppositeEdge(face,i)
+            std::vector < Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> >* hessian);
+    };
 };
 
 #endif

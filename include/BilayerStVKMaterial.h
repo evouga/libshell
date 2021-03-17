@@ -1,32 +1,38 @@
-#ifndef TENSIONFIELDSTVKMATERIAL_H
-#define TENSIONFIELDSTVKMATERIAL_H
+#ifndef BILAYERSTVKMATERIAL_H
+#define BILAYERSTVKMATERIAL_H
 
 #include "MaterialModel.h"
 
 namespace LibShell {
 
     /*
-     * Tension field theory implementation of a St. Venant-Kirchhoff material with
-     * energy density (in the pure-tension case)
+     * St. Venant-Kirchhoff linear material model, with energy density
      * W = alpha/2.0 tr(S)^2 + beta tr(S^2),
-     * for strain tensor S = gbar^{-1}(g-gbar), where g and gbar are the current
-     * and rest metrics of the shell volume (which vary in the thickness direction
-     * as defined by the surface fundamental forms).
+     * for a bilayer where each layer has a different thickness, rest metric, and
+     * Lame parameters. As in the monolayer StVK formulation, the strain tensor
+     * for each layer is S_i = gbar_i^{-1}(g_i-gbar_i), where g_i and gbar_i are
+     * the current and rest metrics of the shell volume within layer i (which vary
+     * in the thickness direction as defined by the surface fundamental forms).
      *
-     * This material has no bending energy.
-     * Takes a MonolayerRestState.  
+     * Takes a BilayerRestState.
      */
 
     template <class SFF>
-    class TensionFieldStVKMaterial : public MaterialModel<SFF>
+    class BilayerStVKMaterial : public MaterialModel<SFF>
     {
     public:
-        TensionFieldStVKMaterial(double lameAlpha, double lameBeta) : lameAlpha_(lameAlpha), lameBeta_(lameBeta) {}
+        BilayerStVKMaterial(double lameAlpha1, double lameBeta1,
+            double lameAlpha2, double lameBeta2
+        )
+            : lameAlpha1_(lameAlpha1), lameBeta1_(lameBeta1),
+            lameAlpha2_(lameAlpha2), lameBeta2_(lameBeta2)
+        {}
 
         /*
          * Lame parameters of the material (as in the energy density written above)
          */
-        double lameAlpha_, lameBeta_;
+        double lameAlpha1_, lameBeta1_;
+        double lameAlpha2_, lameBeta2_;
 
         virtual double stretchingEnergy(
             const MeshConnectivity& mesh,
@@ -44,6 +50,8 @@ namespace LibShell {
             int face,
             Eigen::Matrix<double, 1, 18 + 3 * SFF::numExtraDOFs>* derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
             Eigen::Matrix<double, 18 + 3 * SFF::numExtraDOFs, 18 + 3 * SFF::numExtraDOFs>* hessian) const;
+
+
     };
 };
 

@@ -9,13 +9,11 @@
 #include "../include/ElasticShell.h"
 
 template <class SFF>
-void takeOneStep(const MeshConnectivity &mesh,
+void takeOneStep(const LibShell::MeshConnectivity &mesh,
     Eigen::MatrixXd &curPos,
     Eigen::VectorXd &curEdgeDOFs,
-    const MaterialModel<SFF> &mat,
-    const Eigen::VectorXd &thicknesses,
-    const std::vector<Eigen::Matrix2d> &abars,
-    const std::vector<Eigen::Matrix2d> &bbars,
+    const LibShell::MaterialModel<SFF> &mat,
+    const LibShell::RestState &restState,
     double &reg)
 {
 
@@ -30,7 +28,7 @@ void takeOneStep(const MeshConnectivity &mesh,
         Eigen::VectorXd derivative;
         std::vector<Eigen::Triplet<double> > hessian;
 
-        double energy = ElasticShell<SFF>::elasticEnergy(mesh, curPos, curEdgeDOFs, mat, thicknesses, abars, bbars, &derivative, &hessian);
+        double energy = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, curEdgeDOFs, mat, restState, &derivative, &hessian);
 
         Eigen::SparseMatrix<double> H(freeDOFs, freeDOFs);
         H.setFromTriplets(hessian.begin(), hessian.end());
@@ -76,7 +74,7 @@ void takeOneStep(const MeshConnectivity &mesh,
 
 
 
-            double newenergy = ElasticShell<SFF>::elasticEnergy(mesh, newPos, newEdgeDofs, mat, thicknesses, abars, bbars, &derivative, NULL);
+            double newenergy = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, newPos, newEdgeDofs, mat, restState, &derivative, NULL);
             force = -derivative;
 
             double forceResidual = force.norm();
