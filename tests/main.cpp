@@ -253,13 +253,16 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
 
 template<class SFF> 
 double bilayerTest(const LibShell::MeshConnectivity& mesh,
-    const Eigen::MatrixXd& curPos,
+    const Eigen::MatrixXd& restPos,
     const Eigen::VectorXd& thicknesses,    
     double lameAlpha, double lameBeta)
-{
+{    
+    Eigen::MatrixXd curPos = restPos;
+    curPos.setRandom();
     Eigen::VectorXd edgeDOFs;
     SFF::initializeExtraDOFs(edgeDOFs, mesh, curPos);
     int nedgeDOFs = (int)edgeDOFs.size();
+
 
     LibShell::MonolayerRestState monoRestState;
     monoRestState.thicknesses.resize(mesh.nFaces());
@@ -275,13 +278,13 @@ double bilayerTest(const LibShell::MeshConnectivity& mesh,
         biRestState.layers[1].thicknesses[i] = thicknesses[i];
     }
 
-    LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, curPos, monoRestState.abars);
-    LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, curPos, edgeDOFs, monoRestState.bbars);
+    LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, restPos, monoRestState.abars);
+    LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, restPos, edgeDOFs, monoRestState.bbars);
 
-    LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, curPos, biRestState.layers[0].abars);
-    LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, curPos, biRestState.layers[1].abars);
-    LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, curPos, edgeDOFs, biRestState.layers[0].bbars);
-    LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, curPos, edgeDOFs, biRestState.layers[1].bbars);
+    LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, restPos, biRestState.layers[0].abars);
+    LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, restPos, biRestState.layers[1].abars);
+    LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, restPos, edgeDOFs, biRestState.layers[0].bbars);
+    LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, restPos, edgeDOFs, biRestState.layers[1].bbars);
     
     LibShell::StVKMaterial<SFF> monomat(lameAlpha, lameBeta);
     LibShell::BilayerStVKMaterial<SFF> bimat(lameAlpha, lameBeta, lameAlpha, lameBeta);
