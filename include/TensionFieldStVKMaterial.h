@@ -21,12 +21,7 @@ namespace LibShell {
     class TensionFieldStVKMaterial : public MaterialModel<SFF>
     {
     public:
-        TensionFieldStVKMaterial(double lameAlpha, double lameBeta) : lameAlpha_(lameAlpha), lameBeta_(lameBeta) {}
-
-        /*
-         * Lame parameters of the material (as in the energy density written above)
-         */
-        double lameAlpha_, lameBeta_;
+        TensionFieldStVKMaterial() {}
 
         virtual double stretchingEnergy(
             const MeshConnectivity& mesh,

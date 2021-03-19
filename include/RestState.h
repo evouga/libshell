@@ -17,10 +17,11 @@ namespace LibShell {
     };
 
     /* Encodes the rest state information for an elastic monolayer.
-     * - thicknesses:   |F| x 1 list of triangle thicknesses.
-     * - abars, bbars:  first and second fundamental forms, in the barycentric coordinates of each mesh face, encoding the shell rest state.
-        If you have explicit rest geometry, you can compute these using the *FundamentalForms functions. Alternatively you
-        can set the forms directly (zero matrices for bbar if you want a flat rest state, for instance).
+     * - thicknesses:           |F| x 1 list of triangle thicknesses.
+     * - abars, bbars:          first and second fundamental forms, in the barycentric coordinates of each mesh face, encoding the shell rest state.
+                                If you have explicit rest geometry, you can compute these using the *FundamentalForms functions. Alternatively you
+                                can set the forms directly (zero matrices for bbar if you want a flat rest state, for instance).
+     * - lameAlpha, lameBeta    |F| x 1 list of Lame parameters      
      */
     struct MonolayerRestState : public RestState
     {
@@ -30,6 +31,8 @@ namespace LibShell {
         std::vector<double> thicknesses;
         std::vector<Eigen::Matrix2d> abars;
         std::vector<Eigen::Matrix2d> bbars;
+        std::vector<double> lameAlpha;
+        std::vector<double> lameBeta;
     };
 
     /*

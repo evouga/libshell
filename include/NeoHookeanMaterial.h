@@ -19,12 +19,7 @@ namespace LibShell {
     class NeoHookeanMaterial : public MaterialModel<SFF>
     {
     public:
-        NeoHookeanMaterial(double lameAlpha, double lameBeta) : lameAlpha_(lameAlpha), lameBeta_(lameBeta) {}
-
-        /*
-        * Lame parameters of the material (as in the energy density written above)
-        */
-        double lameAlpha_, lameBeta_;
+        NeoHookeanMaterial() {}
 
         virtual double stretchingEnergy(
             const MeshConnectivity& mesh,

@@ -31,6 +31,8 @@ namespace LibShell {
         Matrix2d a = firstFundamentalForm(mesh, curPos, face, (derivative || hessian) ? &aderiv : NULL, hessian ? &ahess : NULL);
         Matrix2d M = abarinv * (a - rs.abars[face]);
         double dA = 0.5 * sqrt(rs.abars[face].determinant());
+        double lameAlpha = rs.lameAlpha[face];
+        double lameBeta = rs.lameBeta[face];
 
         double T = M.trace();
         double D = M.determinant();
@@ -49,8 +51,8 @@ namespace LibShell {
 
         bool puretension = false;
 
-        double kstretch1 = 0.5 * coeff * lameAlpha_;
-        double kstretch2 = coeff * lameBeta_;
+        double kstretch1 = 0.5 * coeff * lameAlpha;
+        double kstretch2 = coeff * lameBeta;
 
         double transitionCoeff = -kstretch1 / (kstretch1 + kstretch2);
 
@@ -62,31 +64,31 @@ namespace LibShell {
         if (puretension)
         {
 
-            double StVK = 0.5 * lameAlpha_ * pow(M.trace(), 2) + lameBeta_ * (M * M).trace();
+            double StVK = 0.5 * lameAlpha * pow(M.trace(), 2) + lameBeta * (M * M).trace();
             double result = coeff * dA * StVK;
 
             if (derivative)
             {
-                Matrix2d temp = lameAlpha_ * M.trace() * abarinv + 2 * lameBeta_ * M * abarinv;
+                Matrix2d temp = lameAlpha * M.trace() * abarinv + 2 * lameBeta * M * abarinv;
                 *derivative = coeff * dA * aderiv.transpose() * Map<Vector4d>(temp.data());
             }
 
             if (hessian)
             {
                 Matrix<double, 1, 9> inner = aderiv.transpose() * Map<Vector4d>(abarinv.data());
-                *hessian = lameAlpha_ * inner.transpose() * inner;
+                *hessian = lameAlpha * inner.transpose() * inner;
 
                 Matrix2d Mainv = M * abarinv;
                 for (int i = 0; i < 4; ++i) // iterate over Mainv and abarinv as if they were vectors
-                    *hessian += (lameAlpha_ * M.trace() * abarinv(i) + 2 * lameBeta_ * Mainv(i)) * ahess[i];
+                    *hessian += (lameAlpha * M.trace() * abarinv(i) + 2 * lameBeta * Mainv(i)) * ahess[i];
 
                 Matrix<double, 1, 9> inner00 = abarinv(0, 0) * aderiv.row(0) + abarinv(0, 1) * aderiv.row(2);
                 Matrix<double, 1, 9> inner01 = abarinv(0, 0) * aderiv.row(1) + abarinv(0, 1) * aderiv.row(3);
                 Matrix<double, 1, 9> inner10 = abarinv(1, 0) * aderiv.row(0) + abarinv(1, 1) * aderiv.row(2);
                 Matrix<double, 1, 9> inner11 = abarinv(1, 0) * aderiv.row(1) + abarinv(1, 1) * aderiv.row(3);
-                *hessian += 2 * lameBeta_ * inner00.transpose() * inner00;
-                *hessian += 2 * lameBeta_ * (inner01.transpose() * inner10 + inner10.transpose() * inner01);
-                *hessian += 2 * lameBeta_ * inner11.transpose() * inner11;
+                *hessian += 2 * lameBeta * inner00.transpose() * inner00;
+                *hessian += 2 * lameBeta * (inner01.transpose() * inner10 + inner10.transpose() * inner01);
+                *hessian += 2 * lameBeta * inner11.transpose() * inner11;
 
                 *hessian *= coeff * dA;
             }

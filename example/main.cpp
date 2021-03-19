@@ -62,17 +62,20 @@ void runSimulation(igl::opengl::glfw::Viewer &viewer,
     for (int i = 0; i < mesh.nFaces(); i++)
         restState.bbars[i].setZero();
 
+    restState.lameAlpha.resize(mesh.nFaces(), lameAlpha);
+    restState.lameBeta.resize(mesh.nFaces(), lameBeta);
+
     LibShell::MaterialModel<SFF> *mat;
     switch (matid)
     {
     case 0:
-        mat = new LibShell::NeoHookeanMaterial<SFF>(lameAlpha, lameBeta);
+        mat = new LibShell::NeoHookeanMaterial<SFF>();
         break;
     case 1:
-        mat = new LibShell::StVKMaterial<SFF>(lameAlpha, lameBeta);
+        mat = new LibShell::StVKMaterial<SFF>();
         break;
     case 2:
-        mat = new LibShell::TensionFieldStVKMaterial<SFF>(lameAlpha, lameBeta);
+        mat = new LibShell::TensionFieldStVKMaterial<SFF>();
         break;
     default:
         assert(false);

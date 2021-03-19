@@ -21,18 +21,7 @@ namespace LibShell {
     class BilayerStVKMaterial : public MaterialModel<SFF>
     {
     public:
-        BilayerStVKMaterial(double lameAlpha1, double lameBeta1,
-            double lameAlpha2, double lameBeta2
-        )
-            : lameAlpha1_(lameAlpha1), lameBeta1_(lameBeta1),
-            lameAlpha2_(lameAlpha2), lameBeta2_(lameBeta2)
-        {}
-
-        /*
-         * Lame parameters of the material (as in the energy density written above)
-         */
-        double lameAlpha1_, lameBeta1_;
-        double lameAlpha2_, lameBeta2_;
+        BilayerStVKMaterial() {}
 
         virtual double stretchingEnergy(
             const MeshConnectivity& mesh,

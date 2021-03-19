@@ -136,12 +136,20 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
         double lameAlpha1 = 0;
         double lameBeta1 = 0;
         (lameiter1 == 1 ? lameAlpha1 : lameBeta1) = std::pow(10.0, loglamedist(rng));
+        std::vector<double> lameAlpha1v;
+        lameAlpha1v.resize(nfaces, lameAlpha1);
+        std::vector<double> lameBeta1v;
+        lameBeta1v.resize(nfaces, lameBeta1);
 
         for (int lameiter2 = 0; lameiter2 < 2; lameiter2++)
         {
             double lameAlpha2 = 0;
             double lameBeta2 = 0;
             (lameiter2 == 1 ? lameAlpha2 : lameBeta2) = std::pow(10.0, loglamedist(rng));
+            std::vector<double> lameAlpha2v;
+            lameAlpha2v.resize(nfaces, lameAlpha2);
+            std::vector<double> lameBeta2v;
+            lameBeta2v.resize(nfaces, lameBeta2);
 
             bool skip = false;
 
@@ -159,11 +167,13 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
                 else
                 {
                     std::cout << "NeoHookeanMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1 << std::endl;
-                    mat = new LibShell::NeoHookeanMaterial<SFF>(lameAlpha1, lameBeta1);
+                    mat = new LibShell::NeoHookeanMaterial<SFF>();
                     LibShell::MonolayerRestState* rs = new LibShell::MonolayerRestState;
                     rs->thicknesses = thicknesses1;
                     rs->abars = abar1;
                     rs->bbars = bbar1;
+                    rs->lameAlpha = lameAlpha1v;
+                    rs->lameBeta = lameBeta1v;
                     restState = rs;
                 }
                 break;
@@ -177,11 +187,13 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
                 else
                 {
                     std::cout << "StVKMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1 << std::endl;
-                    mat = new LibShell::StVKMaterial<SFF>(lameAlpha1, lameBeta1);
+                    mat = new LibShell::StVKMaterial<SFF>();
                     LibShell::MonolayerRestState* rs = new LibShell::MonolayerRestState;
                     rs->thicknesses = thicknesses1;
                     rs->abars = abar1;
                     rs->bbars = bbar1;
+                    rs->lameAlpha = lameAlpha1v;
+                    rs->lameBeta = lameBeta1v;
                     restState = rs;
                 }
                 break;
@@ -195,11 +207,13 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
                 else
                 {
                     std::cout << "TensionFieldStVKMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1 << std::endl;
-                    mat = new LibShell::TensionFieldStVKMaterial<SFF>(lameAlpha1, lameBeta1);
+                    mat = new LibShell::TensionFieldStVKMaterial<SFF>();
                     LibShell::MonolayerRestState* rs = new LibShell::MonolayerRestState;
                     rs->thicknesses = thicknesses1;
                     rs->abars = abar1;
                     rs->bbars = bbar1;
+                    rs->lameAlpha = lameAlpha1v;
+                    rs->lameBeta = lameBeta1v;
                     restState = rs;
                 }
                 break;
@@ -207,7 +221,7 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
             case 3:
             {
                 std::cout << "BilayerStVKMaterial, alpha1 = " << lameAlpha1 << ", beta1 = " << lameBeta1 << ", alpha2 = " << lameAlpha2 << ", beta2 = " << lameBeta2 << std::endl;
-                mat = new LibShell::BilayerStVKMaterial<SFF>(lameAlpha1, lameBeta1, lameAlpha2, lameBeta2);
+                mat = new LibShell::BilayerStVKMaterial<SFF>();
                 LibShell::BilayerRestState* rs = new LibShell::BilayerRestState;
                 rs->layers[0].thicknesses = thicknesses1;
                 rs->layers[1].thicknesses = thicknesses2;
@@ -215,6 +229,10 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
                 rs->layers[1].abars = abar2;
                 rs->layers[0].bbars = bbar1;
                 rs->layers[1].bbars = bbar2;
+                rs->layers[0].lameAlpha = lameAlpha1v;
+                rs->layers[0].lameBeta = lameBeta1v;
+                rs->layers[1].lameAlpha = lameAlpha2v;
+                rs->layers[1].lameBeta = lameBeta2v;
                 restState = rs;
                 break;
             }
@@ -266,16 +284,30 @@ double bilayerTest(const LibShell::MeshConnectivity& mesh,
 
     LibShell::MonolayerRestState monoRestState;
     monoRestState.thicknesses.resize(mesh.nFaces());
+    monoRestState.lameAlpha.resize(mesh.nFaces());
+    monoRestState.lameBeta.resize(mesh.nFaces());
     for (int i = 0; i < mesh.nFaces(); i++)
+    {
         monoRestState.thicknesses[i] = thicknesses[i];
+        monoRestState.lameAlpha[i] = lameAlpha;
+        monoRestState.lameBeta[i] = lameBeta;
+    }
 
     LibShell::BilayerRestState biRestState;
     biRestState.layers[0].thicknesses.resize(mesh.nFaces());
     biRestState.layers[1].thicknesses.resize(mesh.nFaces());
+    biRestState.layers[0].lameAlpha.resize(mesh.nFaces());
+    biRestState.layers[0].lameBeta.resize(mesh.nFaces());
+    biRestState.layers[1].lameAlpha.resize(mesh.nFaces());
+    biRestState.layers[1].lameBeta.resize(mesh.nFaces());
     for (int i = 0; i < mesh.nFaces(); i++)
     {
         biRestState.layers[0].thicknesses[i] = thicknesses[i];
         biRestState.layers[1].thicknesses[i] = thicknesses[i];
+        biRestState.layers[0].lameAlpha[i] = lameAlpha;
+        biRestState.layers[0].lameBeta[i] = lameBeta;
+        biRestState.layers[1].lameAlpha[i] = lameAlpha;
+        biRestState.layers[1].lameBeta[i] = lameBeta;
     }
 
     LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, restPos, monoRestState.abars);
@@ -286,8 +318,8 @@ double bilayerTest(const LibShell::MeshConnectivity& mesh,
     LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, restPos, edgeDOFs, biRestState.layers[0].bbars);
     LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, restPos, edgeDOFs, biRestState.layers[1].bbars);
     
-    LibShell::StVKMaterial<SFF> monomat(lameAlpha, lameBeta);
-    LibShell::BilayerStVKMaterial<SFF> bimat(lameAlpha, lameBeta, lameAlpha, lameBeta);
+    LibShell::StVKMaterial<SFF> monomat;
+    LibShell::BilayerStVKMaterial<SFF> bimat;
 
     double energy1 = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, monomat, monoRestState, NULL, NULL);
     double energy2 = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, bimat, biRestState, NULL, NULL);
@@ -312,6 +344,9 @@ void getHessian(const LibShell::MeshConnectivity &mesh,
     for (int i = 0; i < mesh.nFaces(); i++)
         restState.thicknesses[i] = thicknesses[i];
 
+    restState.lameAlpha.resize(mesh.nFaces(), lameAlpha);
+    restState.lameBeta.resize(mesh.nFaces(), lameBeta);
+
     LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, curPos, restState.abars);
     LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, curPos, edgeDOFs, restState.bbars);
 
@@ -321,13 +356,13 @@ void getHessian(const LibShell::MeshConnectivity &mesh,
     switch (matid)
     {
     case 0:
-        mat = new LibShell::NeoHookeanMaterial<SFF>(lameAlpha, lameBeta);
+        mat = new LibShell::NeoHookeanMaterial<SFF>();
         break;
     case 1:
-        mat = new LibShell::StVKMaterial<SFF>(lameAlpha, lameBeta);
+        mat = new LibShell::StVKMaterial<SFF>();
         break;
     case 2:
-        mat = new LibShell::TensionFieldStVKMaterial<SFF>(lameAlpha, lameBeta);
+        mat = new LibShell::TensionFieldStVKMaterial<SFF>();
         break;
     case 3:
         H.resize(0, 0);
