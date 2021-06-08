@@ -129,7 +129,7 @@ namespace LibShell {
             for (int i = 0; i < 4; i++)
             {
                 augahess[i].setZero();
-                augahess[i].block<9, 9>(0, 0) = ahess[i];
+                augahess[i].template block<9, 9>(0, 0) = ahess[i];
             }
         }
 
@@ -150,8 +150,8 @@ namespace LibShell {
             *derivative = 2.0 * coeff1 * dA1 * bderiv.transpose() * Map<Vector4d>(temp1.data());
             *derivative += 2.0 * coeff2 * dA2 * bderiv.transpose() * Map<Vector4d>(temp2.data());
 
-            derivative->segment<9>(0) += crossTermCoeff1 * dA1 * aderiv.transpose() * Map<Vector4d>(temp1.data());
-            derivative->segment<9>(0) += crossTermCoeff2 * dA2 * aderiv.transpose() * Map<Vector4d>(temp2.data());
+            derivative->template segment<9>(0) += crossTermCoeff1 * dA1 * aderiv.transpose() * Map<Vector4d>(temp1.data());
+            derivative->template segment<9>(0) += crossTermCoeff2 * dA2 * aderiv.transpose() * Map<Vector4d>(temp2.data());
 
             Matrix2d temp3 = 0.5 * lameAlpha1_ * sigma1.trace() * abarinv1 + lameBeta1_ * sigma1 * abarinv1;
             Matrix2d temp4 = 0.5 * lameAlpha2_ * sigma2.trace() * abarinv2 + lameBeta2_ * sigma2 * abarinv2;
@@ -172,8 +172,8 @@ namespace LibShell {
             Matrix<double, 1, 18 + 3 * nedgedofs> inner4;
             inner4.setZero();
 
-            inner3.segment<9>(0) = aderiv.transpose() * Map<Vector4d>(abarinv1.data());
-            inner4.segment<9>(0) = aderiv.transpose() * Map<Vector4d>(abarinv2.data());
+            inner3.template segment<9>(0) = aderiv.transpose() * Map<Vector4d>(abarinv1.data());
+            inner4.template segment<9>(0) = aderiv.transpose() * Map<Vector4d>(abarinv2.data());
 
             *hessian += crossTermCoeff1 * dA1 * 0.5 * lameAlpha1_ * inner1.transpose() * inner3;
             *hessian += crossTermCoeff1 * dA1 * 0.5 * lameAlpha1_ * inner3.transpose() * inner1;
@@ -216,16 +216,16 @@ namespace LibShell {
 
             Matrix<double, 1, 18 + 3 * nedgedofs> inner003;
             inner003.setZero();
-            inner003.segment<9>(0) = abarinv1(0, 0) * aderiv.row(0) + abarinv1(0, 1) * aderiv.row(2);
+            inner003.template segment<9>(0) = abarinv1(0, 0) * aderiv.row(0) + abarinv1(0, 1) * aderiv.row(2);
             Matrix<double, 1, 18 + 3 * nedgedofs> inner013;
             inner013.setZero();
-            inner013.segment<9>(0) = abarinv1(0, 0) * aderiv.row(1) + abarinv1(0, 1) * aderiv.row(3);
+            inner013.template segment<9>(0) = abarinv1(0, 0) * aderiv.row(1) + abarinv1(0, 1) * aderiv.row(3);
             Matrix<double, 1, 18 + 3 * nedgedofs> inner103;
             inner103.setZero();
-            inner103.segment<9>(0) = abarinv1(1, 0) * aderiv.row(0) + abarinv1(1, 1) * aderiv.row(2);
+            inner103.template segment<9>(0) = abarinv1(1, 0) * aderiv.row(0) + abarinv1(1, 1) * aderiv.row(2);
             Matrix<double, 1, 18 + 3 * nedgedofs> inner113;
             inner113.setZero();
-            inner113.segment<9>(0) = abarinv1(1, 0) * aderiv.row(1) + abarinv1(1, 1) * aderiv.row(3);
+            inner113.template segment<9>(0) = abarinv1(1, 0) * aderiv.row(1) + abarinv1(1, 1) * aderiv.row(3);
 
             *hessian += crossTermCoeff1 * dA1 * lameBeta1_ * inner001.transpose() * inner003;
             *hessian += crossTermCoeff1 * dA1 * lameBeta1_ * inner003.transpose() * inner001;
@@ -236,16 +236,16 @@ namespace LibShell {
 
             Matrix<double, 1, 18 + 3 * nedgedofs> inner004;
             inner004.setZero();
-            inner004.segment<9>(0) = abarinv2(0, 0) * aderiv.row(0) + abarinv2(0, 1) * aderiv.row(2);
+            inner004.template segment<9>(0) = abarinv2(0, 0) * aderiv.row(0) + abarinv2(0, 1) * aderiv.row(2);
             Matrix<double, 1, 18 + 3 * nedgedofs> inner014;
             inner014.setZero();
-            inner014.segment<9>(0) = abarinv2(0, 0) * aderiv.row(1) + abarinv2(0, 1) * aderiv.row(3);
+            inner014.template segment<9>(0) = abarinv2(0, 0) * aderiv.row(1) + abarinv2(0, 1) * aderiv.row(3);
             Matrix<double, 1, 18 + 3 * nedgedofs> inner104;
             inner104.setZero();
-            inner104.segment<9>(0) = abarinv2(1, 0) * aderiv.row(0) + abarinv2(1, 1) * aderiv.row(2);
+            inner104.template segment<9>(0) = abarinv2(1, 0) * aderiv.row(0) + abarinv2(1, 1) * aderiv.row(2);
             Matrix<double, 1, 18 + 3 * nedgedofs> inner114;
             inner114.setZero();
-            inner114.segment<9>(0) = abarinv2(1, 0) * aderiv.row(1) + abarinv2(1, 1) * aderiv.row(3);
+            inner114.template segment<9>(0) = abarinv2(1, 0) * aderiv.row(1) + abarinv2(1, 1) * aderiv.row(3);
 
             *hessian += crossTermCoeff2 * dA2 * lameBeta2_ * inner002.transpose() * inner004;
             *hessian += crossTermCoeff2 * dA2 * lameBeta2_ * inner004.transpose() * inner002;
