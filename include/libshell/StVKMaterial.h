@@ -1,29 +1,29 @@
-#ifndef NEOHOOKEANMATERIAL_H
-#define NEOHOOKEANMATERIAL_H
+#ifndef STVKMATERIAL_H
+#define STVKMATERIAL_H
 
 #include "MaterialModel.h"
 
 namespace LibShell {
 
     /*
-    * Neo-Hookean nonlinear material model, with energy density
-    * W = beta/2.0 (tr[M] - 2 - log det M) + alpha/2.0 (log det M / 2)^2
-    * where M = gbar^-1 g, and g and gbar are the current and rest metrics of the
-    * shell volume (which vary in the thickness direction as defined by the surface
-    * fundamental forms).
-    *
-    * Takes a MonolayerRestState.
-    */
+     * St. Venant-Kirchhoff linear material model, with energy density
+     * W = alpha/2.0 tr(S)^2 + beta tr(S^2),
+     * for strain tensor S = gbar^{-1}(g-gbar), where g and gbar are the current
+     * and rest metrics of the shell volume (which vary in the thickness direction
+     * as defined by the surface fundamental forms).
+     *
+     * Needs a MonolayerRestState.
+     */
 
     template <class SFF>
-    class NeoHookeanMaterial : public MaterialModel<SFF>
+    class StVKMaterial : public MaterialModel<SFF>
     {
     public:
-        NeoHookeanMaterial(double lameAlpha, double lameBeta) : lameAlpha_(lameAlpha), lameBeta_(lameBeta) {}
+        StVKMaterial(double lameAlpha, double lameBeta) : lameAlpha_(lameAlpha), lameBeta_(lameBeta) {}
 
         /*
-        * Lame parameters of the material (as in the energy density written above)
-        */
+         * Lame parameters of the material (as in the energy density written above)
+         */
         double lameAlpha_, lameBeta_;
 
         virtual double stretchingEnergy(
@@ -45,6 +45,6 @@ namespace LibShell {
 
 
     };
-};
+}
 
 #endif

@@ -70,5 +70,5 @@ namespace LibShell {
             ET_BENDING = 2
         };
     };
-};
+}
 #endif

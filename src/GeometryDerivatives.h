@@ -54,6 +54,6 @@ namespace LibShell {
         Eigen::Matrix<double, 4, 9>* derivative, // F(face, i)
         std::vector <Eigen::Matrix<double, 9, 9> >* hessian);
 
-};
+}
 
 #endif

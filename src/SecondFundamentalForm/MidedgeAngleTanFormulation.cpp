@@ -1,10 +1,9 @@
-#include "../../include/MidedgeAngleTanFormulation.h"
-#include <Eigen/Geometry>
+#include "libshell/MeshConnectivity.h"
+#include "libshell/MidedgeAngleTanFormulation.h"
 #include "../GeometryDerivatives.h"
-#include "../../include/MeshConnectivity.h"
+#include <Eigen/Geometry>
 #include <iostream>
 #include <random>
-#include <Eigen/Geometry>
 
 namespace LibShell {
 
@@ -301,4 +300,4 @@ namespace LibShell {
         extraDOFs.setZero();
     }
 
-};
+}

@@ -41,6 +41,6 @@ namespace LibShell {
         Eigen::MatrixXi EF;
         Eigen::MatrixXi EOpp;
     };
-};
+}
 
 #endif

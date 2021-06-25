@@ -23,6 +23,6 @@ namespace LibShell {
             Eigen::Matrix<double, 4, 18>* derivative, // F(face, i), then the three vertices opposite F(face,i), then the thetas on oppositeEdge(face,i)
             std::vector<Eigen::Matrix<double, 18, 18> >* hessian);
     };
-};
+}
 
 #endif

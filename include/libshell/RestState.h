@@ -44,6 +44,6 @@ namespace LibShell {
 
         MonolayerRestState layers[2];
     };
-};
+}
 
 #endif

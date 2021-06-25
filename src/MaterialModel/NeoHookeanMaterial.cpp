@@ -1,13 +1,13 @@
-#include "../../include/NeoHookeanMaterial.h"
-#include "../../include/MeshConnectivity.h"
-#include <vector>
+#include "libshell/NeoHookeanMaterial.h"
+#include "libshell/MeshConnectivity.h"
+#include "libshell/MidedgeAngleSinFormulation.h"
+#include "libshell/MidedgeAngleTanFormulation.h"
+#include "libshell/MidedgeAverageFormulation.h"
+#include "libshell/RestState.h"
 #include "../GeometryDerivatives.h"
 #include <Eigen/Dense>
 #include <iostream>
-#include "../../include/MidedgeAngleSinFormulation.h"
-#include "../../include/MidedgeAngleTanFormulation.h"
-#include "../../include/MidedgeAverageFormulation.h"
-#include "../../include/RestState.h"
+#include <vector>
 
 namespace LibShell {
 
@@ -425,4 +425,4 @@ namespace LibShell {
     template class NeoHookeanMaterial<MidedgeAngleTanFormulation>;
     template class NeoHookeanMaterial<MidedgeAverageFormulation>;
 
-};
+}

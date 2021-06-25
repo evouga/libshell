@@ -1,4 +1,4 @@
-#include "../include/MeshConnectivity.h"
+#include "libshell/MeshConnectivity.h"
 
 #include <vector>
 #include <map>
@@ -129,4 +129,4 @@ namespace LibShell {
         return edgeOppositeVertex(edge, 1 - edgeorient);
     }
 
-};
+}

@@ -1,19 +1,14 @@
-#include "../include/ElasticShell.h"
-#include <Eigen/Geometry>
-#include <Eigen/Dense>
-#include <iostream>
-#include <Eigen/Sparse>
+#include "libshell/ElasticShell.h"
+#include "libshell/MaterialModel.h"
+#include "libshell/MeshConnectivity.h"
+#include "libshell/MidedgeAngleSinFormulation.h"
+#include "libshell/MidedgeAngleTanFormulation.h"
+#include "libshell/MidedgeAverageFormulation.h"
+#include "libshell/RestState.h"
 #include "GeometryDerivatives.h"
-#include <random>
-#include <iostream>
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
 #include <vector>
-#include <map>
-#include "../include/MeshConnectivity.h"
-#include "../include/MaterialModel.h"
-#include "../include/RestState.h"
-#include "../include/MidedgeAngleSinFormulation.h"
-#include "../include/MidedgeAngleTanFormulation.h"
-#include "../include/MidedgeAverageFormulation.h"
 
 namespace LibShell {
 
@@ -193,4 +188,4 @@ namespace LibShell {
     template class ElasticShell<MidedgeAngleTanFormulation>;
     template class ElasticShell<MidedgeAverageFormulation>;
 
-};
+}
