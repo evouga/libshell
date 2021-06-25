@@ -13,7 +13,7 @@ namespace LibShell {
     struct RestState
     {
     public:
-        virtual RestStateType type() { return RestStateType::RST_NONE; }
+        virtual RestStateType type() const { return RestStateType::RST_NONE; }
     };
 
     /* Encodes the rest state information for an elastic monolayer.
@@ -25,7 +25,7 @@ namespace LibShell {
     struct MonolayerRestState : public RestState
     {
     public:
-        virtual RestStateType type() { return RestStateType::RST_MONOLAYER; }
+        virtual RestStateType type() const { return RestStateType::RST_MONOLAYER; }
 
         std::vector<double> thicknesses;
         std::vector<Eigen::Matrix2d> abars;
@@ -40,7 +40,7 @@ namespace LibShell {
     struct BilayerRestState : public RestState
     {
     public:
-        virtual RestStateType type() { return RestStateType::RST_BILAYER; }
+        virtual RestStateType type() const { return RestStateType::RST_BILAYER; }
 
         MonolayerRestState layers[2];
     };

@@ -3,7 +3,6 @@
 
 #include <Eigen/Core>
 #include <vector>
-#include <Eigen/Sparse>
 #include "MaterialModel.h"
 
 namespace LibShell {

@@ -1,7 +1,7 @@
 #ifndef MIDEDGEANGLESINFORMULATION_H
 #define MIDEDGEANGLESINFORMULATION_H
 
-#include <Eigen/Core>
+#include <Eigen/Dense>
 #include <vector>
 
 namespace LibShell {

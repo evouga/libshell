@@ -1,7 +1,7 @@
 #ifndef MIDEDGEAVERAGEFORMULATION_H
 #define MIDEDGEAVERAGEFORMULATION_H
 
-#include <Eigen/Core>
+#include <Eigen/Dense>
 #include <vector>
 
 namespace LibShell {

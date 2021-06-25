@@ -1,7 +1,7 @@
 #ifndef MIDEDGEANGLETANFORMULATION_H
 #define MIDEDGEANGLETANFORMULATION_H
 
-#include <Eigen/Core>
+#include <Eigen/Dense>
 #include <vector>
 
 namespace LibShell {
