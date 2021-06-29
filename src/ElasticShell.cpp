@@ -6,8 +6,6 @@
 #include "libshell/MidedgeAverageFormulation.h"
 #include "libshell/RestState.h"
 #include "GeometryDerivatives.h"
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
 #include <vector>
 
 namespace LibShell {
@@ -183,7 +181,7 @@ namespace LibShell {
         }
     }
 
-    // instantions
+    // instantiations
     template class ElasticShell<MidedgeAngleSinFormulation>;
     template class ElasticShell<MidedgeAngleTanFormulation>;
     template class ElasticShell<MidedgeAverageFormulation>;

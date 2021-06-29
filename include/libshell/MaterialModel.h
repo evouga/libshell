@@ -1,7 +1,7 @@
 #ifndef MATERIALMODEL_H
 #define MATERIALMODEL_H
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 
 namespace LibShell {
 

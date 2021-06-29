@@ -6,7 +6,6 @@
 #include "libshell/RestState.h"
 #include "../GeometryDerivatives.h"
 #include <Eigen/Dense>
-#include <iostream>
 #include <vector>
 
 namespace LibShell {

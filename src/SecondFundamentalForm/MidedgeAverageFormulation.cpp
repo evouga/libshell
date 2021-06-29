@@ -1,8 +1,6 @@
 #include "libshell/MeshConnectivity.h"
 #include "libshell/MidedgeAverageFormulation.h"
 #include "../GeometryDerivatives.h"
-#include <iostream>
-#include <random>
 
 namespace LibShell {
 

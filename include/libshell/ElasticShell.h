@@ -2,6 +2,7 @@
 #define ELASTICSHELL_H
 
 #include <Eigen/Core>
+#include <Eigen/Sparse>
 #include <vector>
 #include "MaterialModel.h"
 

@@ -52,7 +52,7 @@ namespace LibShell {
         const Eigen::MatrixXd& curPos,
         int face,
         Eigen::Matrix<double, 4, 9>* derivative, // F(face, i)
-        std::vector <Eigen::Matrix<double, 9, 9> >* hessian);
+        std::vector<Eigen::Matrix<double, 9, 9> >* hessian);
 
 }
 

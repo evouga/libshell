@@ -1,7 +1,5 @@
 #include "GeometryDerivatives.h"
 #include "libshell/MeshConnectivity.h"
-#include <iostream>
-#include <random>
 
 namespace LibShell {
 

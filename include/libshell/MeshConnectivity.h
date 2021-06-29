@@ -1,7 +1,7 @@
 #ifndef MESHCONNECTIVITY_H
 #define MESHCONNECTIVITY_H
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 
 namespace LibShell {
 

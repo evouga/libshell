@@ -2,8 +2,6 @@
 #include "libshell/MidedgeAngleTanFormulation.h"
 #include "../GeometryDerivatives.h"
 #include <Eigen/Geometry>
-#include <iostream>
-#include <random>
 
 namespace LibShell {
 
