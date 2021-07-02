@@ -4,9 +4,9 @@
 #include <Eigen/Core>
 #include <vector>
 
-#include "../include/MaterialModel.h"
-#include "../include/MeshConnectivity.h"
-#include "../include/ElasticShell.h"
+#include "libshell/MaterialModel.h"
+#include "libshell/MeshConnectivity.h"
+#include "libshell/ElasticShell.h"
 
 template <class SFF>
 void takeOneStep(const LibShell::MeshConnectivity &mesh,

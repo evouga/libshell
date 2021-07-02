@@ -1,31 +1,29 @@
-#ifndef TENSIONFIELDSTVKMATERIAL_H
-#define TENSIONFIELDSTVKMATERIAL_H
+#ifndef NEOHOOKEANMATERIAL_H
+#define NEOHOOKEANMATERIAL_H
 
 #include "MaterialModel.h"
 
 namespace LibShell {
 
     /*
-     * Tension field theory implementation of a St. Venant-Kirchhoff material with
-     * energy density (in the pure-tension case)
-     * W = alpha/2.0 tr(S)^2 + beta tr(S^2),
-     * for strain tensor S = gbar^{-1}(g-gbar), where g and gbar are the current
-     * and rest metrics of the shell volume (which vary in the thickness direction
-     * as defined by the surface fundamental forms).
-     *
-     * This material has no bending energy.
-     * Takes a MonolayerRestState.  
-     */
+    * Neo-Hookean nonlinear material model, with energy density
+    * W = beta/2.0 (tr[M] - 2 - log det M) + alpha/2.0 (log det M / 2)^2
+    * where M = gbar^-1 g, and g and gbar are the current and rest metrics of the
+    * shell volume (which vary in the thickness direction as defined by the surface
+    * fundamental forms).
+    *
+    * Takes a MonolayerRestState.
+    */
 
     template <class SFF>
-    class TensionFieldStVKMaterial : public MaterialModel<SFF>
+    class NeoHookeanMaterial : public MaterialModel<SFF>
     {
     public:
-        TensionFieldStVKMaterial(double lameAlpha, double lameBeta) : lameAlpha_(lameAlpha), lameBeta_(lameBeta) {}
+        NeoHookeanMaterial(double lameAlpha, double lameBeta) : lameAlpha_(lameAlpha), lameBeta_(lameBeta) {}
 
         /*
-         * Lame parameters of the material (as in the energy density written above)
-         */
+        * Lame parameters of the material (as in the energy density written above)
+        */
         double lameAlpha_, lameBeta_;
 
         virtual double stretchingEnergy(
@@ -44,7 +42,9 @@ namespace LibShell {
             int face,
             Eigen::Matrix<double, 1, 18 + 3 * SFF::numExtraDOFs>* derivative, // F(face, i), then the three vertices opposite F(face,i), then the extra DOFs on oppositeEdge(face,i)
             Eigen::Matrix<double, 18 + 3 * SFF::numExtraDOFs, 18 + 3 * SFF::numExtraDOFs>* hessian) const;
+
+
     };
-};
+}
 
 #endif

@@ -2,8 +2,8 @@
 #define ELASTICSHELL_H
 
 #include <Eigen/Core>
-#include <vector>
 #include <Eigen/Sparse>
+#include <vector>
 #include "MaterialModel.h"
 
 namespace LibShell {
@@ -70,5 +70,5 @@ namespace LibShell {
             ET_BENDING = 2
         };
     };
-};
+}
 #endif

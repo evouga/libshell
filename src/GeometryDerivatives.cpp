@@ -1,8 +1,5 @@
 #include "GeometryDerivatives.h"
-#include "../include/MeshConnectivity.h"
-#include <iostream>
-#include <random>
-#include <Eigen/Geometry>
+#include "libshell/MeshConnectivity.h"
 
 namespace LibShell {
 
@@ -230,4 +227,4 @@ namespace LibShell {
         return result;
     }
 
-};
+}

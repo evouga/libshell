@@ -1,8 +1,6 @@
-#include "../../include/MidedgeAverageFormulation.h"
+#include "libshell/MeshConnectivity.h"
+#include "libshell/MidedgeAverageFormulation.h"
 #include "../GeometryDerivatives.h"
-#include "../../include/MeshConnectivity.h"
-#include <iostream>
-#include <random>
 
 namespace LibShell {
 
@@ -254,4 +252,4 @@ namespace LibShell {
         extraDOFs.resize(0);
     }
 
-};
+}
