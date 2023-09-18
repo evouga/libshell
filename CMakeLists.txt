@@ -18,6 +18,7 @@ endif()
 
 file(GLOB LIBFILES src/*.cpp src/SecondFundamentalForm/*.cpp src/MaterialModel/*.cpp)
 add_library(${PROJECT_NAME} STATIC ${LIBFILES})
+target_link_libraries(${PROJECT_NAME} igl::core)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_CURRENT_LIST_DIR}/lib)
 
