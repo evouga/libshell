@@ -4,7 +4,7 @@
 #include "StaticSolve.h"
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
-#include <imgui/imgui.h>
+#include <imgui.h>
 #include "../include/MidedgeAngleTanFormulation.h"
 #include "../include/MidedgeAngleSinFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
@@ -133,8 +133,10 @@ int main(int argc, char *argv[])
     igl::opengl::glfw::Viewer viewer;
 
     // Attach a menu plugin
+    igl::opengl::glfw::imgui::ImGuiPlugin plugin;
     igl::opengl::glfw::imgui::ImGuiMenu menu;
-    viewer.plugins.push_back(&menu);
+    viewer.plugins.push_back(&plugin);
+    plugin.widgets.push_back(&menu);
    
 
     // Add content to the default menu window
