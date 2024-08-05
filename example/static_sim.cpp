@@ -11,10 +11,9 @@
 #include "../include/NeoHookeanMaterial.h"
 #include "../include/RestState.h"
 
-#include <igl/opengl/glfw/Viewer.h>
-#include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
-#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
-#include <imgui.h>
+#include <polyscope/surface_mesh.h>
+
+#include <igl/readOBJ.h>
 
 #include <unordered_set>
 #include <memory>
@@ -33,12 +32,6 @@ int projType;
 Eigen::MatrixXd curPos;
 LibShell::MeshConnectivity mesh;
 
-void repaint(igl::opengl::glfw::Viewer &viewer)
-{
-    viewer.data().clear();
-    viewer.data().set_mesh(curPos, mesh.faces());    
-}
-
 void lameParameters(double &alpha, double &beta)
 {
     double young = 1.0; // doesn't matter for static solves
@@ -48,10 +41,10 @@ void lameParameters(double &alpha, double &beta)
 
 template <class SFF>
 void runSimulation(
-    igl::opengl::glfw::Viewer &viewer, 
-    const LibShell::MeshConnectivity &mesh, 
+    polyscope::SurfaceMesh *surface_mesh,
+    const LibShell::MeshConnectivity &mesh,
     const Eigen::MatrixXd &restPos,
-    Eigen::MatrixXd &curPos, 
+    Eigen::MatrixXd &curPos,
     const std::unordered_set<int> *fixedVerts,
     double thickness,
     double lameAlpha,
@@ -201,9 +194,7 @@ void runSimulation(
 
     std::tie(curPos, init_edgeDOFs) = variable_to_pos_edgedofs(x0);
 
-    viewer.data().set_vertices(curPos);
-
-    repaint(viewer);
+    surface_mesh->updateVertexPositions(curPos);
 }
 
 int main(int argc, char *argv[])
@@ -217,7 +208,7 @@ int main(int argc, char *argv[])
     thickness = 1e-1;    
     poisson = 1.0 / 2.0;
     matid = 0;
-    sffid = 0;
+    sffid = ;
     projType = 0;
 
     // load mesh
@@ -249,22 +240,17 @@ int main(int argc, char *argv[])
     // initial position
     curPos = origV;
 
-    igl::opengl::glfw::Viewer viewer;
+    polyscope::init();
 
-    // Attach a menu plugin
-    igl::opengl::glfw::imgui::ImGuiPlugin plugin;
-    igl::opengl::glfw::imgui::ImGuiMenu menu;
-    viewer.plugins.push_back(&plugin);
-    plugin.widgets.push_back(&menu);
-   
+    // Register a surface mesh structure
+    auto surface_mesh = polyscope::registerSurfaceMesh("Rest mesh", curPos, F);
 
-    // Add content to the default menu window
-    menu.callback_draw_viewer_menu = [&]()
+    polyscope::state::userCallback = [&]()
     {
         if (ImGui::Button("Reset", ImVec2(-1, 0)))
         {
             curPos = origV;
-            repaint(viewer);
+            surface_mesh->updateVertexPositions(curPos);
         }
 
         if (ImGui::CollapsingHeader("Parameters", ImGuiTreeNodeFlags_DefaultOpen))
@@ -275,7 +261,7 @@ int main(int argc, char *argv[])
             ImGui::Combo("Second Fundamental Form", &sffid, "TanTheta\0SinTheta\0Average\0\0");
         }
 
-        
+
         if (ImGui::CollapsingHeader("Optimization", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::Combo("Hessian Projection", &projType, "No Projection\0Max Zero\0Abs\0\0");
@@ -292,15 +278,15 @@ int main(int argc, char *argv[])
                 switch (sffid)
                 {
                 case 0:
-                    runSimulation<LibShell::MidedgeAngleTanFormulation>(viewer, mesh, origV, curPos, nullptr, thickness,
+                    runSimulation<LibShell::MidedgeAngleTanFormulation>(surface_mesh, mesh, origV, curPos, nullptr, thickness,
                         lameAlpha, lameBeta, matid, projType);
                     break;
                 case 1:
-                    runSimulation<LibShell::MidedgeAngleSinFormulation>(viewer, mesh, origV, curPos, nullptr, thickness,
+                    runSimulation<LibShell::MidedgeAngleSinFormulation>(surface_mesh, mesh, origV, curPos, nullptr, thickness,
                         lameAlpha, lameBeta, matid, projType);
                     break;
                 case 2:
-                    runSimulation<LibShell::MidedgeAverageFormulation>(viewer, mesh, origV, curPos, nullptr, thickness,
+                    runSimulation<LibShell::MidedgeAverageFormulation>(surface_mesh, mesh, origV, curPos, nullptr, thickness,
                         lameAlpha, lameBeta, matid, projType);
                     break;
                 default:
@@ -310,7 +296,6 @@ int main(int argc, char *argv[])
         }
     };
 
-    viewer.data().set_face_based(false);
-    repaint(viewer);
-    viewer.launch();
+    // View the point cloud and mesh we just registered in the 3D UI
+    polyscope::show();
 }

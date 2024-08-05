@@ -63,6 +63,14 @@ namespace LibShell {
             Eigen::VectorXd* derivative, // positions, then thetas
             std::vector<Eigen::Triplet<double> >* hessian);
 
+        static std::vector<double> elasticEnergyPerElement(
+            const MeshConnectivity& mesh,
+            const Eigen::MatrixXd& curPos,
+            const Eigen::VectorXd& edgeDOFs,
+            const MaterialModel<SFF>& mat,
+            const RestState &restState,
+            int whichTerms);
+
         /*
          * Computes current fundamental forms for a given mesh. Can be used to initialize these forms from a given mesh rest state.
          */

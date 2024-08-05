@@ -206,6 +206,47 @@ namespace LibShell {
     }
 
     template <class SFF>
+    std::vector<double> ElasticShell<SFF>::elasticEnergyPerElement(
+        const MeshConnectivity& mesh,
+        const Eigen::MatrixXd& curPos,
+        const Eigen::VectorXd& extraDOFs,
+        const MaterialModel<SFF>& mat,
+        const RestState& restState,
+        int whichTerms)
+    {
+        int nfaces = mesh.nFaces();
+        int nedges = mesh.nEdges();
+        int nverts = (int)curPos.rows();
+
+        if (curPos.cols() != 3 || extraDOFs.size() != SFF::numExtraDOFs * nedges)
+        {
+            return std::vector<double>(nfaces, std::numeric_limits<double>::infinity());
+        }
+
+        std::vector<double> results(nfaces);
+
+        // stretching terms
+        if (whichTerms & EnergyTerm::ET_STRETCHING)
+        {
+            for (int i = 0; i < nfaces; i++)
+            {
+                results[i] += mat.stretchingEnergy(mesh, curPos, restState, i, NULL, NULL);
+            }
+        }
+
+        // bending terms
+        if (whichTerms & EnergyTerm::ET_BENDING)
+        {
+            constexpr int nedgedofs = SFF::numExtraDOFs;
+            for (int i = 0; i < nfaces; i++)
+            {
+                results[i] += mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, NULL, NULL);
+            }
+        }
+        return results;
+    }
+
+    template <class SFF>
     void ElasticShell<SFF>::firstFundamentalForms(const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos, std::vector<Eigen::Matrix2d>& abars)
     {
         int nfaces = mesh.nFaces();
