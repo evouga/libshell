@@ -32,4 +32,4 @@
 *.swp
 
 build/*
-cmake-buil-*/*
+cmake-build-*/*
