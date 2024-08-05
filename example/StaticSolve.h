@@ -3,6 +3,7 @@
 
 #include <Eigen/Core>
 #include <vector>
+#include <iostream>
 
 #include "../include/MaterialModel.h"
 #include "../include/MeshConnectivity.h"

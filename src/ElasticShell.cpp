@@ -1,13 +1,4 @@
 #include "../include/ElasticShell.h"
-#include <Eigen/Geometry>
-#include <Eigen/Dense>
-#include <iostream>
-#include <Eigen/Sparse>
-#include "GeometryDerivatives.h"
-#include <random>
-#include <iostream>
-#include <vector>
-#include <map>
 #include "../include/MeshConnectivity.h"
 #include "../include/MaterialModel.h"
 #include "../include/RestState.h"
@@ -15,7 +6,50 @@
 #include "../include/MidedgeAngleTanFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
 
+#include "GeometryDerivatives.h"
+
+#include <Eigen/Geometry>
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
+
+#include <iostream>
+#include <random>
+#include <vector>
+#include <map>
+
+
 namespace LibShell {
+    template <class DerivedA>
+    void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, int projType)
+    {
+        // no projection
+        if (projType == 0)
+        {
+            return;
+        }
+        Eigen::SelfAdjointEigenSolver<DerivedA> eigenSolver(A);
+        if (eigenSolver.eigenvalues()[0] >= 0) {
+            return;
+        }
+
+        using T = typename DerivedA::Scalar;
+        Eigen::Matrix<T, -1, 1> D = eigenSolver.eigenvalues();
+        for (int i = 0; i < A.rows(); ++i) {
+            if (D[i] < 0) {
+                if(projType == 1)
+                {
+                    D[i] = 0;
+                }
+                else
+                {
+                    D[i] = -D[i];
+                }
+            } else {
+                break;
+            }
+        }
+        A = eigenSolver.eigenvectors() * D.asDiagonal() * eigenSolver.eigenvectors().transpose();
+    }
 
     template <class SFF>
     double ElasticShell<SFF>::elasticEnergy(
@@ -24,11 +58,13 @@ namespace LibShell {
         const Eigen::VectorXd& extraDOFs,
         const MaterialModel<SFF>& mat,
         const RestState& restState,
+        int projType,
         Eigen::VectorXd* derivative, // positions, then thetas
         std::vector<Eigen::Triplet<double> >* hessian)
     {
         return elasticEnergy(mesh, curPos, extraDOFs, mat, restState,
             EnergyTerm::ET_BENDING | EnergyTerm::ET_STRETCHING,
+            projType,
             derivative, hessian);
     }
 
@@ -40,6 +76,7 @@ namespace LibShell {
         const MaterialModel<SFF>& mat,
         const RestState& restState,
         int whichTerms,
+        int projType,
         Eigen::VectorXd* derivative, // positions, then thetas
         std::vector<Eigen::Triplet<double> >* hessian)
     {
@@ -79,6 +116,7 @@ namespace LibShell {
                 }
                 if (hessian)
                 {
+                    projSymMatrix(hess, projType);
                     for (int j = 0; j < 3; j++)
                     {
                         for (int k = 0; k < 3; k++)
@@ -121,6 +159,7 @@ namespace LibShell {
                 }
                 if (hessian)
                 {
+                    projSymMatrix(hess, projType);
                     for (int j = 0; j < 3; j++)
                     {
                         for (int k = 0; k < 3; k++)
@@ -192,5 +231,10 @@ namespace LibShell {
     template class ElasticShell<MidedgeAngleSinFormulation>;
     template class ElasticShell<MidedgeAngleTanFormulation>;
     template class ElasticShell<MidedgeAverageFormulation>;
+
+    template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 9, 9>>& symA, int projType);
+    template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 18, 18>>& symA, int projType);
+    template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 21, 21>>& symA, int projType);
+
 
 };
