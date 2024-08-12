@@ -2,6 +2,7 @@
 #include <iomanip>
 
 #include <Eigen/Sparse>
+#include <spdlog/spdlog.h>
 
 #include "../include/LineSearch.h"
 #include "../include/NewtonDescent.h"
@@ -10,232 +11,217 @@
 namespace OptSolver {
 // Newton solver with line search
 void NewtonSolver(
-    std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *,
-                         Eigen::SparseMatrix<double> *, bool)>
-        obj_func,
-    std::function<double(const Eigen::VectorXd &, const Eigen::VectorXd &)>
-        find_max_step,
-    Eigen::VectorXd &x0, int num_iter, double grad_tol, double x_tol,
-    double f_tol, bool is_proj_hess, bool display_info) {
-  const int DIM = x0.rows();
-  // Eigen::VectorXd randomVec = x0;
-  // randomVec.setRandom();
-  // x0 += 1e-6 * randomVec;
-  Eigen::VectorXd grad = Eigen::VectorXd::Zero(DIM);
-  Eigen::SparseMatrix<double> hessian;
+    std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *, Eigen::SparseMatrix<double> *, bool)> obj_func,
+    std::function<double(const Eigen::VectorXd &, const Eigen::VectorXd &)> find_max_step,
+    Eigen::VectorXd &x0,
+    int num_iter,
+    double grad_tol,
+    double x_tol,
+    double f_tol,
+    bool is_proj_hess,
+    bool display_info,
+    bool is_swap) {
+    const int DIM = x0.rows();
+    // Eigen::VectorXd randomVec = x0;
+    // randomVec.setRandom();
+    // x0 += 1e-6 * randomVec;
+    Eigen::VectorXd grad = Eigen::VectorXd::Zero(DIM);
+    Eigen::SparseMatrix<double> hessian;
 
-  Eigen::VectorXd neg_grad, delta_x;
-  double max_step_size = 1.0;
-  double reg = 1e-8;
+    Eigen::VectorXd neg_grad, delta_x;
+    double max_step_size = 1.0;
+    double reg = 1e-8;
 
-  bool is_proj = is_proj_hess;
-  Timer<std::chrono::high_resolution_clock> total_timer;
-  double total_assembling_time = 0;
-  double total_solving_time = 0;
-  double total_linesearch_time = 0;
+    bool is_proj = is_proj_hess;
+    Timer<std::chrono::high_resolution_clock> total_timer;
+    double total_assembling_time = 0;
+    double total_solving_time = 0;
+    double total_linesearch_time = 0;
 
-  total_timer.start();
-  std::ofstream optInfo;
-  if (display_info) {
-    std::cout << "gradient tol: " << grad_tol
-              << ", function update tol: " << f_tol
-              << ", variable update tol: " << x_tol
-              << ", maximum iteration: " << num_iter << std::endl
-              << std::endl;
-  }
-  int i = 0;
+    total_timer.start();
+    std::ofstream optInfo;
+    spdlog::set_level(spdlog::level::info);
 
-  double f = obj_func(x0, nullptr, nullptr, false);
-  if (f == 0) {
-    std::cout << "energy = 0, return" << std::endl;
-  }
-
-  Eigen::SparseMatrix<double> I(DIM, DIM);
-  I.setIdentity();
-
-  bool is_small_perturb_needed = false;
-
-  for (; i < num_iter; i++) {
     if (display_info) {
-      std::cout << "\niter: " << i << std::endl;
+        spdlog::set_level(spdlog::level::debug);
     }
 
-    Timer<std::chrono::high_resolution_clock> local_timer;
-    local_timer.start();
-    double f = obj_func(x0, &grad, &hessian, is_proj);
-    local_timer.stop();
-    double localAssTime =
-        local_timer.elapsed<std::chrono::milliseconds>() * 1e-3;
-    total_assembling_time += localAssTime;
+    if (display_info) {
+        spdlog::debug(
+            "Termination Creteria, gradient tolerance: {}, function update tolerance: {}, variable update tolerance: "
+            "{}, maximum iteration: {}\n",
+            grad_tol, f_tol, x_tol, num_iter);
+    }
+    int i = 0;
 
-    local_timer.start();
-    Eigen::SparseMatrix<double> H = hessian;
-    std::cout << "num of nonzeros: " << H.nonZeros() << ", rows: " << H.rows()
-              << ", cols: " << H.cols()
-              << ", Sparsity: " << H.nonZeros() * 100.0 / (H.rows() * H.cols())
-              << "%" << std::endl;
-
-    if (is_small_perturb_needed && is_proj) {
-      // due to the numerical issue, we may need to add a small perturbation to
-      // the PSD projected hessian matrix
-      H += reg * I;
+    double f = obj_func(x0, nullptr, nullptr, false);
+    if (f == 0) {
+        spdlog::info("energy = 0, return");
     }
 
-    Eigen::SparseMatrix<double> HT = H.transpose();
-    Eigen::SimplicialLLT<Eigen::SparseMatrix<double> > solver(H);
+    Eigen::SparseMatrix<double> I(DIM, DIM);
+    I.setIdentity();
 
-    while (solver.info() != Eigen::Success) {
-      if (display_info) {
-        if (is_proj) {
-          std::cout << "some small perturb is needed to remove round-off "
-                       "error, current reg = "
-                    << reg << std::endl;
+    bool is_small_perturb_needed = false;
+
+    for (; i < num_iter; i++) {
+        if (display_info) {
+            spdlog::debug("iter: {}", i);
         }
 
-        else {
-          std::cout << "Matrix is not positive definite, current reg = " << reg
-                    << std::endl;
+        Timer<std::chrono::high_resolution_clock> local_timer;
+        local_timer.start();
+        double f = obj_func(x0, &grad, &hessian, is_proj);
+        local_timer.stop();
+        double localAssTime = local_timer.elapsed<std::chrono::milliseconds>() * 1e-3;
+        total_assembling_time += localAssTime;
+
+        local_timer.start();
+        Eigen::SparseMatrix<double> H = hessian;
+        spdlog::debug("num of nonzeros: {}, rows: {}, cols: {}, Sparsity: {}%", H.nonZeros(), H.rows(), H.cols(),
+                      H.nonZeros() * 100.0 / (H.rows() * H.cols()));
+
+        if (is_small_perturb_needed && is_proj) {
+            // due to the numerical issue, we may need to add a small perturbation to
+            // the PSD projected hessian matrix
+            H += reg * I;
         }
-      }
 
-      if (is_proj) {
-        is_small_perturb_needed = true;
-      }
+        Eigen::SparseMatrix<double> HT = H.transpose();
+        Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver(H);
 
-      H = hessian + reg * I;
-      solver.compute(H);
-      reg = std::max(2 * reg, 1e-16);
+        while (solver.info() != Eigen::Success) {
+            if (display_info) {
+                if (is_proj) {
+                    spdlog::debug("some small perturb is needed to remove round-off error, current reg = {}", reg);
+                }
 
-      if (reg > 1e4) {
-        std::cout << "reg is too large, use SPD hessian instead." << std::endl;
-        reg = 1e-6;
-        is_proj = true;
-        f = obj_func(x0, &grad, &hessian, is_proj);
-      }
+                else {
+                    spdlog::debug("Matrix is not positive definite, current reg = {}", reg);
+                }
+            }
+
+            if (is_proj) {
+                is_small_perturb_needed = true;
+            }
+
+            H = hessian + reg * I;
+            solver.compute(H);
+            reg = std::max(2 * reg, 1e-16);
+
+            if (reg > 1e4 && is_proj_hess) {
+                spdlog::debug("reg is too large, use SPD hessian instead.");
+                reg = 1e-6;
+                is_proj = true;
+                f = obj_func(x0, &grad, &hessian, is_proj);
+            }
+        }
+
+        neg_grad = -grad;
+        delta_x = solver.solve(neg_grad);
+
+        local_timer.stop();
+        double local_solving_time = local_timer.elapsed<std::chrono::milliseconds>() * 1e-3;
+        total_solving_time += local_solving_time;
+
+        max_step_size = find_max_step(x0, delta_x);
+
+        local_timer.start();
+        double rate = BacktrackingArmijo(x0, grad, delta_x, obj_func, max_step_size);
+        local_timer.stop();
+        double local_linesearch_time = local_timer.elapsed<std::chrono::milliseconds>() * 1e-3;
+        total_linesearch_time += local_linesearch_time;
+
+        if (!is_proj) {
+            reg *= 0.5;
+            reg = std::max(reg, 1e-16);
+        } else {
+            reg = 1e-8;
+        }
+
+        x0 = x0 + rate * delta_x;
+
+        double fnew = obj_func(x0, &grad, nullptr, is_proj);
+        if (display_info) {
+            spdlog::debug("line search rate : {}, actual hessian : {}, reg = {}", rate, !is_proj, reg);
+            spdlog::debug("f_old: {}, f_new: {}, grad norm: {}, delta x: {}, delta_f: {}", f, fnew, grad.norm(),
+                          rate * delta_x.norm(), f - fnew);
+            spdlog::debug("timing info (in total seconds): ");
+            spdlog::debug("assembling took: {}, LLT solver took: {}, line search took: {}\n", total_assembling_time,
+                          total_solving_time, total_linesearch_time);
+        }
+
+        // switch to the actual hessian when close to convergence
+        if (is_swap) {
+            // this is just some experience value, you can change it
+            if ((f - fnew) / f < 1e-5 || delta_x.norm() < 1e-5 || grad.norm() < 1e-4) {
+                is_proj = false;
+            }
+        }
+        
+
+        // Termination conditions
+        if (rate < 1e-8) {
+            spdlog::info("terminate with small line search rate (<1e-8): L2-norm = {}", grad.norm());
+            break;
+        }
+
+        if (grad.norm() < grad_tol) {
+            spdlog::info("terminate with gradient L2-norm = {}", grad.norm());
+            break;
+        }
+
+        if (rate * delta_x.norm() < x_tol) {
+            spdlog::info("terminate with small variable change, gradient L2-norm = {}", grad.norm());
+            break;
+        }
+
+        if (f - fnew < f_tol) {
+            spdlog::info("terminate with small energy change, gradient L2-norm = {}", grad.norm());
+            break;
+        }
     }
 
-    neg_grad = -grad;
-    delta_x = solver.solve(neg_grad);
-
-    local_timer.stop();
-    double local_solving_time =
-        local_timer.elapsed<std::chrono::milliseconds>() * 1e-3;
-    total_solving_time += local_solving_time;
-
-    max_step_size = find_max_step(x0, delta_x);
-
-    local_timer.start();
-    double rate =
-        BacktrackingArmijo(x0, grad, delta_x, obj_func, max_step_size);
-    local_timer.stop();
-    double local_linesearch_time =
-        local_timer.elapsed<std::chrono::milliseconds>() * 1e-3;
-    total_linesearch_time += local_linesearch_time;
-
-    if (!is_proj) {
-      reg *= 0.5;
-      reg = std::max(reg, 1e-16);
-    } else {
-      reg = 1e-8;
+    if (i >= num_iter) {
+        spdlog::info("terminate with reaching the maximum iteration, with gradient L2-norm = {}", grad.norm());
     }
 
-    x0 = x0 + rate * delta_x;
+    f = obj_func(x0, &grad, nullptr, false);
+    spdlog::info("end up with energy: {}, gradient: {}", f, grad.norm());
 
-    double fnew = obj_func(x0, &grad, nullptr, is_proj);
+    total_timer.stop();
     if (display_info) {
-      std::cout << "line search rate : " << rate
-                << ", actual hessian : " << !is_proj << ", reg = " << reg
-                << std::endl;
-      std::cout << "f_old: " << f << ", f_new: " << fnew
-                << ", grad norm: " << grad.norm()
-                << ", delta x: " << rate * delta_x.norm()
-                << ", delta_f: " << f - fnew << std::endl;
-      std::cout << "timing info (in total seconds): " << std::endl;
-      std::cout << "assembling took: " << total_assembling_time
-                << ", LLT solver took: " << total_solving_time
-                << ", line search took: " << total_linesearch_time << std::endl;
+        spdlog::info(
+            "total time costed (s): {}, within that, assembling took: {}, LLT solver took: {}, line search took: {}",
+            total_timer.elapsed<std::chrono::milliseconds>() * 1e-3, total_assembling_time, total_solving_time,
+            total_linesearch_time);
     }
-
-    // switch to the actual hessian when close to convergence
-    if ((f - fnew) / f < 1e-5 || delta_x.norm() < 1e-5 || grad.norm() < 1e-4) {
-      is_proj = false;
-    }
-
-    // Termination conditions
-    if (rate < 1e-8) {
-      std::cout << "terminate with small line search rate (<1e-8): L2-norm = "
-                << grad.norm() << std::endl;
-      break;
-    }
-
-    if (grad.norm() < grad_tol) {
-      std::cout << "terminate with gradient L2-norm = " << grad.norm()
-                << std::endl;
-      break;
-    }
-
-    if (rate * delta_x.norm() < x_tol) {
-      std::cout << "terminate with small variable change, gradient L2-norm = "
-                << grad.norm() << std::endl;
-      break;
-    }
-
-    if (f - fnew < f_tol) {
-      std::cout << "terminate with small energy change, gradient L2-norm = "
-                << grad.norm() << std::endl;
-      break;
-    }
-  }
-
-  if (i >= num_iter) {
-    std::cout << "terminate with reaching the maximum iteration, with gradient "
-                 "L2-norm = "
-              << grad.norm() << std::endl;
-  }
-
-  f = obj_func(x0, &grad, nullptr, false);
-  std::cout << "end up with energy: " << f << ", gradient: " << grad.norm()
-            << std::endl;
-
-  total_timer.stop();
-  if (display_info) {
-    std::cout << "total time costed (s): "
-              << total_timer.elapsed<std::chrono::milliseconds>() * 1e-3
-              << ", within that, assembling took: " << total_assembling_time
-              << ", LLT solver took: " << total_solving_time
-              << ", line search took: " << total_linesearch_time << std::endl;
-  }
 }
 
 // Test the function gradient and hessian
 void TestFuncGradHessian(
-    std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *,
-                         Eigen::SparseMatrix<double> *, bool)>
-        obj_Func,
+    std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *, Eigen::SparseMatrix<double> *, bool)> obj_Func,
     const Eigen::VectorXd &x0) {
-  Eigen::VectorXd dir = x0;
-  dir(0) = 0;
-  dir.setRandom();
+    Eigen::VectorXd dir = x0;
+    dir(0) = 0;
+    dir.setRandom();
 
-  Eigen::VectorXd grad;
-  Eigen::SparseMatrix<double> H;
+    Eigen::VectorXd grad;
+    Eigen::SparseMatrix<double> H;
 
-  double f = obj_Func(x0, &grad, &H, false);
-  std::cout << "f: " << f << std::endl;
-  if (f == 0)
-    return;
+    double f = obj_Func(x0, &grad, &H, false);
+    spdlog::info("energy: {}, gradient L2-norm: {}", f, grad.norm());
+    if (f == 0) return;
 
-  for (int i = 3; i < 10; i++) {
-    double eps = std::pow(0.1, i);
-    Eigen::VectorXd x = x0 + eps * dir;
-    Eigen::VectorXd grad1;
-    double f1 = obj_Func(x, &grad1, nullptr, false);
+    for (int i = 3; i < 10; i++) {
+        double eps = std::pow(0.1, i);
+        Eigen::VectorXd x = x0 + eps * dir;
+        Eigen::VectorXd grad1;
+        double f1 = obj_Func(x, &grad1, nullptr, false);
 
-    std::cout << "\neps: " << eps << std::endl;
-    std::cout << "energy-gradient: " << (f1 - f) / eps - grad.dot(dir)
-              << std::endl;
-    std::cout << "gradient-hessian: " << ((grad1 - grad) / eps - H * dir).norm()
-              << std::endl;
-  }
+        spdlog::info("eps: {}", eps);
+        spdlog::info("energy - gradient : {}", (f1 - f) / eps - grad.dot(dir));
+        spdlog::info("energy - hessian : {}", ((grad1 - grad) / eps - H * dir).norm());
+    }
 }
-} // namespace OptSolver
+}  // namespace OptSolver

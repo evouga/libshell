@@ -23,6 +23,7 @@ namespace OptSolver {
 /// @param[in] f_tol                    the tolerance of the function value
 /// @param[in] is_proj                  whether to project the hessian matrix to PSD
 /// @param[in] display_info             whether to display the information
+/// @param[in] is_swap                  whether to swap the hessian matrix computation to actual hessian (without PSD) near the optimum
 ///
 void NewtonSolver(
     std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *,
@@ -32,7 +33,7 @@ void NewtonSolver(
         find_max_step,
     Eigen::VectorXd &x0, int num_iter = 1000,
     double grad_tol = 1e-14, double x_tol = 0, double f_tol = 0,
-    bool is_proj = false, bool display_info = false);
+    bool is_proj = false, bool display_info = false, bool is_swap = false);
 
 ///
 /// Test the function gradient and hessian
