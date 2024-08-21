@@ -7,6 +7,7 @@
 #include "../../include/MidedgeAngleSinFormulation.h"
 #include "../../include/MidedgeAngleTanFormulation.h"
 #include "../../include/MidedgeAverageFormulation.h"
+#include "../../include/MidedgeAngleThetaFormulation.h"
 #include "../../include/RestState.h"
 
 namespace LibShell {
@@ -428,5 +429,5 @@ namespace LibShell {
     template class NeoHookeanMaterial<MidedgeAngleSinFormulation>;
     template class NeoHookeanMaterial<MidedgeAngleTanFormulation>;
     template class NeoHookeanMaterial<MidedgeAverageFormulation>;
-
+    template class NeoHookeanMaterial<MidedgeAngleThetaFormulation>;
 };

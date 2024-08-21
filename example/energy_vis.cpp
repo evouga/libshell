@@ -94,6 +94,15 @@ void compute_energy_density(
 
     rest_surface_mesh->addFaceScalarQuantity("Bending Energy Density", bending_energy_density);
     current_surface_mesh->addFaceScalarQuantity("Bending Energy Density", bending_energy_density);
+
+    // compute the total bending energy
+    double bending_energy = 0.0;
+    for(auto &energy : bending_energy_density)
+    {
+        bending_energy += energy;
+    }
+    // std::accumulate(bending_energy_density.begin(), bending_energy_density.end(), bending_energy);
+    std::cout << "Total bending energy: " << bending_energy << std::endl;
 }
 
 int main(int argc, char** argv)

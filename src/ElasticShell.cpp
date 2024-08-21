@@ -5,6 +5,7 @@
 #include "../include/MidedgeAngleSinFormulation.h"
 #include "../include/MidedgeAngleTanFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
+#include "../include/MidedgeAngleThetaFormulation.h"
 
 #include "GeometryDerivatives.h"
 
@@ -269,6 +270,7 @@ namespace LibShell {
     }
 
     // instantions
+    template class ElasticShell<MidedgeAngleThetaFormulation>;
     template class ElasticShell<MidedgeAngleSinFormulation>;
     template class ElasticShell<MidedgeAngleTanFormulation>;
     template class ElasticShell<MidedgeAverageFormulation>;

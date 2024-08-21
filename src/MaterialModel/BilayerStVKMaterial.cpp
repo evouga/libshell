@@ -6,6 +6,7 @@
 #include "../../include/MidedgeAngleSinFormulation.h"
 #include "../../include/MidedgeAngleTanFormulation.h"
 #include "../../include/MidedgeAverageFormulation.h"
+#include "../../include/MidedgeAngleThetaFormulation.h"
 #include "../../include/RestState.h"
 #include <iostream>
 
@@ -272,5 +273,5 @@ namespace LibShell {
     template class BilayerStVKMaterial<MidedgeAngleSinFormulation>;
     template class BilayerStVKMaterial<MidedgeAngleTanFormulation>;
     template class BilayerStVKMaterial<MidedgeAverageFormulation>;
-
+    template class BilayerStVKMaterial<MidedgeAngleThetaFormulation>;
 };

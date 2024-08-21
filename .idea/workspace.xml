@@ -31,13 +31,7 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="224ff4b5-bb15-4581-9dfe-8fc7138bf093" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake/libigl.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/cmake/libigl.cmake" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/example/main.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/include/ElasticShell.h" beforeDir="false" afterPath="$PROJECT_DIR$/include/ElasticShell.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ElasticShell.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/src/ElasticShell.cpp" afterDir="false" />
-    </list>
+    <list default="true" id="224ff4b5-bb15-4581-9dfe-8fc7138bf093" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -500,6 +494,7 @@
   &quot;associatedIndex&quot;: 4
 }</component>
   <component name="ProjectId" id="2kEEE0Zdo9ZGpcyu7WpfB8N9FyU" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -530,11 +525,6 @@
   }
 }</component>
   <component name="RunManager" selected="CMake Application.energy_vis">
-    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
-      <method v="2">
-        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="CLI11" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="libshell" TARGET_NAME="CLI11" CONFIG_NAME="Debug">
       <method v="2">
         <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
