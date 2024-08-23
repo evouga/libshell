@@ -321,8 +321,8 @@ double bilayerTest(const LibShell::MeshConnectivity& mesh,
     LibShell::StVKMaterial<SFF> monomat;
     LibShell::BilayerStVKMaterial<SFF> bimat;
 
-    double energy1 = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, monomat, monoRestState, NULL, NULL);
-    double energy2 = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, bimat, biRestState, NULL, NULL);
+    double energy1 = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, monomat, monoRestState, LibShell::HessianProjectType::kNone,NULL, NULL);
+    double energy2 = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, bimat, biRestState, LibShell::HessianProjectType::kNone,NULL, NULL);
     
     return std::fabs(energy1 - energy2);
 }
@@ -371,7 +371,7 @@ void getHessian(const LibShell::MeshConnectivity &mesh,
         assert(false);
     }
 
-    LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, *mat, restState, NULL, &hessian);
+    LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, *mat, restState, LibShell::HessianProjectType::kNone, NULL, &hessian);
 
     int nverts = curPos.rows();
     int nedges = mesh.nEdges();
@@ -665,15 +665,15 @@ void testBendingFiniteDifferences(
             Eigen::VectorXd deriv;
             std::vector<Eigen::Triplet<double> > hess;
             double result = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, testpos, testedge, mat, restState, 
-                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &deriv, &hess);
+                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, LibShell::HessianProjectType::kNone, &deriv, &hess);
 
             Eigen::VectorXd fwdderiv;
             Eigen::VectorXd backderiv;
 
             double fwdnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, fwdpertpos, fwdpertedge, mat, restState, 
-                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &fwdderiv, NULL);
+                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, LibShell::HessianProjectType::kNone, &fwdderiv, NULL);
             double backnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, backpertpos, backpertedge, mat, restState, 
-                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &backderiv, NULL);
+                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, LibShell::HessianProjectType::kNone, &backderiv, NULL);
 
             double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
             double direcderiv = deriv.dot(pertVec);

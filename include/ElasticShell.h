@@ -4,7 +4,9 @@
 #include <Eigen/Core>
 #include <vector>
 #include <Eigen/Sparse>
+
 #include "MaterialModel.h"
+#include "types.h"
 
 namespace LibShell {
 
@@ -29,6 +31,7 @@ namespace LibShell {
          * - SFF:           the choice of second fundamental form discretization.
          * - whichTerms     optional flags offering finer-grained control over which terms to include. ET_STRETCHING includes the bending energy, and
                             ET_BENDING the bending energy. Default is both (ET_STRETCHING | ET_BENDING).
+         * - projType:      the type of projection to use for the Hessian. kNone: no projection, kMaxZero: Max Zero projection, kAbs: Abs projection.
          *
          * Outputs:
          * - returns the total elastic energy of the shell.
@@ -44,6 +47,7 @@ namespace LibShell {
             const Eigen::VectorXd& edgeDOFs,
             const MaterialModel<SFF>& mat,
             const RestState &restState,
+            const HessianProjectType &projType,
             Eigen::VectorXd* derivative, // positions, then thetas
             std::vector<Eigen::Triplet<double> >* hessian);
 
@@ -54,6 +58,7 @@ namespace LibShell {
             const MaterialModel<SFF>& mat,
             const RestState &restState,
             int whichTerms,
+            const HessianProjectType& projType,
             Eigen::VectorXd* derivative, // positions, then thetas
             std::vector<Eigen::Triplet<double> >* hessian);
 
