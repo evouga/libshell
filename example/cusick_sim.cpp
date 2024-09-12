@@ -51,6 +51,10 @@ LibShell::MeshConnectivity mesh;
 
 std::string output_folder = "";
 
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif  // !M_PI
+
 void lame_parameters(double& alpha, double& beta) {
     alpha = young * poisson / (1.0 - poisson * poisson);
     beta = young / 2.0 / (1.0 + poisson);
@@ -384,7 +388,7 @@ int main(int argc, char* argv[]) {
     double triangle_area;
     double inner_radius;
     double outer_radius;
-    bool no_gui;
+    bool no_gui = false;
 
     // trianlge area
     app.add_option("--triangle-area", triangle_area, "Plane relative triangle area")->default_val(1e-4);

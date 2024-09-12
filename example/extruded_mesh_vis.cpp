@@ -49,6 +49,7 @@ int proj_type;
 Eigen::MatrixXd cur_pos;
 LibShell::MeshConnectivity mesh;
 
+std::string input_mesh = "";
 std::string output_folder = "";
 
 #ifndef M_PI
@@ -89,46 +90,91 @@ void lame_parameters(double& alpha, double& beta) {
 	beta = young / 2.0 / (1.0 + poisson);
 }
 
-void get_offset_mesh(const Eigen::MatrixXd& V,
-					 const LibShell::MeshConnectivity& mesh,
-					 const Eigen::VectorXd& edge_DOFs,
-					 Eigen::MatrixXd& offset_V,
-					 Eigen::MatrixXi& offset_F,
-					 double distance = 0.1) {
-	offset_V.resize(mesh.nFaces() * 3, 3);
-	offset_F.resize(mesh.nFaces(), 3);
+Eigen::VectorXd get_offset_mesh(const Eigen::MatrixXd& V,
+                                const LibShell::MeshConnectivity& mesh,
+                                const Eigen::VectorXd& edge_DOFs,
+                                Eigen::MatrixXd& offset_V,
+                                Eigen::MatrixXi& offset_F,
+                                double distance = 0.1) {
+    offset_V.resize(mesh.nFaces() * 3, 3);
+    Eigen::VectorXd err = Eigen::VectorXd::Zero(V.rows());
+    offset_F.resize(mesh.nFaces(), 3);
 
-	double ave_edge_len = 0;
-	for (int eid = 0; eid < mesh.nEdges(); eid++) {
-		ave_edge_len += (V.row(mesh.edgeVertex(eid, 0)) - V.row(mesh.edgeVertex(eid, 1))).norm();
-	}
-	ave_edge_len /= mesh.nEdges();
+    double ave_edge_len = 0;
+    for (int eid = 0; eid < mesh.nEdges(); eid++) {
+        ave_edge_len += (V.row(mesh.edgeVertex(eid, 0)) - V.row(mesh.edgeVertex(eid, 1))).norm();
+    }
+    ave_edge_len /= mesh.nEdges();
 
-	double z = distance * ave_edge_len;
+    double z = distance * ave_edge_len;
+    std::vector<std::vector<int>> vmaps(V.rows());
 
-	for (int fid = 0; fid < mesh.nFaces(); fid++) {
-		std::vector<Eigen::Vector3d> es(3), es_perp(3);
-		for (int i = 0; i < 3; i++) {
-			es[i] = (V.row(mesh.faceVertex(fid, (i + 2) % 3)) - V.row(mesh.faceVertex(fid, (i + 1) % 3)));
-		}
-		Eigen::Vector3d face_normal = es[1].cross(es[2]).normalized();
-		std::vector<double> edge_angles(3), zis(3);
-		for (int i = 0; i < 3; i++) {
-			es_perp[i] = es[i].cross(face_normal).normalized();
-			int eid = mesh.faceEdge(fid, i);
-			double angle = edge_theta(mesh, V, eid, nullptr, nullptr);
-			double orient = mesh.faceEdgeOrientation(fid, i) == 0 ? 1.0 : -1.0;
-			edge_angles[i] = 0.5 * angle + orient * edge_DOFs[eid];
-			zis[i] = z * std::tan(edge_angles[i]);
-		}
+    for (int fid = 0; fid < mesh.nFaces(); fid++) {
+        std::vector<Eigen::Vector3d> es(3), es_perp(3);
+        for (int i = 0; i < 3; i++) {
+            es[i] = (V.row(mesh.faceVertex(fid, (i + 2) % 3)) - V.row(mesh.faceVertex(fid, (i + 1) % 3)));
+        }
+        Eigen::Vector3d face_normal = es[1].cross(es[2]).normalized();
+        std::vector<double> edge_angles(3), zis(3);
+        for (int i = 0; i < 3; i++) {
+            es_perp[i] = es[i].cross(face_normal).normalized();
+            int eid = mesh.faceEdge(fid, i);
+            double angle = edge_theta(mesh, V, eid, nullptr, nullptr);
+            double orient = mesh.faceEdgeOrientation(fid, i) == 0 ? 1.0 : -1.0;
+            edge_angles[i] = 0.5 * angle + orient * edge_DOFs[eid];
+            zis[i] = z * std::tan(edge_angles[i]);
+        }
 
-		for (int i = 0; i < 3; i++) {
-			offset_V.row(fid * 3 + i) = z * face_normal + zis[(i + 1) % 3] * es_perp[(i + 1) % 3] +
-										zis[(i + 2) % 3] * es_perp[(i + 2) % 3] - zis[i] * es_perp[i];
-			offset_V.row(fid * 3 + i) += V.row(mesh.faceVertex(fid, i));
-		}
-		offset_F.row(fid) << 3 * fid, 3 * fid + 1, 3 * fid + 2;
-	}
+        for (int i = 0; i < 3; i++) {
+            offset_V.row(fid * 3 + i) = z * face_normal + zis[(i + 1) % 3] * es_perp[(i + 1) % 3] +
+                                        zis[(i + 2) % 3] * es_perp[(i + 2) % 3] - zis[i] * es_perp[i];
+            offset_V.row(fid * 3 + i) += V.row(mesh.faceVertex(fid, i));
+            vmaps[mesh.faceVertex(fid, i)].push_back(fid * 3 + i);
+        }
+        offset_F.row(fid) << 3 * fid, 3 * fid + 1, 3 * fid + 2;
+
+		// check the correctness of the offset mesh
+        for (int i = 0; i < 3; i++) {
+            Eigen::Vector3d Mz_i =
+                (offset_V.row(fid * 3 + (i + 1) % 3) + offset_V.row(fid * 3 + (i + 2) % 3)) / 2;
+            Eigen::Vector3d Mz = V.row(mesh.faceVertex(fid, (i + 1) % 3)) + V.row(mesh.faceVertex(fid, (i + 2) % 3));
+            Mz /= 2;
+
+			Eigen::Vector3d mid_edge_normal = Mz_i - Mz;
+            mid_edge_normal.normalize();
+
+			double is_perp = mid_edge_normal.dot(es[i]);
+
+			Eigen::Vector3d tmp = (offset_V.row(fid * 3 + i) - V.row(mesh.faceVertex(fid, i)));
+            double dist = tmp.dot(face_normal);
+
+            if (std::abs(is_perp) > 1e-6) {
+                spdlog::error("The offset mesh is not perpendicular to the edge");
+            }
+
+			if (std::abs(dist - z) > 1e-6) {
+                spdlog::error("The offset mesh is not at the correct distance, expected: {}, actual: {}", z, dist);
+			}
+
+			if (std::abs((Mz_i - Mz).norm() - z / std::cos(edge_angles[i])) > 1e-6) {
+                spdlog::error("Incorrect midpoints distance, expected: {}, actual: {}", z / std::cos(edge_angles[i]),
+                              (Mz_i - Mz).norm());
+            }
+        }
+    }
+
+	for (int i = 0; i < vmaps.size(); i++) {
+        if (vmaps[i].size() > 1) {
+            for (int j = 0; j < vmaps[i].size(); j++) {
+                for (int k = j + 1; k < vmaps[i].size(); k++) {
+                    err[i] += (offset_V.row(vmaps[i][j]) - offset_V.row(vmaps[i][k])).squaredNorm();
+				}
+			}
+        }
+    }
+
+    return err;
+  
 }
 
 template <class SFF>
@@ -161,7 +207,7 @@ double run_simulation(const LibShell::MeshConnectivity& mesh,
 	// initialize second fundamental forms to those of input mesh
 	rest_state.bbars.resize(mesh.nFaces());
 	for (int i = 0; i < mesh.nFaces(); i++) {
-		rest_state.bbars[i] = SFF::secondFundamentalForm(mesh, rest_pos, rest_edge_DOFs, i, nullptr, nullptr);
+		rest_state.bbars[i].setZero();
 	}
 
 	rest_state.lameAlpha.resize(mesh.nFaces(), lame_alpha);
@@ -289,6 +335,8 @@ double run_simulation(const LibShell::MeshConnectivity& mesh,
 
 	OptSolver::TestFuncGradHessian(obj_func, x0);
 
+	double init_norm = cur_edge_DOFs.norm();
+
 	OptSolver::NewtonSolver(obj_func, find_max_step, x0, num_steps, grad_tol, x_tol, f_tol, proj_type != 0, true,
 							is_swap);
 
@@ -296,68 +344,17 @@ double run_simulation(const LibShell::MeshConnectivity& mesh,
 
 	double energy = obj_func(x0, nullptr, nullptr, false);
 
-	std::cout << "Edge Dofs: " << cur_edge_DOFs.transpose() << std::endl;
 
 	spdlog::info("Initial Energy: {}, Optimized Energy: {}", init_energy, energy);
+    spdlog::info("Initial edge dofs norm: {}, Optimized edge dofs norm: {}", init_norm, cur_edge_DOFs.norm());
 
 	return obj_func(x0, nullptr, nullptr, false);
 }
 
-static void gererated_foleded_mesh(
-	int N, int M, double fold_theta, Eigen::MatrixXd& rest_V, Eigen::MatrixXi& rest_F, Eigen::MatrixXd& fold_V) {
-	double constexpr R = 1;
-	double constexpr H = 5;
-
-	std::vector<Eigen::Vector3d> rest_pos, fold_pos;
-	std::vector<Eigen::Vector3i> rest_faces;
-
-	for (int i = 0; i <= 2 * N; i++) {
-		for (int j = 0; j <= M; j++) {
-			double x = (i - N) * M_PI * R / N;
-			double y = j * H / M;
-			rest_pos.push_back(Eigen::Vector3d{x, y, 0});
-
-			if (i <= N) {
-				fold_pos.push_back(Eigen::Vector3d(x, y, 0));
-			} else {
-				fold_pos.push_back(Eigen::Vector3d(x * std::cos(fold_theta), y, x * std::sin(fold_theta)));
-			}
-
-			// T theta = i * M_PI / N;
-			// cylinder_pos.push_back(Vector<T, dim>{-R * std::sin(theta), y, R + R * std::cos(theta)});
-		}
-	}
-
-	for (int i = 0; i < 2 * N; i++) {
-		for (int j = 0; j < M; j++) {
-			int k = i * (M + 1) + j;
-			rest_faces.push_back(Eigen::Vector3i{k, k + 1, k + M + 1});
-			rest_faces.push_back(Eigen::Vector3i{k + 1, k + M + 2, k + M + 1});
-		}
-	}
-
-	rest_V.resize(rest_pos.size(), 3);
-	for (int vid = 0; vid < rest_pos.size(); vid++) {
-		rest_V.row(vid) = rest_pos[vid].transpose();
-	}
-
-	fold_V.resize(fold_pos.size(), 3);
-	for (int vid = 0; vid < fold_pos.size(); vid++) {
-		fold_V.row(vid) = fold_pos[vid].transpose();
-	}
-
-	rest_F.resize(rest_faces.size(), 3);
-	for (int fid = 0; fid < rest_faces.size(); fid++) {
-		rest_F.row(fid) = rest_faces[fid].transpose();
-	}
-}
 
 int main(int argc, char* argv[]) {
-	CLI::App app("Static Simulation for a Stretched Sheet");
-	double triangle_area;
-	bool no_gui = false;
-	int N = 50;
-	int M = 50;
+	CLI::App app("Visualize the Tan-formula Extruded Mesh");
+    app.add_option("Input, -i, --input", input_mesh, "Input Mesh")->check(CLI::ExistingFile)->required(true);
 
 	// optimization parameters
 	app.add_option("--num-steps", num_steps, "Number of iteration")->default_val(30);
@@ -370,24 +367,11 @@ int main(int argc, char* argv[]) {
 	app.add_option("--thickness", thickness, "Thickness")->default_val(1e-4);
 	app.add_option("--poisson", poisson, "Poisson's Ratio")->default_val(0.5);
 	app.add_option("--material", matid, "Material Model")->default_val(1);
-	app.add_option(
-		   "--sff", sffid,
-		   "Second Fundamental Form Formula, 0: midedge tan, 1: midedge sin, 2: midedge theta")
-		->default_val(2);
 	app.add_option("--projection", proj_type, "Hessian Projection Type, 0 : no projection, 1: max(H, 0), 2: Abs(H)")
 		->default_val(1);
 	app.add_flag("--swap", is_swap, "Swap to Actual Hessian when close to optimum");
 
-	// sampling parameters
-	app.add_option("-N", N, "Sampling points in x direction")->default_val(1);
-	app.add_option("-M", M, "Sampling points in y direction")->default_val(1);
-
-	// folded angle
-	double fold_theta;
-	app.add_option("--fold-theta", fold_theta, "Folded angle")->default_val(0.9999 * M_PI);
-
 	app.add_option("ouput,-o,--output", output_folder, "Output folder");
-	app.add_flag("--no-gui", no_gui, "Without gui")->default_val(false);
 	CLI11_PARSE(app, argc, argv);
 
 	// make output folder
@@ -399,7 +383,10 @@ int main(int argc, char* argv[]) {
 	Eigen::MatrixXd orig_V, rest_V;
 	Eigen::MatrixXi F;
 
-	gererated_foleded_mesh(N, M, fold_theta, rest_V, F, orig_V);
+	igl::readOBJ(input_mesh, orig_V, F);
+    rest_V = orig_V;
+
+	double distance = 1;
 
 	std::unordered_set<int> fixed_verts;
 	for (int i = 0; i < rest_V.rows(); i++) {
@@ -419,36 +406,6 @@ int main(int argc, char* argv[]) {
 
 	double energy = 0;
 
-	if (no_gui) {
-		double lame_alpha, lame_beta;
-		lame_parameters(lame_alpha, lame_beta);
-
-		switch (sffid) {
-			case 0:
-				energy = run_simulation<LibShell::MidedgeAngleTanFormulation>(mesh, rest_V, rest_edge_DOFs, cur_pos,
-																			  cur_edge_DOFs, &fixed_verts, thickness,
-																			  lame_alpha, lame_beta, matid, proj_type);
-				break;
-			case 1:
-				energy = run_simulation<LibShell::MidedgeAngleSinFormulation>(mesh, rest_V, rest_edge_DOFs, cur_pos,
-																			  cur_edge_DOFs, &fixed_verts, thickness,
-																			  lame_alpha, lame_beta, matid, proj_type);
-				break;
-			case 2:
-				energy = run_simulation<LibShell::MidedgeAngleThetaFormulation>(
-					mesh, rest_V, rest_edge_DOFs, cur_pos, cur_edge_DOFs, &fixed_verts, thickness, lame_alpha,
-					lame_beta, matid, proj_type);
-				break;
-			default:
-				assert(false);
-		}
-		if (output_folder != "") {
-			igl::writeOBJ(output_folder + "/rest.obj", rest_V, F);
-			igl::writeOBJ(output_folder + "/orig.obj", orig_V, F);
-			igl::writeOBJ(output_folder + "/deformed.obj", cur_pos, F);
-		}
-		return EXIT_SUCCESS;
-	}
 
 	polyscope::init();
 
@@ -457,11 +414,6 @@ int main(int argc, char* argv[]) {
 	surface_mesh->setEnabled(false);
 
 	auto cur_surface_mesh = polyscope::registerSurfaceMesh("Current mesh", cur_pos, F);
-
-	if (output_folder != "") {
-		igl::writeOBJ(output_folder + "/rest.obj", rest_V, F);
-		igl::writeOBJ(output_folder + "/orig.obj", orig_V, F);
-	}
 
 	polyscope::state::userCallback = [&]() {
 		if (ImGui::Button("Reset", ImVec2(-1, 0))) {
@@ -473,34 +425,6 @@ int main(int argc, char* argv[]) {
 			ImGui::InputDouble("Thickness", &thickness);
 			ImGui::InputDouble("Poisson's Ration", &poisson);
 			ImGui::Combo("Material Model", &matid, "NeoHookean\0StVK\0\0");
-			ImGui::Combo("Second Fundamental Form", &sffid, "TanTheta\0SinTheta\0Theta\0\0");
-		}
-
-		if (ImGui::CollapsingHeader("Mesh Parameters", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::InputInt("N", &N);
-			ImGui::InputInt("M", &M);
-			ImGui::InputDouble("Folded Angle", &fold_theta);
-
-			if (ImGui::Button("Regenerate Mesh")) {
-				gererated_foleded_mesh(N, M, fold_theta, rest_V, F, orig_V);
-
-				// get the left and right boundary vertices
-				fixed_verts.clear();
-
-				for (int i = 0; i < rest_V.rows(); i++) {
-					fixed_verts.insert(i);
-				}
-
-				// set up mesh connectivity
-				mesh = LibShell::MeshConnectivity(F);
-
-				// initial position
-				cur_pos = orig_V;
-
-				surface_mesh = polyscope::registerSurfaceMesh("Rest mesh", rest_V, F);
-				surface_mesh->setEnabled(false);
-				cur_surface_mesh = polyscope::registerSurfaceMesh("Current mesh", cur_pos, F);
-			}
 		}
 
 		if (ImGui::CollapsingHeader("Optimization", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -541,15 +465,21 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
+		ImGui::InputDouble("Relative Offset Distance", &distance);
+
 		if (ImGui::Button("Compute the offset mesh", ImVec2(-1, 0))) {
 			if (init_edge_DOFs.size() && cur_edge_DOFs.size()) {
 				Eigen::MatrixXd offset_V;
 				Eigen::MatrixXi offset_F;
-				get_offset_mesh(cur_pos, mesh, init_edge_DOFs, offset_V, offset_F);
-
+				Eigen::VectorXd init_err = get_offset_mesh(cur_pos, mesh, init_edge_DOFs, offset_V, offset_F, distance);
 				auto offset_mesh = polyscope::registerSurfaceMesh("Init Offset mesh", offset_V, offset_F);
-				get_offset_mesh(cur_pos, mesh, cur_edge_DOFs, offset_V, offset_F);
+				Eigen::VectorXd cur_err = get_offset_mesh(cur_pos, mesh, cur_edge_DOFs, offset_V, offset_F, distance);
 				auto cur_offset_mesh = polyscope::registerSurfaceMesh("Current Offset mesh", offset_V, offset_F);
+
+				cur_surface_mesh->addVertexScalarQuantity("Initial Error", init_err);
+                cur_surface_mesh->addVertexScalarQuantity("Current Error", cur_err);
+
+				spdlog::info("Initial Error: {}, Current Error: {}", init_err.sum(), cur_err.sum());
 			}
 			
 		}
