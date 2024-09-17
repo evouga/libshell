@@ -8,8 +8,6 @@ set(LIBIGL_EIGEN_VERSION 3.3.7 CACHE STRING "Eigen version")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(libigl)
-igl_include(glfw)
-igl_include(imgui)
 
 # Add your project files
 if(MSVC)
@@ -17,15 +15,14 @@ if(MSVC)
 endif()
 
 file(GLOB LIBFILES src/*.cpp src/SecondFundamentalForm/*.cpp src/MaterialModel/*.cpp)
-add_library(${PROJECT_NAME} STATIC ${LIBFILES})
-target_link_libraries(${PROJECT_NAME} igl::core)
+add_library(${PROJECT_NAME} STATIC ${LIBFILES} ${OPTFILES})
+target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_CURRENT_LIST_DIR}/lib)
 
-file(GLOB EXAMPLEFILES example/*.cpp)
-add_executable(example_${PROJECT_NAME} ${EXAMPLEFILES})
-target_link_libraries(example_${PROJECT_NAME} ${PROJECT_NAME} igl::core igl::glfw igl::imgui)
+add_subdirectory(optimization)
+add_subdirectory(example)
 
 file(GLOB TESTFILES tests/*.cpp)
 add_executable(tests_${PROJECT_NAME} ${TESTFILES})
-target_link_libraries(tests_${PROJECT_NAME} ${PROJECT_NAME} igl::core)
+target_link_libraries(tests_${PROJECT_NAME} ${PROJECT_NAME} Eigen3::Eigen)
