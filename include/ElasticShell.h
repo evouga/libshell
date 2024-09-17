@@ -47,9 +47,9 @@ namespace LibShell {
             const Eigen::VectorXd& edgeDOFs,
             const MaterialModel<SFF>& mat,
             const RestState &restState,
-            const HessianProjectType &projType,
             Eigen::VectorXd* derivative, // positions, then thetas
-            std::vector<Eigen::Triplet<double> >* hessian);
+            std::vector<Eigen::Triplet<double> >* hessian,
+            const HessianProjectType projType = HessianProjectType::kMaxZero);
 
         static double elasticEnergy(
             const MeshConnectivity& mesh,
@@ -58,9 +58,9 @@ namespace LibShell {
             const MaterialModel<SFF>& mat,
             const RestState &restState,
             int whichTerms,
-            const HessianProjectType& projType,
             Eigen::VectorXd* derivative, // positions, then thetas
-            std::vector<Eigen::Triplet<double> >* hessian);
+            std::vector<Eigen::Triplet<double> >* hessian,
+            const HessianProjectType projType = HessianProjectType::kMaxZero);
 
         /*
          * Computes current fundamental forms for a given mesh. Can be used to initialize these forms from a given mesh rest state.

@@ -56,13 +56,13 @@ namespace LibShell {
         const Eigen::VectorXd& extraDOFs,
         const MaterialModel<SFF>& mat,
         const RestState& restState,
-        const HessianProjectType& projType,
         Eigen::VectorXd* derivative, // positions, then thetas
-        std::vector<Eigen::Triplet<double> >* hessian)
+        std::vector<Eigen::Triplet<double> >* hessian,
+        const HessianProjectType projType)
     {
         return elasticEnergy(mesh, curPos, extraDOFs, mat, restState,
-            EnergyTerm::ET_BENDING | EnergyTerm::ET_STRETCHING, projType,
-            derivative, hessian);
+            EnergyTerm::ET_BENDING | EnergyTerm::ET_STRETCHING,
+                             derivative, hessian, projType);
     }
 
     template <class SFF>
@@ -73,9 +73,9 @@ namespace LibShell {
         const MaterialModel<SFF>& mat,
         const RestState& restState,
         int whichTerms,
-        const HessianProjectType& projType,
         Eigen::VectorXd* derivative, // positions, then thetas
-        std::vector<Eigen::Triplet<double> >* hessian)
+        std::vector<Eigen::Triplet<double> >* hessian,
+        const HessianProjectType projType)
     {
         int nfaces = mesh.nFaces();
         int nedges = mesh.nEdges();

@@ -157,8 +157,8 @@ void run_simulation(const LibShell::MeshConnectivity &mesh,
     std::tie(pos, edge_DOFs) = variable_to_pos_edgedofs(var);
 
     double energy = LibShell::ElasticShell<SFF>::elasticEnergy(
-        mesh, pos, edge_DOFs, *mat, rest_state, psd_proj ? proj_type : LibShell::HessianProjectType::kNone, grad,
-        hessian ? &hessian_triplets : nullptr);
+        mesh, pos, edge_DOFs, *mat, rest_state, grad,
+        hessian ? &hessian_triplets : nullptr, psd_proj ? proj_type : LibShell::HessianProjectType::kNone);
 
     if (grad) {
       if (fixed_verts) {
