@@ -42,14 +42,14 @@ void NewtonSolver(
                   << "\nfunction update tolerance: " << f_tol
                   << "\nvariable update tolerance: " << x_tol
                   << "\nmaximum iteration: " << num_iter
-                  << "================================================\n"
+                  << "\n==============================================\n"
                   << std::endl;
     }
     int i = 0;
 
-    double f = obj_func(x0, nullptr, nullptr, false);
-    if (f == 0) {
-        std::cout << "energy = 0, return" << std::endl;
+    double f = obj_func(x0, &grad, nullptr, false);
+    if (grad.norm() < grad_tol) {
+        std::cout << "initial gradient norm = " << grad.norm() << ", is smaller than the gradient tolerance: " << grad_tol << ", return" << std::endl;
         return;
     }
 
