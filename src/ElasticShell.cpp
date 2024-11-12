@@ -6,6 +6,7 @@
 #include "../include/MidedgeAngleTanFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
 #include "../include/MidedgeAngleThetaFormulation.h"
+#include "../include/MidedgeAngleCompressiveFormulation.h"
 
 #include "GeometryDerivatives.h"
 
@@ -274,6 +275,7 @@ namespace LibShell {
     template class ElasticShell<MidedgeAngleSinFormulation>;
     template class ElasticShell<MidedgeAngleTanFormulation>;
     template class ElasticShell<MidedgeAverageFormulation>;
+    template class ElasticShell<MidedgeAngleCompressiveFormulation>;
 
     template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 9, 9>>& symA, int projType);
     template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 18, 18>>& symA, int projType);

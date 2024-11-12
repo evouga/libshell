@@ -8,6 +8,7 @@
 #include "../include/MidedgeAngleSinFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
 #include "../include/MidedgeAngleThetaFormulation.h"
+#include "../include/MidedgeAngleCompressiveFormulation.h"
 #include "../include/StVKMaterial.h"
 #include "../include/BilayerStVKMaterial.h"
 #include "../include/TensionFieldStVKMaterial.h"
@@ -19,7 +20,7 @@
 std::default_random_engine rng;
 
 const int nummats = 4;
-const int numsff = 4;    
+const int numsff = 5;    
 
 
 template<class SFF>
@@ -250,10 +251,10 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
                 edgeDOFs[i] = angdist(rng);
             }
 
-            FiniteDifferenceLog localStretchingLog;
+            /*FiniteDifferenceLog localStretchingLog;
             testStretchingFiniteDifferences(mesh, curPos, *mat, *restState, verbose, localStretchingLog);
             std::cout << "Stretching (stencil):" << std::endl;
-            localStretchingLog.printStats();
+            localStretchingLog.printStats();*/
 
             FiniteDifferenceLog globalBendingLog;
             FiniteDifferenceLog localBendingLog;
@@ -407,7 +408,7 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
         std::vector<Eigen::SparseMatrix<double> > hessians(numoptions);
         for (int i = 0; i < nummats; i++)
         {
-            for (int j = 0; j < numsff; j++)
+            for (int j = 4; j < numsff; j++)
             {
                 switch (j)
                 {
@@ -424,6 +425,10 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
                     getHessian<LibShell::MidedgeAngleThetaFormulation>(mesh, restPos, thicknesses, i, lameAlpha, lameBeta,
                                                                      hessians[i * numsff + j]);
                     break;
+                case 4:
+                    getHessian<LibShell::MidedgeAngleCompressiveFormulation>(mesh, restPos, thicknesses, i, lameAlpha,
+                                                                             lameBeta, hessians[i * numsff + j]);
+                    break;
                 default:
                     assert(false);
                 }                
@@ -431,11 +436,11 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
         }
         for (int i = 0; i < nummats; i++)
         {
-            for (int j = 0; j < numsff; j++)
+            for (int j = 4; j < numsff; j++)
             {
                 for (int k = 0; k < nummats; k++)
                 {
-                    for (int l = 0; l < numsff; l++)
+                    for (int l = 4; l < numsff; l++)
                     {
                         // ignore TensionField material
                         if (i == 2 || k == 2)
@@ -468,7 +473,7 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
 
         // bilayer consistency tests
         std::cout << "Bilayer consistency tests: " << std::endl;
-        for (int j = 0; j < numsff; j++)
+        for (int j = 4; j < numsff; j++)
         {
             double diff = 0;
             switch (j)
@@ -486,10 +491,14 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
                 diff =
                     bilayerTest<LibShell::MidedgeAngleThetaFormulation>(mesh, restPos, thicknesses, lameAlpha, lameBeta);
                 break;
+            case 4: 
+                diff = bilayerTest<LibShell::MidedgeAngleCompressiveFormulation>(mesh, restPos, thicknesses, lameAlpha,
+                                                                                 lameBeta);
+                break;
             default:
                 assert(false);
             }
-            std::string sffnames[] = { "Tan", "Sin", "Avg", "Theta" };
+            std::string sffnames[] = {"Tan", "Sin", "Avg", "Theta", "Compressive-tan"};
             std::cout << "  - " << sffnames[j] << ": " << diff << std::endl;
         }
     }
@@ -498,25 +507,179 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
 
 int main()
 {
-    int dim = 20;
-    bool verbose = false;
+    int dim = 2;
+    bool verbose = true;
     bool testderivatives = true;
-    bool testconsistency = true;
+    bool testconsistency = false;
     
     
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
     makeSquareMesh(dim, V, F);
 
+    Eigen::MatrixXd restV = V;
+
+    if (dim == 2) {
+        V(2, 2) = 0.5;
+        V(1, 2) = 0.5;
+    }
+
     LibShell::MeshConnectivity mesh(F);
+
+    Eigen::VectorXd edgeDOFs;
+    LibShell::MidedgeAngleCompressiveFormulation::initializeExtraDOFs(edgeDOFs, mesh, V);
+
+    constexpr int nedgedofs = LibShell::MidedgeAngleCompressiveFormulation::numExtraDOFs;
+
+    Eigen::Matrix<double, 4, 18 + 3 * nedgedofs> bderiv;
+    std::vector<Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs>> bhess;
+    Eigen::Matrix2d b = LibShell::MidedgeAngleCompressiveFormulation::secondFundamentalForm(
+        mesh, V, edgeDOFs, 0, &bderiv, &bhess);
+
+    Eigen::VectorXd tan_edgeDOFs;
+    LibShell::MidedgeAngleTanFormulation::initializeExtraDOFs(tan_edgeDOFs, mesh, V);
+
+    constexpr int ntanedgedofs = LibShell::MidedgeAngleTanFormulation::numExtraDOFs;
+
+    Eigen::Matrix<double, 4, 18 + 3 * ntanedgedofs> btanderiv;
+    std::vector<Eigen::Matrix<double, 18 + 3 * ntanedgedofs, 18 + 3 * ntanedgedofs>> btanhess;
+    Eigen::Matrix2d btan =
+        LibShell::MidedgeAngleTanFormulation::secondFundamentalForm(mesh, V, tan_edgeDOFs, 0, &btanderiv, &btanhess);
+
+    std::cout << "compression formula: \n";
+    std::cout << "b: \n" << b << std::endl;
+    std::cout << "bderiv: \n" << bderiv << std::endl;
+
+    int faceid = 0;
+
+   auto test_energy_derivatives = [&V, &nedgedofs, &mesh](
+        const Eigen::VectorXd &x, const Eigen::VectorXd &perturb,
+        const std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *, Eigen::MatrixXd *)> func) {
+            Eigen::VectorXd deriv;
+            Eigen::MatrixXd hess;
+            double f = func(x, &deriv, &hess);
+
+            for (int i = 4; i < 10; i++) {
+                double eps = std::pow(0.1, i);
+                auto x_pert = x + eps * perturb;
+
+                Eigen::VectorXd deriv_pert;
+                double f_pert = func(x_pert, &deriv_pert, nullptr);
+
+                std::cout << "eps: " << eps << std::endl;
+                std::cout << "f-g check: "
+                          << "f: " << f << ", f_pert: " << f_pert << ", diff: " << (f_pert - f) / eps - perturb.dot(deriv)
+                          << std::endl;
+                std::cout << "g-h check: " << ((deriv_pert - deriv) / eps - hess * perturb).norm() << std::endl;
+            }
+    };
+
+   auto pos_edge_dofs_2_variable = [&mesh, &faceid](const Eigen::MatrixXd &cur_pos, const Eigen::VectorXd &cur_edge_dofs) {
+       int ndofs_per_edge = cur_edge_dofs.size() / mesh.nEdges();
+
+       int total_dofs = 18 + 3 * ndofs_per_edge;
+
+       Eigen::VectorXd x(total_dofs);
+       x.setZero();
+       for (int i = 0; i < 3; i++) {
+           int edge_id = mesh.faceEdge(faceid, i);
+           int opp_vid = mesh.vertexOppositeFaceEdge(faceid, i);
+           if (opp_vid != -1) {
+               x.segment<3>(9 + 3 * i) = cur_pos.row(opp_vid);
+           }
+
+           for (int j = 0; j < ndofs_per_edge; j++) {
+               x(18 + ndofs_per_edge * i + j) = cur_edge_dofs(ndofs_per_edge * edge_id + j);
+           }
+       }
+       for (int i = 0; i < 3; i++) {
+           x.segment<3>(3 * i) = cur_pos.row(mesh.faceVertex(faceid, i));
+       }
+       return x;
+   };
+
+   auto variable_2_pos_edge_dofs = [&mesh, &faceid](const Eigen::VectorXd &x, Eigen::MatrixXd &cur_pos,
+                                       Eigen::VectorXd &cur_edge_dofs) {
+       int ndofs_per_edge = cur_edge_dofs.size() / mesh.nEdges();
+
+       int total_dofs = 18 + 3 * ndofs_per_edge;
+
+       for (int i = 0; i < 3; i++) {
+           int edge_id = mesh.faceEdge(faceid, i);
+           int opp_vid = mesh.vertexOppositeFaceEdge(faceid, i);
+           if (opp_vid != -1) {
+               cur_pos.row(opp_vid) = x.segment<3>(9 + 3 * i);
+           }
+
+           for (int j = 0; j < ndofs_per_edge; j++) {
+               cur_edge_dofs(ndofs_per_edge * edge_id + j) = x(18 + ndofs_per_edge * i + j);
+           }
+       }
+
+       for (int i = 0; i < 3; i++) {
+           cur_pos.row(mesh.faceVertex(faceid, i)) = x.segment<3>(3 * i);
+       }
+   };
+
+    auto II_func = [&](const Eigen::VectorXd& x, Eigen::VectorXd* deriv, Eigen::MatrixXd* hess) {
+        auto test_V = V;
+        constexpr int test_nedgedofs = LibShell::MidedgeAngleCompressiveFormulation::numExtraDOFs;
+        auto test_edge_dofs = edgeDOFs;
+
+        variable_2_pos_edge_dofs(x, test_V, test_edge_dofs);
+
+        Eigen::Matrix<double, 4, 18 + 3 * test_nedgedofs> test_bderiv;
+        std::vector<Eigen::Matrix<double, 18 + 3 * test_nedgedofs, 18 + 3 * test_nedgedofs>> test_bhess;
+        Eigen::Matrix2d test_b =
+            LibShell::MidedgeAngleCompressiveFormulation::secondFundamentalForm(mesh, test_V, test_edge_dofs, faceid, deriv ? &test_bderiv : nullptr, hess ? &test_bhess : nullptr);
+        if (deriv) {
+            *deriv = (test_bderiv.row(0) + test_bderiv.row(1) + test_bderiv.row(3)).transpose();
+        }
+           
+        if (hess) {
+            *hess = test_bhess[0] + test_bhess[1] + test_bhess[3];
+        }
+
+        double energy = 0;
+        energy = test_b(0, 0) + test_b(0, 1) + test_b(1, 1);
+         
+        return energy;
+    };
+
+    LibShell::StVKMaterial<LibShell::MidedgeAngleCompressiveFormulation> monomat;
+    LibShell::MonolayerRestState monoRestState;
+
+
+    
+
+    Eigen::VectorXd x = pos_edge_dofs_2_variable(V, edgeDOFs);
+    auto pert = x;
+    pert.setRandom();
+    pert.normalize();
+    //for (int i = 0; i < 3; i++) {
+    //    pert(18 + 3 * i + 1) = 0;
+    //    pert(18 + 3 * i + 2) = 0;
+    //}
+    test_energy_derivatives(x, pert, II_func);
+
+    /*Eigen::VectorXd tan_x = pos_edge_dofs_2_variable(V, tan_edgeDOFs);
+    Eigen::VectorXd tan_pert = tan_x;
+    tan_pert.segment(0, 18) = pert.segment(0, 18);
+    for (int i = 0; i < 3; i++) {
+        tan_pert(18 + i) = pert(18 + 3 * i);
+    }
+
+    test_energy_derivatives(tan_x, tan_pert, tan_II_func);*/
+
+
     std::default_random_engine generator;
 
     if (testderivatives)
     {
         std::cout << "Running finite difference tests" << std::endl;;
-        for (int i = 0; i < nummats; i++)
+        for (int i = 1; i < 2; i++)
         {
-            for (int j = 0; j < numsff; j++)
+            for (int j = 4; j < 5; j++)
             {
                 std::cout << "Starting trial: ";
                 switch (j)
@@ -536,6 +699,10 @@ int main()
                 case 3:
                     std::cout << "MidedgeAngleThetaFormulation, ";
                     differenceTest<LibShell::MidedgeAngleThetaFormulation>(mesh, V, i, verbose);
+                    break;
+                case 4:
+                    std::cout << "MidedgeAngleCompressiveFormulation, ";
+                    differenceTest<LibShell::MidedgeAngleCompressiveFormulation>(mesh, V, i, verbose);
                     break;
                 default:
                     assert(false);
@@ -644,6 +811,7 @@ void testBendingFiniteDifferences(
     Eigen::MatrixXd posPert(testpos.rows(), testpos.cols());
     posPert.setRandom();
 
+    
     Eigen::VectorXd edgePert(testedge.size());
     edgePert.setRandom();
 
