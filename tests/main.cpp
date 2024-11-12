@@ -459,7 +459,7 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
                         if (idx2 <= idx1)
                             continue;
                         std::string matnames[] = { "Neohk", "StVK" };
-                        std::string sffnames[] = { "Tan", "Sin", "Avg", "Theta" };
+                        std::string sffnames[] = {"Tan", "Sin", "Avg", "Theta", "Compressive-tan"};
                         std::cout << "(" << matnames[i] << ", " << sffnames[j] << ") vs (" << matnames[k] << ", " << sffnames[l] << "): ";
                         double diff = 0;
                         int nverts = restPos.rows();
