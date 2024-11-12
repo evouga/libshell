@@ -20,39 +20,7 @@
 
 
 namespace LibShell {
-    template <class DerivedA>
-    void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, int projType)
-    {
-        // no projection
-        if (projType == 0)
-        {
-            return;
-        }
-        Eigen::SelfAdjointEigenSolver<DerivedA> eigenSolver(A);
-        if (eigenSolver.eigenvalues()[0] >= 0) {
-            return;
-        }
-
-        using T = typename DerivedA::Scalar;
-        Eigen::Matrix<T, -1, 1> D = eigenSolver.eigenvalues();
-        for (int i = 0; i < A.rows(); ++i) {
-            if (D[i] < 0) {
-                if(projType == 1)
-                {
-                    D[i] = 0;
-                }
-                else
-                {
-                    D[i] = -D[i];
-                }
-            } else {
-                break;
-            }
-        }
-        A = eigenSolver.eigenvectors() * D.asDiagonal() * eigenSolver.eigenvectors().transpose();
-    }
-
-    template <class DerivedA>
+   template <class DerivedA>
     void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, const HessianProjectType& projType)
     {
         // no projection
@@ -91,7 +59,6 @@ namespace LibShell {
         const Eigen::VectorXd& extraDOFs,
         const MaterialModel<SFF>& mat,
         const RestState& restState,
-        int projType,
         Eigen::VectorXd* derivative, // positions, then thetas
         std::vector<Eigen::Triplet<double> >* hessian,
         const HessianProjectType projType)
@@ -109,7 +76,6 @@ namespace LibShell {
         const MaterialModel<SFF>& mat,
         const RestState& restState,
         int whichTerms,
-        int projType,
         Eigen::VectorXd* derivative, // positions, then thetas
         std::vector<Eigen::Triplet<double> >* hessian,
         const HessianProjectType projType)

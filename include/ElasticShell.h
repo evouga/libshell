@@ -14,7 +14,7 @@ namespace LibShell {
     struct RestState;
 
     template <class DerivedA>
-    void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, int projType);
+    void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, const HessianProjectType& projType);
 
     template <class SFF>
     class ElasticShell
@@ -50,7 +50,6 @@ namespace LibShell {
             const Eigen::VectorXd& edgeDOFs,
             const MaterialModel<SFF>& mat,
             const RestState &restState,
-            int projType,
             Eigen::VectorXd* derivative, // positions, then thetas
             std::vector<Eigen::Triplet<double> >* hessian,
             const HessianProjectType projType = HessianProjectType::kMaxZero);
@@ -62,7 +61,6 @@ namespace LibShell {
             const MaterialModel<SFF>& mat,
             const RestState &restState,
             int whichTerms,
-            int projType,
             Eigen::VectorXd* derivative, // positions, then thetas
             std::vector<Eigen::Triplet<double> >* hessian,
             const HessianProjectType projType = HessianProjectType::kMaxZero);
