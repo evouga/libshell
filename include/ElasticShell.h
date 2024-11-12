@@ -4,7 +4,9 @@
 #include <Eigen/Core>
 #include <vector>
 #include <Eigen/Sparse>
+
 #include "MaterialModel.h"
+#include "types.h"
 
 namespace LibShell {
 
@@ -32,7 +34,7 @@ namespace LibShell {
          * - SFF:           the choice of second fundamental form discretization.
          * - whichTerms     optional flags offering finer-grained control over which terms to include. ET_STRETCHING includes the bending energy, and
                             ET_BENDING the bending energy. Default is both (ET_STRETCHING | ET_BENDING).
-         * - projType:      the type of projection to use for the Hessian. 0: no projection, 1: Max Zero projection, 2: Abs projection.
+         * - projType:      the type of projection to use for the Hessian. kNone: no projection, kMaxZero: Max Zero projection, kAbs: Abs projection.
          *
          * Outputs:
          * - returns the total elastic energy of the shell.
@@ -50,7 +52,8 @@ namespace LibShell {
             const RestState &restState,
             int projType,
             Eigen::VectorXd* derivative, // positions, then thetas
-            std::vector<Eigen::Triplet<double> >* hessian);
+            std::vector<Eigen::Triplet<double> >* hessian,
+            const HessianProjectType projType = HessianProjectType::kMaxZero);
 
         static double elasticEnergy(
             const MeshConnectivity& mesh,
@@ -61,7 +64,8 @@ namespace LibShell {
             int whichTerms,
             int projType,
             Eigen::VectorXd* derivative, // positions, then thetas
-            std::vector<Eigen::Triplet<double> >* hessian);
+            std::vector<Eigen::Triplet<double> >* hessian,
+            const HessianProjectType projType = HessianProjectType::kMaxZero);
 
         static std::vector<double> elasticEnergyPerElement(
             const MeshConnectivity& mesh,
