@@ -1,4 +1,3 @@
-#include "StaticSolve.h"
 #include "../Optimization/include/NewtonDescent.h"
 
 #include "../include/MeshConnectivity.h"

@@ -51,17 +51,50 @@ struct Energies
 {
     double exact;
     double quadraticbending;
-    double neohookean;
-    double neohookeandir;
-    double neohookeandirzero;
     double stvk;
     double stvkdir;
-    double prism;
+    double stvkCompressiveDir;
+    double stvkIncompressibleDir;
 };
 
-void optimizeEdgeDOFs(ShellEnergy& energy, const Eigen::MatrixXd& curPos, Eigen::VectorXd& edgeDOFs)
+double edgeDOFPenaltyEnergy(const Eigen::VectorXd& edgeDOFs, const Eigen::VectorXd&edge_area, double penaltyScale, Eigen::VectorXd* deriv, std::vector<Eigen::Triplet<double> >* hessian)
 {
-    double tol = 1e-5;
+    int nedges = edge_area.size();
+    if (deriv) {
+        deriv->resize(edgeDOFs.size());
+        deriv->setZero();
+    }
+
+    if (hessian) {
+        hessian->clear();
+    }
+
+    if(edgeDOFs.size() == nedges || edgeDOFs.size() % nedges != 0)
+        return 0.0;
+    int ndof_per_edge = edgeDOFs.size() / nedges;
+
+    double penalty = 0.0;
+    for (int i = 0; i < nedges; i++) {
+        penalty += (edgeDOFs(i * ndof_per_edge + 1) - 1) * (edgeDOFs(i * ndof_per_edge + 1) - 1) * penaltyScale * edge_area[i];
+        penalty += (edgeDOFs(i * ndof_per_edge + 2) - 1) * (edgeDOFs(i * ndof_per_edge + 2) - 1) * penaltyScale * edge_area[i];
+
+        if(deriv) {
+            (*deriv)(i * ndof_per_edge + 1) += 2 * (edgeDOFs(i * ndof_per_edge + 1) - 1) * penaltyScale * edge_area[i];
+            (*deriv)(i * ndof_per_edge + 2) += 2 * (edgeDOFs(i * ndof_per_edge + 2) - 1) * penaltyScale * edge_area[i];
+        }
+
+        if(hessian) {
+            hessian->push_back({i * ndof_per_edge + 1, i * ndof_per_edge + 1, 2 * penaltyScale * edge_area[i]});
+            hessian->push_back({i * ndof_per_edge + 2, i * ndof_per_edge + 2, 2 * penaltyScale * edge_area[i]});
+        }
+    } 
+    return penalty;
+}
+
+
+void optimizeEdgeDOFs(ShellEnergy& energy, const Eigen::MatrixXd& curPos, const Eigen::VectorXd& edge_area,  Eigen::VectorXd& edgeDOFs)
+{
+    double tol = 1e-4;
     int nposdofs = curPos.rows() * 3;
     int nedgedofs = edgeDOFs.size();
 
@@ -79,16 +112,28 @@ void optimizeEdgeDOFs(ShellEnergy& energy, const Eigen::MatrixXd& curPos, Eigen:
 
     Eigen::SparseMatrix<double> PT = P.transpose();
 
+    double young = 1.0 / thickness;
+    double penaltyScale = young * thickness * thickness * thickness;
+
     double reg = 1e-6;
     while (true)
     {
         std::vector<Eigen::Triplet<double> > Hcoeffs;
         Eigen::VectorXd F;
         double origEnergy = energy.elasticEnergy(curPos, edgeDOFs, true, &F, &Hcoeffs);
+        
+        std::vector<Eigen::Triplet<double>> PenaltyCoeffs;
+        Eigen::VectorXd PenaltyDeriv;
+        double penalty = edgeDOFPenaltyEnergy(edgeDOFs, edge_area, penaltyScale, &PenaltyDeriv, &PenaltyCoeffs);
+        origEnergy += penalty;
+        F.segment(nposdofs, nedgedofs) += PenaltyDeriv;
+        for (auto& it : PenaltyCoeffs)
+            Hcoeffs.push_back({it.row() + nposdofs, it.col() + nposdofs, it.value()});
+
         Eigen::VectorXd PF = P * F;
-        std::cout << "Force resid now: " << PF.norm() << ", energy: " << origEnergy << ", reg: " << reg << std::endl;
-        if (PF.norm() < tol)
-            return;
+        std::cout << "Force resid now: " << PF.norm() << ", energy: " << origEnergy - penalty << ", penalty: " << penalty << ", reg: " << reg << std::endl;
+        if (PF.norm() < tol) return;
+
         Eigen::SparseMatrix<double> H(nposdofs + nedgedofs, nposdofs + nedgedofs);
         H.setFromTriplets(Hcoeffs.begin(), Hcoeffs.end());
         Eigen::SparseMatrix<double> PHPT = P * H * PT;
@@ -170,41 +215,47 @@ Energies measureCylinderEnergy(
         restState.bbars[i].setZero();
 
     Eigen::VectorXd restEdgeDOFs = edgeDOFs;
-
-    NeohookeanShellEnergy nhenergyModel(mesh, restState);
-    NeohookeanDirectorShellEnergy nhdenergyModel(mesh, dirrestState);
     QuadraticBendingShellEnergy qbenergyModel(mesh, restState, restPos,
                                               restEdgeDOFs);
     StVKShellEnergy stvkenergyModel(mesh, restState);
-    StVKDirectorShellEnergy stvkdenergyModel(mesh, dirrestState);
+    StVKDirectorShellEnergy stvk_dir_energyModel(mesh, dirrestState);
+    StVKCompressiveDirectorShellEnergy stvk_compress_dir_energyModel(mesh, dirrestState);
 
-    Eigen::VectorXd nhF, stvkF;
-    Eigen::VectorXd nhdF, stvkdF;
-    Eigen::VectorXd qbF;
+    Eigen::VectorXd edge_area(mesh.nEdges());
 
-    Eigen::VectorXd diredgeDOFs = zerodiredgeDOFs;
-    optimizeEdgeDOFs(nhdenergyModel, curPos, diredgeDOFs);
-
-    result.neohookean =
-        nhenergyModel.elasticEnergy(curPos, edgeDOFs, true, &nhF, NULL);
-    result.neohookeandir =
-        nhdenergyModel.elasticEnergy(curPos, diredgeDOFs, true, &nhdF, NULL);
-    result.neohookeandirzero =
-        nhdenergyModel.elasticEnergy(curPos, zerodiredgeDOFs, true, &nhdF, NULL);
-    result.quadraticbending =
-        qbenergyModel.elasticEnergy(curPos, edgeDOFs, true, &qbF, NULL);
-    result.stvk =
-        stvkenergyModel.elasticEnergy(curPos, edgeDOFs, true, &stvkF, NULL);
-    result.stvkdir = stvkdenergyModel.elasticEnergy(curPos, diredgeDOFs, true,
-                                                    &stvkdF, NULL);
-
-    int nverts = curPos.rows();
-    nhForces.resize(nverts, 3);
-    qbForces.resize(nverts, 3);
-    for (int i = 0; i < nverts; i++) {
-        nhForces.row(i) = -nhF.segment<3>(3 * i);
-        qbForces.row(i) = -qbF.segment<3>(3 * i);
+    for (int i = 0; i < mesh.nEdges(); i++) {
+        for (int j = 0; j < 2; j++) {
+            int fid = mesh.edgeFace(i, j);
+            if(fid != -1) {
+                edge_area[i] += std::sqrt(restState.abars[fid].determinant()) / 2.0 / 3.0;
+            }
+        } 
     }
+    Eigen::VectorXd diredgeDOFs = zerodiredgeDOFs;
+    std::cout << "============= Optimizing edge direction =========== " << std::endl;
+    optimizeEdgeDOFs(stvk_dir_energyModel, curPos, edge_area, diredgeDOFs);
+
+    Eigen::VectorXd zero_compressed_diredgeDOFs;
+    LibShell::MidedgeAngleCompressiveFormulation::initializeExtraDOFs(zero_compressed_diredgeDOFs, mesh, curPos);
+    
+    Eigen::VectorXd compresed_diredgeDOFs = zero_compressed_diredgeDOFs;
+    std::cout << "============= Optimizing edge direction and norm =========== " << std::endl;
+    optimizeEdgeDOFs(stvk_compress_dir_energyModel, curPos, edge_area, compresed_diredgeDOFs);
+
+    result.quadraticbending =
+        qbenergyModel.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL);
+    result.stvk =
+        stvkenergyModel.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL);
+    result.stvkdir = stvk_dir_energyModel.elasticEnergy(curPos, diredgeDOFs, true, NULL, NULL);
+
+    int compressed_nedgedofs = zero_compressed_diredgeDOFs.size() / mesh.nEdges();
+    for (int i = 0; i < mesh.nEdges(); i++) {
+        zero_compressed_diredgeDOFs[i * compressed_nedgedofs] = diredgeDOFs[i];
+    }
+    result.stvkCompressiveDir =
+        stvk_compress_dir_energyModel.elasticEnergy(curPos, compresed_diredgeDOFs, true, NULL, NULL);
+    result.stvkIncompressibleDir =
+        stvk_dir_energyModel.elasticEnergy(curPos, zero_compressed_diredgeDOFs, true, NULL, NULL);
 
     // ground truth energy
     // W = PI * r
@@ -283,30 +334,52 @@ Energies measureSphereEnergy(
         dirrestState.bbars[i].setZero();
     }
 
+    Eigen::VectorXd edge_area(mesh.nEdges());
+
+    for (int i = 0; i < mesh.nEdges(); i++) {
+        for (int j = 0; j < 2; j++) {
+            int fid = mesh.edgeFace(i, j);
+            if (fid != -1) {
+                edge_area[i] += std::sqrt(restState.abars[fid].determinant()) / 2.0 / 3.0;
+            }
+        }
+    }
+
     Eigen::VectorXd restEdgeDOFs = edgeDOFs;
 
-    NeohookeanShellEnergy nhenergyModel(mesh, restState);
-    NeohookeanDirectorShellEnergy nhdenergyModel(mesh, dirrestState);
     QuadraticBendingShellEnergy qbenergyModel(mesh, restState, curPos,
         restEdgeDOFs);
     StVKShellEnergy stvkenergyModel(mesh, restState);
-    StVKDirectorShellEnergy stvkdenergyModel(mesh, dirrestState);
+    StVKDirectorShellEnergy stvk_dir_energyModel(mesh, dirrestState);
+    StVKCompressiveDirectorShellEnergy stvk_compress_dir_energyModel(mesh, dirrestState);
 
     Eigen::VectorXd diredgeDOFs = zerodiredgeDOFs;
-    optimizeEdgeDOFs(nhdenergyModel, curPos, diredgeDOFs);
+    optimizeEdgeDOFs(stvk_dir_energyModel, edge_area, curPos, diredgeDOFs);
 
-    result.neohookean =
-        nhenergyModel.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL);
-    result.neohookeandir =
-        nhdenergyModel.elasticEnergy(curPos, diredgeDOFs, true, NULL, NULL);
-    result.neohookeandirzero =
-        nhdenergyModel.elasticEnergy(curPos, zerodiredgeDOFs, true, NULL, NULL);
     result.quadraticbending =
         qbenergyModel.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL);
     result.stvk =
         stvkenergyModel.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL);
-    result.stvkdir = stvkdenergyModel.elasticEnergy(curPos, diredgeDOFs, true,
-        NULL, NULL);
+    result.stvkdir = stvk_dir_energyModel.elasticEnergy(curPos, diredgeDOFs, true, NULL, NULL);
+
+    Eigen::VectorXd zero_compressed_diredgeDOFs;
+    LibShell::MidedgeAngleCompressiveFormulation::initializeExtraDOFs(zero_compressed_diredgeDOFs, mesh, curPos);
+
+    Eigen::VectorXd compresed_diredgeDOFs = zero_compressed_diredgeDOFs;
+    optimizeEdgeDOFs(stvk_compress_dir_energyModel, curPos, edge_area, compresed_diredgeDOFs);
+
+    result.quadraticbending = qbenergyModel.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL);
+    result.stvk = stvkenergyModel.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL);
+    result.stvkdir = stvk_dir_energyModel.elasticEnergy(curPos, diredgeDOFs, true, NULL, NULL);
+
+    int compressed_nedgedofs = zero_compressed_diredgeDOFs.size() / mesh.nEdges();
+    for (int i = 0; i < mesh.nEdges(); i++) {
+        zero_compressed_diredgeDOFs[i * compressed_nedgedofs] = diredgeDOFs[i];
+    }
+    result.stvkCompressiveDir =
+        stvk_compress_dir_energyModel.elasticEnergy(curPos, compresed_diredgeDOFs, true, NULL, NULL);
+    result.stvkIncompressibleDir =
+        stvk_dir_energyModel.elasticEnergy(curPos, zero_compressed_diredgeDOFs, true, NULL, NULL);
 
     // ground truth energy
     Eigen::Matrix2d abar;
@@ -333,7 +406,7 @@ int main(int argc, char* argv[])
     cokeHeight = 0.122;
     sphereRadius = 0.05;
 
-    triangleArea = 0.0000001;
+    triangleArea = 0.000001;
 
     // curMeshType = MeshType::MT_CYLINDER_REGULAR;
     curMeshType = MeshType::MT_CYLINDER_IRREGULAR;
@@ -364,7 +437,7 @@ int main(int argc, char* argv[])
     int steps = 5;
     double multiplier = 4;
     std::ofstream log("log.txt");
-    log << "#V, exact energy, NH energy, NH_dir energy, NH_dir_zero energy, StVK energy, StVK_dir energy, quadratic, prism" << std::endl;
+    log << "#V \t exact energy \t StVK energy \t StVK_dir energy \t StVK_incomp_dir \t StVK_comp_dir \t quadratic" << std::endl;
     if (curMeshType == MeshType::MT_SPHERE)
     {
         makeSphere(sphereRadius, triangleArea, origV, F);
@@ -376,7 +449,8 @@ int main(int argc, char* argv[])
             igl::writePLY(ss.str(), origV, F);
 
             curenergies = measureSphereEnergy(mesh, origV, thickness, lameAlpha, lameBeta, sphereRadius);
-            log << origV.rows() << ": " << curenergies.exact << " " << curenergies.neohookean << " " << curenergies.neohookeandir << " " << curenergies.neohookeandirzero << " " << curenergies.stvk << " " << curenergies.stvkdir << " " << curenergies.quadraticbending << " " << curenergies.prism << std::endl;
+            log << origV.rows() << ":\t " << curenergies.exact << " \t " << curenergies.stvk << " \t "
+                << curenergies.stvkdir << " \t " << curenergies.stvkIncompressibleDir << " \t " << curenergies.stvkCompressiveDir << " \t " << curenergies.quadraticbending << std::endl;
             triangleArea *= multiplier;
             makeSphere(sphereRadius, triangleArea, origV, F);
             mesh = LibShell::MeshConnectivity(F);            
@@ -389,12 +463,9 @@ int main(int argc, char* argv[])
         for (int step = 0; step < steps; step++)
         {
             curenergies = measureCylinderEnergy(mesh, origV, rolledV, thickness, lameAlpha, lameBeta, curRadius, curHeight, nhForces, qbForces);
-            log << origV.rows() << ": " << curenergies.exact << " "
-                << curenergies.neohookean << " " << curenergies.neohookeandir
-                << " " << curenergies.neohookeandir << " " << curenergies.stvk
-                << " " << curenergies.stvkdir << " "
-                << curenergies.quadraticbending << " " << curenergies.prism
-                << std::endl;
+            log << origV.rows() << ":\t " << curenergies.exact << " \t " << curenergies.stvk << " \t "
+                << curenergies.stvkdir << " \t " << curenergies.stvkIncompressibleDir << " \t "
+                << curenergies.stvkCompressiveDir << " \t " << curenergies.quadraticbending << std::endl;
             triangleArea *= multiplier;
             makeHalfCylinder(curMeshType == MeshType::MT_CYLINDER_REGULAR, cokeRadius, cokeHeight, triangleArea, origV, rolledV, F);
             mesh = LibShell::MeshConnectivity(F);

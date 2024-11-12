@@ -8,6 +8,10 @@ set(LIBIGL_EIGEN_VERSION 3.3.7 CACHE STRING "Eigen version")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 include(libigl)
+igl_include(restricted triangle)
+
+include(CLI11)
+include(spdlog)
 
 # Add your project files
 if(MSVC)
@@ -26,3 +30,5 @@ add_subdirectory(example)
 file(GLOB TESTFILES tests/*.cpp)
 add_executable(tests_${PROJECT_NAME} ${TESTFILES})
 target_link_libraries(tests_${PROJECT_NAME} ${PROJECT_NAME} Eigen3::Eigen)
+
+add_subdirectory(bending_models)

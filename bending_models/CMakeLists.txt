@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.1)
-project(bending_models)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -11,15 +10,16 @@ endif()
 igl_include(restricted triangle)
 
 
-file(GLOB SRCFILES quickhull/*.cpp quickhull/*.hpp make_geometric_shapes/*.cpp make_geometric_shapes/*.h ShellEnergy/*.h QuadraticExpansionBending.h QuadraticExpansionBending.cpp)	  
+file(GLOB SRCFILES quickhull/*.cpp quickhull/*.hpp make_geometric_shapes/*.cpp make_geometric_shapes/*.h ShellEnergy/*.h QuadraticExpansionBending.h QuadraticExpansionBending.cpp )	  
 
-add_executable(${PROJECT_NAME} main.cpp ${SRCFILES})
+add_executable(bending_models main.cpp ${SRCFILES})
 # other dependencies
-    target_link_libraries(${proj_name} ${PROJECT_NAME}
-            CLI11::CLI11
+target_link_libraries(bending_models ${PROJECT_NAME}
+            optimization
             igl::core
             igl_restricted::triangle
-            polyscope)
+            polyscope
+            CLI11::CLI11)
 
 # Use C++14
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 14)

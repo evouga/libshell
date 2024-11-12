@@ -2,6 +2,7 @@
 #include <iomanip>
 
 #include <Eigen/Sparse>
+#include <spdlog/spdlog.h>
 
 #include "../include/LineSearch.h"
 #include "../include/NewtonDescent.h"
@@ -21,6 +22,9 @@ void NewtonSolver(
     bool display_info,
     bool is_swap) {
     const int DIM = x0.rows();
+    // Eigen::VectorXd randomVec = x0;
+    // randomVec.setRandom();
+    // x0 += 1e-6 * randomVec;
     Eigen::VectorXd grad = Eigen::VectorXd::Zero(DIM);
     Eigen::SparseMatrix<double> hessian;
 
@@ -35,22 +39,24 @@ void NewtonSolver(
     double total_linesearch_time = 0;
 
     total_timer.start();
+    std::ofstream optInfo;
+    spdlog::set_level(spdlog::level::info);
 
     if (display_info) {
-        std::cout << "============= Termination Creteria ============="
-                  << "\ngradient tolerance: " << grad_tol
-                  << "\nfunction update tolerance: " << f_tol
-                  << "\nvariable update tolerance: " << x_tol
-                  << "\nmaximum iteration: " << num_iter
-                  << "\n==============================================\n"
-                  << std::endl;
+        spdlog::set_level(spdlog::level::debug);
+    }
+
+    if (display_info) {
+        spdlog::debug(
+            "Termination Creteria, gradient tolerance: {}, function update tolerance: {}, variable update tolerance: "
+            "{}, maximum iteration: {}\n",
+            grad_tol, f_tol, x_tol, num_iter);
     }
     int i = 0;
 
-    double f = obj_func(x0, &grad, nullptr, false);
-    if (grad.norm() < grad_tol) {
-        std::cout << "initial gradient norm = " << grad.norm() << ", is smaller than the gradient tolerance: " << grad_tol << ", return" << std::endl;
-        return;
+    double f = obj_func(x0, nullptr, nullptr, false);
+    if (f == 0) {
+        spdlog::info("energy = 0, return");
     }
 
     Eigen::SparseMatrix<double> I(DIM, DIM);
@@ -60,7 +66,7 @@ void NewtonSolver(
 
     for (; i < num_iter; i++) {
         if (display_info) {
-            std::cout << "\niteration: " << i << std::endl;
+            spdlog::debug("iter: {}", i);
         }
 
         Timer<std::chrono::high_resolution_clock> local_timer;
@@ -72,8 +78,14 @@ void NewtonSolver(
 
         local_timer.start();
         Eigen::SparseMatrix<double> H = hessian;
-        std::cout << "num of nonzeros: " << H.nonZeros() << ", rows: " << H.rows() << ", cols: " << H.cols()
-                  << ", Sparsity: " << H.nonZeros() * 100.0 / (H.rows() * H.cols()) << "%" << std::endl;
+        spdlog::debug("num of nonzeros: {}, rows: {}, cols: {}, Sparsity: {}%", H.nonZeros(), H.rows(), H.cols(),
+                      H.nonZeros() * 100.0 / (H.rows() * H.cols()));
+
+        if (is_small_perturb_needed && is_proj) {
+            // due to the numerical issue, we may need to add a small perturbation to
+            // the PSD projected hessian matrix
+            H += reg * I;
+        }
 
         Eigen::SparseMatrix<double> HT = H.transpose();
         Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver(H);
@@ -81,13 +93,11 @@ void NewtonSolver(
         while (solver.info() != Eigen::Success) {
             if (display_info) {
                 if (is_proj) {
-                    std::cout << "some small perturb is needed to remove round-off error, current reg = " << reg
-                              << std::endl;
+                    spdlog::debug("some small perturb is needed to remove round-off error, current reg = {}", reg);
                 }
 
                 else {
-                    std::cout << "the hessian matrix is not SPD, add reg * I to make it PSD, current reg = " << reg
-                              << std::endl;
+                    spdlog::debug("Matrix is not positive definite, current reg = {}", reg);
                 }
             }
 
@@ -100,17 +110,10 @@ void NewtonSolver(
             reg = std::max(2 * reg, 1e-16);
 
             if (reg > 1e4 && is_proj_hess) {
-                // the actual hessian is far from SPD, switch to the PSD hessian if enabled by the user
-                // Notice that 1e4 is just some experience value, you can change it
-                if(!is_proj) {
-                    std::cout << "reg is too large, use SPD hessian instead." << std::endl;
-                    reg = 1e-6;
-                    is_proj = true;
-                    f = obj_func(x0, &grad, &hessian, is_proj);
-                } else {
-                    std::cout << "reg is too large to get rid of round-off error in the PSD hessian. Please check your implementation" << std::endl;
-                    return;
-                }
+                spdlog::debug("reg is too large, use SPD hessian instead.");
+                reg = 1e-6;
+                is_proj = true;
+                f = obj_func(x0, &grad, &hessian, is_proj);
             }
         }
 
@@ -140,13 +143,12 @@ void NewtonSolver(
 
         double fnew = obj_func(x0, &grad, nullptr, is_proj);
         if (display_info) {
-            std::cout << "line search rate : " << rate << ", actual hessian : " << !is_proj << ", reg = " << reg
-                      << std::endl;
-            std::cout << "f_old: " << f << ", f_new: " << fnew << ", grad norm: " << grad.norm()
-                      << ", delta x: " << rate * delta_x.norm() << ", delta_f: " << f - fnew << std::endl;
-            std::cout << "timing info (in total seconds): " << std::endl;
-            std::cout << "assembling took: " << total_assembling_time << ", LLT solver took: " << total_solving_time
-                      << ", line search took: " << total_linesearch_time << std::endl;
+            spdlog::debug("line search rate : {}, actual hessian : {}, reg = {}", rate, !is_proj, reg);
+            spdlog::debug("f_old: {}, f_new: {}, grad norm: {}, delta x: {}, delta_f: {}", f, fnew, grad.norm(),
+                          rate * delta_x.norm(), f - fnew);
+            spdlog::debug("timing info (in total seconds): ");
+            spdlog::debug("assembling took: {}, LLT solver took: {}, line search took: {}\n", total_assembling_time,
+                          total_solving_time, total_linesearch_time);
         }
 
         // switch to the actual hessian when close to convergence
@@ -160,39 +162,39 @@ void NewtonSolver(
 
         // Termination conditions
         if (rate < 1e-8) {
-            std::cout << "terminate with small line search rate (<1e-8): L2-norm = " << grad.norm() << std::endl;
+            spdlog::info("terminate with small line search rate (<1e-8): L2-norm = {}", grad.norm());
             break;
         }
 
         if (grad.norm() < grad_tol) {
-            std::cout << "terminate with gradient L2-norm = " << grad.norm() << std::endl;
+            spdlog::info("terminate with gradient L2-norm = {}", grad.norm());
             break;
         }
 
         if (rate * delta_x.norm() < x_tol) {
-            std::cout << "terminate with small variable change (<1e-8): L2-norm = " << grad.norm() << std::endl;
+            spdlog::info("terminate with small variable change, gradient L2-norm = {}", grad.norm());
             break;
         }
 
         if (f - fnew < f_tol) {
-            std::cout << "terminate with small energy change (<1e-8): L2-norm = " << grad.norm() << std::endl;
+            spdlog::info("terminate with small energy change, gradient L2-norm = {}", grad.norm());
             break;
         }
     }
 
     if (i >= num_iter) {
-        std::cout << "terminate with reaching the maximum iteration, with gradient L2-norm = " << grad.norm() << std::endl;
+        spdlog::info("terminate with reaching the maximum iteration, with gradient L2-norm = {}", grad.norm());
     }
 
     f = obj_func(x0, &grad, nullptr, false);
-    std::cout << "end up with energy: " << f << ", gradient: " << grad.norm() << std::endl;
+    spdlog::info("end up with energy: {}, gradient: {}", f, grad.norm());
 
     total_timer.stop();
     if (display_info) {
-        std::cout << "total time costed (s): " << total_timer.elapsed<std::chrono::milliseconds>() * 1e-3
-                  << ", within that, assembling took: " << total_assembling_time
-                  << ", LLT solver took: " << total_solving_time << ", line search took: " << total_linesearch_time
-                  << std::endl;
+        spdlog::info(
+            "total time costed (s): {}, within that, assembling took: {}, LLT solver took: {}, line search took: {}",
+            total_timer.elapsed<std::chrono::milliseconds>() * 1e-3, total_assembling_time, total_solving_time,
+            total_linesearch_time);
     }
 }
 
@@ -208,7 +210,7 @@ void TestFuncGradHessian(
     Eigen::SparseMatrix<double> H;
 
     double f = obj_Func(x0, &grad, &H, false);
-    std::cout << "energy: " << f << ", gradient L2-norm: " << grad.norm() << std::endl;
+    spdlog::info("energy: {}, gradient L2-norm: {}", f, grad.norm());
     if (f == 0) return;
 
     for (int i = 3; i < 10; i++) {
@@ -217,9 +219,9 @@ void TestFuncGradHessian(
         Eigen::VectorXd grad1;
         double f1 = obj_Func(x, &grad1, nullptr, false);
 
-        std::cout << "eps: " << eps << std::endl;
-        std::cout << "energy - gradient : " << (f1 - f) / eps - grad.dot(dir) << std::endl;
-        std::cout << "energy - hessian : " << ((grad1 - grad) / eps - H * dir).norm() << std::endl;
+        spdlog::info("eps: {}", eps);
+        spdlog::info("energy - gradient : {}", (f1 - f) / eps - grad.dot(dir));
+        spdlog::info("energy - hessian : {}", ((grad1 - grad) / eps - H * dir).norm());
     }
 }
 }  // namespace OptSolver

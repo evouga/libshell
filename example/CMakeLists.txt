@@ -13,5 +13,7 @@ foreach (proj_source ${EXAMPLEFILES})
     target_link_libraries(${exe_name} ${PROJECT_NAME}
             optimization
             igl::core
-            polyscope)
+            igl_restricted::triangle
+            polyscope
+            CLI11::CLI11)
 endforeach ()

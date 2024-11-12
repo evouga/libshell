@@ -26,16 +26,14 @@ namespace OptSolver {
 /// @param[in] is_swap                  whether to swap the hessian matrix computation to actual hessian (without PSD) near the optimum
 ///
 void NewtonSolver(
-    std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *, Eigen::SparseMatrix<double> *, bool)> obj_func,
-    std::function<double(const Eigen::VectorXd &, const Eigen::VectorXd &)> find_max_step,
-    Eigen::VectorXd &x0,
-    int num_iter = 1000,
-    double grad_tol = 1e-6,
-    double x_tol = 0,
-    double f_tol = 0,
-    bool is_proj_hess = false,
-    bool display_info = false,
-    bool is_swap = false);
+    std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *,
+                         Eigen::SparseMatrix<double> *, bool)>
+        obj_func,
+    std::function<double(const Eigen::VectorXd &, const Eigen::VectorXd &)>
+        find_max_step,
+    Eigen::VectorXd &x0, int num_iter = 1000,
+    double grad_tol = 1e-14, double x_tol = 0, double f_tol = 0,
+    bool is_proj = false, bool display_info = false, bool is_swap = false);
 
 ///
 /// Test the function gradient and hessian
