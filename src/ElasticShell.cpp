@@ -21,11 +21,11 @@
 
 
 namespace LibShell {
-    template <class DerivedA>
-    void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, int projType)
+   template <class DerivedA>
+    void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, const HessianProjectType& projType)
     {
         // no projection
-        if (projType == 0)
+        if (projType == HessianProjectType::kNone)
         {
             return;
         }
@@ -38,14 +38,14 @@ namespace LibShell {
         Eigen::Matrix<T, -1, 1> D = eigenSolver.eigenvalues();
         for (int i = 0; i < A.rows(); ++i) {
             if (D[i] < 0) {
-                if(projType == 1)
-                {
-                    D[i] = 0;
-                }
-                else
-                {
-                    D[i] = -D[i];
-                }
+              if (projType == HessianProjectType::kMaxZero) {
+                D[i] = 0;
+              } else if (projType == HessianProjectType::kAbs) {
+                D[i] = -D[i];
+              } else {
+                std::cerr << "Unknown projection type, use Max(A, 0) instead!" << std::endl;
+                D[i] = 0;
+              }
             } else {
                 break;
             }
@@ -60,14 +60,13 @@ namespace LibShell {
         const Eigen::VectorXd& extraDOFs,
         const MaterialModel<SFF>& mat,
         const RestState& restState,
-        int projType,
         Eigen::VectorXd* derivative, // positions, then thetas
-        std::vector<Eigen::Triplet<double> >* hessian)
+        std::vector<Eigen::Triplet<double> >* hessian,
+        const HessianProjectType projType)
     {
         return elasticEnergy(mesh, curPos, extraDOFs, mat, restState,
             EnergyTerm::ET_BENDING | EnergyTerm::ET_STRETCHING,
-            projType,
-            derivative, hessian);
+                             derivative, hessian, projType);
     }
 
     template <class SFF>
@@ -78,9 +77,9 @@ namespace LibShell {
         const MaterialModel<SFF>& mat,
         const RestState& restState,
         int whichTerms,
-        int projType,
         Eigen::VectorXd* derivative, // positions, then thetas
-        std::vector<Eigen::Triplet<double> >* hessian)
+        std::vector<Eigen::Triplet<double> >* hessian,
+        const HessianProjectType projType)
     {
         int nfaces = mesh.nFaces();
         int nedges = mesh.nEdges();
@@ -277,9 +276,13 @@ namespace LibShell {
     template class ElasticShell<MidedgeAverageFormulation>;
     template class ElasticShell<MidedgeAngleCompressiveFormulation>;
 
-    template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 9, 9>>& symA, int projType);
-    template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 18, 18>>& symA, int projType);
-    template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 21, 21>>& symA, int projType);
-
-
+    template void
+    projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 9, 9>> &symA,
+                  const HessianProjectType& projType);
+    template void
+    projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 18, 18>> &symA,
+                  const HessianProjectType &projType);
+    template void
+    projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 21, 21>> &symA,
+                  const HessianProjectType &projType);
 };

@@ -51,7 +51,7 @@ This procedure will build:
 
 ## Dependencies
 
-The library itself depends only on Eigen (set the environment variable `EIGEN3_INCLUDE_DIR` to point to your Eigen folder). The example program includes a viewer which uses libigl.
+The library itself depends only on Eigen (set the environment variable `EIGEN3_INCLUDE_DIR` to point to your Eigen folder). The example program includes a viewer which uses polyscope, and libigl for mesh io.
 
 ## Compiling on Windows
 
