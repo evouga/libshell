@@ -157,18 +157,13 @@ static Eigen::Vector3d secondFundamentalFormEntries(const MeshConnectivity& mesh
             }
 
             if (derivative) {
-                derivative->block(i, 3 * hv[0], 1, 3) += 2.0 * tan(alpha) * hderiv.block(0, 0, 1, 3) * vec_norm;
-                derivative->block(i, 3 * hv[1], 1, 3) += 2.0 * tan(alpha) * hderiv.block(0, 3, 1, 3) * vec_norm;
-                derivative->block(i, 3 * hv[2], 1, 3) += 2.0 * tan(alpha) * hderiv.block(0, 6, 1, 3) * vec_norm;
-
-                derivative->block(i, 3 * av[0], 1, 3) +=
-                    altitude / cos(alpha) / cos(alpha) * thetaderiv.block(0, 0, 1, 3) * vec_norm;
-                derivative->block(i, 3 * av[1], 1, 3) +=
-                    altitude / cos(alpha) / cos(alpha) * thetaderiv.block(0, 3, 1, 3) * vec_norm;
-                derivative->block(i, 3 * av[2], 1, 3) +=
-                    altitude / cos(alpha) / cos(alpha) * thetaderiv.block(0, 6, 1, 3) * vec_norm;
-                derivative->block(i, 3 * av[3], 1, 3) +=
-                    altitude / cos(alpha) / cos(alpha) * thetaderiv.block(0, 9, 1, 3) * vec_norm;
+                for(int j = 0; j < 3; j++) {
+                    derivative->block(i, 3 * hv[j], 1, 3) += 2.0 * tan(alpha) * hderiv.block(0, 3 * j, 1, 3) * vec_norm;
+                }
+                for(int j = 0; j < 4; j++) {
+                    derivative->block(i, 3 * av[j], 1, 3) +=
+                    altitude / cos(alpha) / cos(alpha) * thetaderiv.block(0, 3 * j, 1, 3) * vec_norm;
+                }
                 (*derivative)(i, 18 + 3 * i) += 2.0 * altitude / cos(alpha) / cos(alpha) * orient * vec_norm;
                 (*derivative)(i, 18 + 3 * i + offset) += 2.0 * tan(alpha) * altitude;
             }
@@ -212,7 +207,7 @@ static Eigen::Vector3d secondFundamentalFormEntries(const MeshConnectivity& mesh
                         thetaderiv.block(0, 3 * k, 1, 3).transpose() * vec_norm;
                 }
 
-                (*hessian)[i](18 + 3 * i, 18 + 3 * i) += 4.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha);
+                (*hessian)[i](18 + 3 * i, 18 + 3 * i) += 4.0 * altitude * tan(alpha) / cos(alpha) / cos(alpha) * vec_norm;
 
                 // extra norm dofs
                 for (int j = 0; j < 3; j++) {
