@@ -31,5 +31,8 @@
 *.swo
 *.swp
 
+.idea/*
+
 build/*
+build_*/*
 cmake-build-*/*
