@@ -19,6 +19,8 @@
 #include <vector>
 #include <map>
 
+#include <tbb/parallel_for.h>
+
 
 namespace LibShell {
    template <class DerivedA>
@@ -105,18 +107,36 @@ namespace LibShell {
         // stretching terms
         if (whichTerms & EnergyTerm::ET_STRETCHING)
         {
+            std::vector<double> stretch_energies(nfaces);
+            std::vector<Eigen::Matrix<double, 1, 9>> stretch_derivs;
+            std::vector<Eigen::Matrix<double, 9, 9>> stretch_hessians;
+
+            if (derivative) {
+                stretch_derivs.resize(nfaces);
+            }
+
+            if (hessian) {
+                stretch_hessians.resize(nfaces);
+            }
+
+            tbb::parallel_for(0, nfaces, [&](int i) {
+                stretch_energies[i] =
+                    mat.stretchingEnergy(mesh, curPos, restState, i, derivative ? &stretch_derivs[i] : nullptr,
+                                         hessian ? &stretch_hessians[i] : nullptr);
+            });
+
             for (int i = 0; i < nfaces; i++)
             {
-                Eigen::Matrix<double, 1, 9> deriv;
-                Eigen::Matrix<double, 9, 9> hess;
-                result += mat.stretchingEnergy(mesh, curPos, restState, i, derivative ? &deriv : NULL, hessian ? &hess : NULL);
+                result += stretch_energies[i];
                 if (derivative)
                 {
+                    Eigen::Matrix<double, 1, 9>& deriv = stretch_derivs[i];
                     for (int j = 0; j < 3; j++)
                         derivative->segment<3>(3 * mesh.faceVertex(i, j)) += deriv.segment<3>(3 * j);
                 }
                 if (hessian)
                 {
+                    Eigen::Matrix<double, 9, 9>& hess = stretch_hessians[i];
                     projSymMatrix(hess, projType);
                     for (int j = 0; j < 3; j++)
                     {
@@ -139,13 +159,31 @@ namespace LibShell {
         if (whichTerms & EnergyTerm::ET_BENDING)
         {
             constexpr int nedgedofs = SFF::numExtraDOFs;
+
+            std::vector<double> bend_energies(nfaces);
+            std::vector<Eigen::Matrix<double, 1, 18 + 3 * nedgedofs>> bend_derivs;
+            std::vector<Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs>> bend_hessians;
+
+            if (derivative) {
+                bend_derivs.resize(nfaces);
+            }
+
+            if (hessian) {
+                bend_hessians.resize(nfaces);
+            }
+
+            tbb::parallel_for(0, nfaces, [&](int i) {
+                bend_energies[i] =
+                    mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &bend_derivs[i] : nullptr,
+                                                     hessian ? &bend_hessians[i] : nullptr);
+            });
+
             for (int i = 0; i < nfaces; i++)
             {
-                Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> deriv;
-                Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs> hess;
-                result += mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &deriv : NULL, hessian ? &hess : NULL);
+                result += bend_energies[i];
                 if (derivative)
                 {
+                    Eigen::Matrix<double, 1, 18 + 3 * nedgedofs>& deriv = bend_derivs[i];
                     for (int j = 0; j < 3; j++)
                     {
                         derivative->segment<3>(3 * mesh.faceVertex(i, j)) += deriv.template block<1, 3>(0, 3 * j).transpose();
@@ -160,6 +198,7 @@ namespace LibShell {
                 }
                 if (hessian)
                 {
+                    Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs>& hess = bend_hessians[i];
                     projSymMatrix(hess, projType);
                     for (int j = 0; j < 3; j++)
                     {

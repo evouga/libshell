@@ -1,9 +1,7 @@
-#include "polyscope/polyscope.h"
-#include "polyscope/surface_mesh.h"
+#include "ShellEnergy.h"
+
 #include "../include/MeshConnectivity.h"
 #include "../include/ElasticShell.h"
-#include "make_geometric_shapes/HalfCylinder.h"
-#include "make_geometric_shapes/Sphere.h"
 #include "../include/MidedgeAngleTanFormulation.h"
 #include "../include/MidedgeAngleSinFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
@@ -12,13 +10,24 @@
 #include "../include/NeoHookeanMaterial.h"
 #include "../include/RestState.h"
 #include "../include/StVKMaterial.h"
-#include "igl/readOBJ.h"
+
+#include "../Optimization/include/NewtonDescent.h"
+
+#include "make_geometric_shapes/HalfCylinder.h"
+#include "make_geometric_shapes/Sphere.h"
+
+#include <polyscope/surface_vector_quantity.h>
+#include <polyscope/polyscope.h>
+#include <polyscope/surface_mesh.h>
+
+#include <igl/readOBJ.h>
+#include <igl/writePLY.h>
+#include <igl/principal_curvature.h>
 #include <set>
 #include <vector>
-#include "ShellEnergy.h"
-#include "igl/writePLY.h"
-#include "polyscope/surface_vector_quantity.h"
-#include "igl/principal_curvature.h"
+
+
+
 
 double cokeRadius;
 double cokeHeight;
@@ -94,7 +103,7 @@ double edgeDOFPenaltyEnergy(const Eigen::VectorXd& edgeDOFs, const Eigen::Vector
 
 void optimizeEdgeDOFs(ShellEnergy& energy, const Eigen::MatrixXd& curPos, const Eigen::VectorXd& edge_area,  Eigen::VectorXd& edgeDOFs)
 {
-    double tol = 1e-4;
+    double tol = 1e-5;
     int nposdofs = curPos.rows() * 3;
     int nedgedofs = edgeDOFs.size();
 
@@ -112,10 +121,58 @@ void optimizeEdgeDOFs(ShellEnergy& energy, const Eigen::MatrixXd& curPos, const 
 
     Eigen::SparseMatrix<double> PT = P.transpose();
 
-    double young = 1.0 / thickness;
-    double penaltyScale = young * thickness * thickness * thickness;
+    double stiffness = 1e3;
+    double penaltyScale = stiffness * thickness;
 
-    double reg = 1e-6;
+    
+    // energy, gradient, and hessian
+    auto obj_func = [&](const Eigen::VectorXd& var, Eigen::VectorXd* grad, Eigen::SparseMatrix<double>* hessian,
+                        bool psd_proj) {
+        std::vector<Eigen::Triplet<double>> hessian_triplets;
+        double total_energy = 0;
+        
+        double elastic_energy = energy.elasticEnergy(curPos, var, true, grad, hessian ? &hessian_triplets : nullptr,
+                             psd_proj ? LibShell::HessianProjectType::kMaxZero : LibShell::HessianProjectType::kNone);
+        total_energy += elastic_energy;
+
+        Eigen::VectorXd edge_penalty_deriv;
+        std::vector<Eigen::Triplet<double>> edge_penalty_hessian;
+        double penalty = edgeDOFPenaltyEnergy(var, edge_area, penaltyScale, grad ? &edge_penalty_deriv : nullptr,
+                                              hessian ? &edge_penalty_hessian : nullptr);
+
+        total_energy += penalty;
+
+        if (grad) {
+            *grad = P * (*grad);
+            *grad += edge_penalty_deriv;
+        }
+
+        if (hessian) {
+            hessian->resize(var.size() + 3 * curPos.rows(), var.size() + 3 * curPos.rows());
+            hessian->setFromTriplets(hessian_triplets.begin(), hessian_triplets.end());
+            *hessian = P * (*hessian) * PT;
+
+            Eigen::SparseMatrix<double> edge_penalty_hessian_mat(var.size(), var.size());
+            edge_penalty_hessian_mat.setFromTriplets(edge_penalty_hessian.begin(), edge_penalty_hessian.end());
+            *hessian += edge_penalty_hessian_mat;
+        }
+        return total_energy;
+    };
+
+    auto find_max_step = [&](const Eigen::VectorXd& x, const Eigen::VectorXd& dir) { return 1.0; };
+
+    std::cout << "At beginning, elastic energy: " << energy.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL)
+              << ", penalty energy: " << edgeDOFPenaltyEnergy(edgeDOFs, edge_area, penaltyScale, NULL, NULL)
+              << std::endl;
+
+    OptSolver::NewtonSolver(obj_func, find_max_step, edgeDOFs, 1000, 1e-5, 1e-15, 1e-15, true, true, true);
+
+    std::cout << "At the end, elastic energy: " << energy.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL)
+              << ", penalty energy: " << edgeDOFPenaltyEnergy(edgeDOFs, edge_area, penaltyScale, NULL, NULL)
+              << std::endl;
+
+
+    /*double reg = 1e-6;
     while (true)
     {
         std::vector<Eigen::Triplet<double> > Hcoeffs;
@@ -155,7 +212,7 @@ void optimizeEdgeDOFs(ShellEnergy& energy, const Eigen::MatrixXd& curPos, const 
         }
         edgeDOFs = newedgeDOFs;
         reg *= 0.5;
-    }
+    }*/
 }
 
 
@@ -221,7 +278,7 @@ Energies measureCylinderEnergy(
     StVKDirectorShellEnergy stvk_dir_energyModel(mesh, dirrestState);
     StVKCompressiveDirectorShellEnergy stvk_compress_dir_energyModel(mesh, dirrestState);
 
-    Eigen::VectorXd edge_area(mesh.nEdges());
+    Eigen::VectorXd edge_area = Eigen::VectorXd::Zero(mesh.nEdges());
 
     for (int i = 0; i < mesh.nEdges(); i++) {
         for (int j = 0; j < 2; j++) {
@@ -231,14 +288,34 @@ Energies measureCylinderEnergy(
             }
         } 
     }
+   
+    Eigen::VectorXd zero_compressed_diredgeDOFs;
+    LibShell::MidedgeAngleCompressiveFormulation::initializeExtraDOFs(zero_compressed_diredgeDOFs, mesh, curPos);
+
     Eigen::VectorXd diredgeDOFs = zerodiredgeDOFs;
     std::cout << "============= Optimizing edge direction =========== " << std::endl;
     optimizeEdgeDOFs(stvk_dir_energyModel, curPos, edge_area, diredgeDOFs);
 
-    Eigen::VectorXd zero_compressed_diredgeDOFs;
-    LibShell::MidedgeAngleCompressiveFormulation::initializeExtraDOFs(zero_compressed_diredgeDOFs, mesh, curPos);
-    
+    int compressed_nedgedofs = zero_compressed_diredgeDOFs.size() / mesh.nEdges();
+    for (int i = 0; i < mesh.nEdges(); i++) {
+        zero_compressed_diredgeDOFs[i * compressed_nedgedofs] = diredgeDOFs[i];
+        zero_compressed_diredgeDOFs[i * compressed_nedgedofs + 1] = 1;
+        zero_compressed_diredgeDOFs[i * compressed_nedgedofs + 2] = 1;
+    }
+    result.stvkIncompressibleDir =
+        stvk_compress_dir_energyModel.elasticEnergy(curPos, zero_compressed_diredgeDOFs, true, NULL, NULL);
+
+
+    for (int i = 0; i < mesh.nEdges(); i++) {
+        zero_compressed_diredgeDOFs[i * compressed_nedgedofs] = 0;
+    }
     Eigen::VectorXd compresed_diredgeDOFs = zero_compressed_diredgeDOFs;
+    Eigen::VectorXd tmp_vec = zero_compressed_diredgeDOFs;
+    for (int i = 0; i < mesh.nEdges(); i++) {
+        tmp_vec[i * zero_compressed_diredgeDOFs.size() / mesh.nEdges() + 1] = 0;
+        tmp_vec[i * zero_compressed_diredgeDOFs.size() / mesh.nEdges() + 2] = 0;
+    }
+    std::cout << "zero magnitude penalty: " << edgeDOFPenaltyEnergy(tmp_vec, edge_area, 1.0, NULL, NULL) << std::endl;
     std::cout << "============= Optimizing edge direction and norm =========== " << std::endl;
     optimizeEdgeDOFs(stvk_compress_dir_energyModel, curPos, edge_area, compresed_diredgeDOFs);
 
@@ -247,15 +324,10 @@ Energies measureCylinderEnergy(
     result.stvk =
         stvkenergyModel.elasticEnergy(curPos, edgeDOFs, true, NULL, NULL);
     result.stvkdir = stvk_dir_energyModel.elasticEnergy(curPos, diredgeDOFs, true, NULL, NULL);
-
-    int compressed_nedgedofs = zero_compressed_diredgeDOFs.size() / mesh.nEdges();
-    for (int i = 0; i < mesh.nEdges(); i++) {
-        zero_compressed_diredgeDOFs[i * compressed_nedgedofs] = diredgeDOFs[i];
-    }
+ 
     result.stvkCompressiveDir =
         stvk_compress_dir_energyModel.elasticEnergy(curPos, compresed_diredgeDOFs, true, NULL, NULL);
-    result.stvkIncompressibleDir =
-        stvk_dir_energyModel.elasticEnergy(curPos, zero_compressed_diredgeDOFs, true, NULL, NULL);
+    
 
     // ground truth energy
     // W = PI * r
@@ -406,7 +478,7 @@ int main(int argc, char* argv[])
     cokeHeight = 0.122;
     sphereRadius = 0.05;
 
-    triangleArea = 0.000001;
+    triangleArea = 0.0000001;
 
     // curMeshType = MeshType::MT_CYLINDER_REGULAR;
     curMeshType = MeshType::MT_CYLINDER_IRREGULAR;
@@ -437,7 +509,12 @@ int main(int argc, char* argv[])
     int steps = 5;
     double multiplier = 4;
     std::ofstream log("log.txt");
-    log << "#V \t exact energy \t StVK energy \t StVK_dir energy \t StVK_incomp_dir \t StVK_comp_dir \t quadratic" << std::endl;
+    // Assuming log is an output stream
+    log << std::left;  // Left-align columns
+    log << "#V" << std::setw(5) << ":\t" << std::setw(15) << "exact energy" << std::setw(15)
+        << "StVK energy" << std::setw(20)
+        << "StVK_dir energy" << std::setw(20) << "StVK_incomp_dir" << std::setw(20) << "StVK_comp_dir" << std::setw(15)
+        << "quadratic" << std::endl;
     if (curMeshType == MeshType::MT_SPHERE)
     {
         makeSphere(sphereRadius, triangleArea, origV, F);
@@ -449,8 +526,10 @@ int main(int argc, char* argv[])
             igl::writePLY(ss.str(), origV, F);
 
             curenergies = measureSphereEnergy(mesh, origV, thickness, lameAlpha, lameBeta, sphereRadius);
-            log << origV.rows() << ":\t " << curenergies.exact << " \t " << curenergies.stvk << " \t "
-                << curenergies.stvkdir << " \t " << curenergies.stvkIncompressibleDir << " \t " << curenergies.stvkCompressiveDir << " \t " << curenergies.quadraticbending << std::endl;
+            log << std::setw(5) << origV.rows() << ":\t" << std::setw(15) << curenergies.exact << std::setw(15)
+                << curenergies.stvk << std::setw(20) << curenergies.stvkdir << std::setw(20)
+                << curenergies.stvkIncompressibleDir << std::setw(20) << curenergies.stvkCompressiveDir << std::setw(15)
+                << curenergies.quadraticbending << std::endl;
             triangleArea *= multiplier;
             makeSphere(sphereRadius, triangleArea, origV, F);
             mesh = LibShell::MeshConnectivity(F);            
@@ -463,9 +542,10 @@ int main(int argc, char* argv[])
         for (int step = 0; step < steps; step++)
         {
             curenergies = measureCylinderEnergy(mesh, origV, rolledV, thickness, lameAlpha, lameBeta, curRadius, curHeight, nhForces, qbForces);
-            log << origV.rows() << ":\t " << curenergies.exact << " \t " << curenergies.stvk << " \t "
-                << curenergies.stvkdir << " \t " << curenergies.stvkIncompressibleDir << " \t "
-                << curenergies.stvkCompressiveDir << " \t " << curenergies.quadraticbending << std::endl;
+            log << std::setw(5) << origV.rows() << ":\t" << std::setw(15) << curenergies.exact << std::setw(15)
+                << curenergies.stvk << std::setw(20) << curenergies.stvkdir << std::setw(20)
+                << curenergies.stvkIncompressibleDir << std::setw(20) << curenergies.stvkCompressiveDir << std::setw(15)
+                << curenergies.quadraticbending << std::endl;
             triangleArea *= multiplier;
             makeHalfCylinder(curMeshType == MeshType::MT_CYLINDER_REGULAR, cokeRadius, cokeHeight, triangleArea, origV, rolledV, F);
             mesh = LibShell::MeshConnectivity(F);
