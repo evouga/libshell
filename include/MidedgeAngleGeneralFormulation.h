@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "MeshConnectivity.h"
+
 #include <Eigen/Core>
 #include <vector>
 
@@ -77,7 +79,6 @@ public:
         kUndefined = 4
     };
 
-private:
     // ni^T bj = mi cos(sigma) bj^T ei / |ei| - mi sin(sigma) sin(zeta) sij * |bj x ei| / |ei|
     //         = mi cos(sigma) bj^T ei / |ei| - mi sin(sigma) sin(zeta) sij * hi, if bj is not parallel to ei
     //         = mi cos(sigma) |ei| * sign(bj^T ei), if bj is parallel to ei
@@ -89,8 +90,11 @@ private:
                                int j,
                                Eigen::Matrix<double, 1, 30>* derivative,
                                Eigen::Matrix<double, 30, 30>* hessian);
+public:
+    static void test_compute_nibj(const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos, const Eigen::VectorXd& edgeDOFs, int face, int i, int j);
+    static void test_second_fund_form(const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos, const Eigen::VectorXd& edgeDOFs, int face);
 
-private:
+public:
     static std::vector<std::array<VectorRelationship, 2>> m_edge_face_basis_sign;
 };
 };  // namespace LibShell

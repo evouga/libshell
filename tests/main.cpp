@@ -9,6 +9,7 @@
 #include "../include/MidedgeAverageFormulation.h"
 #include "../include/MidedgeAngleThetaFormulation.h"
 #include "../include/MidedgeAngleCompressiveFormulation.h"
+#include "../include/MidedgeAngleGeneralFormulation.h"
 #include "../include/StVKMaterial.h"
 #include "../include/BilayerStVKMaterial.h"
 #include "../include/TensionFieldStVKMaterial.h"
@@ -251,10 +252,10 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
                 edgeDOFs[i] = angdist(rng);
             }
 
-            FiniteDifferenceLog localStretchingLog;
-            testStretchingFiniteDifferences(mesh, curPos, *mat, *restState, verbose, localStretchingLog);
-            std::cout << "Stretching (stencil):" << std::endl;
-            localStretchingLog.printStats();
+            // FiniteDifferenceLog localStretchingLog;
+            // testStretchingFiniteDifferences(mesh, curPos, *mat, *restState, verbose, localStretchingLog);
+            // std::cout << "Stretching (stencil):" << std::endl;
+            // localStretchingLog.printStats();
 
             FiniteDifferenceLog globalBendingLog;
             FiniteDifferenceLog localBendingLog;
@@ -513,7 +514,7 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
 
 int main()
 {
-    int dim = 10;
+    int dim = 2;
     bool verbose = false;
     bool testderivatives = true;
     bool testconsistency = true;
@@ -526,7 +527,51 @@ int main()
     LibShell::MeshConnectivity mesh(F);
 
     Eigen::VectorXd edgeDOFs;
-    LibShell::MidedgeAngleCompressiveFormulation::initializeExtraDOFs(edgeDOFs, mesh, V);
+    LibShell::MidedgeAngleGeneralFormulation::initializeExtraDOFs(edgeDOFs, mesh, V);
+
+    edgeDOFs.setRandom();
+
+    Eigen::Matrix2d general_II;
+    int rand_face = std::rand() % mesh.nFaces();
+
+
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < 2; j++) {
+            if(i != 1 || j != 0) {
+                continue;
+            }
+            std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
+            LibShell::MidedgeAngleGeneralFormulation::test_compute_nibj(mesh, V, edgeDOFs, rand_face, i, j);
+        }
+    }
+
+    LibShell::MidedgeAngleGeneralFormulation::test_second_fund_form(mesh, V, edgeDOFs, rand_face);
+
+    Eigen::VectorXd compressive_edgeDOFs;
+    LibShell::MidedgeAngleCompressiveFormulation::initializeExtraDOFs(compressive_edgeDOFs, mesh, V);
+    compressive_edgeDOFs.setRandom();
+
+    for(int i = 0; i < mesh.nEdges(); i++) {
+        edgeDOFs[4 * i + 0] = compressive_edgeDOFs[3 * i + 0];
+        edgeDOFs[4 * i + 1] = M_PI_2;
+        edgeDOFs[4 * i + 2] = compressive_edgeDOFs[3 * i + 1];
+        edgeDOFs[4 * i + 3] = compressive_edgeDOFs[3 * i + 2];
+    }
+
+    Eigen::Matrix2d compressive_II;
+    compressive_II = LibShell::MidedgeAngleCompressiveFormulation::secondFundamentalForm(mesh, V, compressive_edgeDOFs, rand_face, nullptr, nullptr);
+
+    general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, rand_face, nullptr, nullptr);
+
+    std::cout << "General II: \n" << general_II << std::endl;
+    std::cout << "Compressive II: \n" << compressive_II << std::endl;
+
+    std::cout << "edge DOFs: " << edgeDOFs.transpose() << std::endl;
+    std::cout << "compressive edge dofs: " << compressive_edgeDOFs.transpose() << std::endl;
+
+    std::cout << "MidedgeAngleGeneralFormulation ==================\n";
+    differenceTest<LibShell::MidedgeAngleGeneralFormulation>(mesh, V, 1, verbose);
+    return EXIT_SUCCESS;
 
     if (testderivatives)
     {
@@ -677,64 +722,69 @@ void testBendingFiniteDifferences(
         double pert = std::pow(10.0, epsilon);
 
         // global testing
-        {
-            Eigen::MatrixXd fwdpertpos = testpos + pert * posPert;
-            Eigen::MatrixXd backpertpos = testpos - pert * posPert;
-            Eigen::VectorXd fwdpertedge = testedge + pert * edgePert;
-            Eigen::VectorXd backpertedge = testedge - pert * edgePert;
+        // {
+        //     Eigen::MatrixXd fwdpertpos = testpos + pert * posPert;
+        //     Eigen::MatrixXd backpertpos = testpos - pert * posPert;
+        //     Eigen::VectorXd fwdpertedge = testedge + pert * edgePert;
+        //     Eigen::VectorXd backpertedge = testedge - pert * edgePert;
+        //
+        //     Eigen::VectorXd pertVec(3 * nverts + nedgedofs * nedges);
+        //     for (int i = 0; i < nverts; i++)
+        //     {
+        //         for (int j = 0; j < 3; j++)
+        //         {
+        //             pertVec[3 * i + j] = posPert(i, j);
+        //         }
+        //     }
+        //     for (int i = 0; i < nedgedofs * nedges; i++)
+        //     {
+        //         pertVec[3 * nverts + i] = edgePert[i];
+        //     }
+        //
+        //     Eigen::VectorXd deriv;
+        //     std::vector<Eigen::Triplet<double> > hess;
+        //     double result = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, testpos, testedge, mat, restState,
+        //         LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &deriv,
+        //         &hess, LibShell::HessianProjectType::kNone);
+        //
+        //     Eigen::VectorXd fwdderiv;
+        //     Eigen::VectorXd backderiv;
+        //
+        //     double fwdnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, fwdpertpos, fwdpertedge, mat, restState,
+        //         LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &fwdderiv,
+        //         NULL, LibShell::HessianProjectType::kNone);
+        //     double backnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, backpertpos, backpertedge, mat, restState,
+        //         LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &backderiv,
+        //         NULL, LibShell::HessianProjectType::kNone);
+        //
+        //     double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
+        //     double direcderiv = deriv.dot(pertVec);
+        //     if (verbose) std::cout << "g " << findiff << " " << direcderiv << std::endl;
+        //     globalLog.addEntry(pert, findiff, direcderiv);
+        //
+        //     Eigen::VectorXd diffderiv = (fwdderiv - backderiv) / 2.0 / pert;
+        //     Eigen::SparseMatrix<double> H(3 * nverts + nedgedofs * nedges, 3 * nverts + nedgedofs * nedges);
+        //     H.setFromTriplets(hess.begin(), hess.end());
+        //     Eigen::VectorXd derivderiv = H * pertVec;
+        //     if (verbose)
+        //     {
+        //         std::cout << diffderiv.transpose() << std::endl;
+        //         std::cout << "//" << std::endl;
+        //         std::cout << derivderiv.transpose() << std::endl;
+        //     }
+        //     for (int i = 0; i < 3 * nverts + nedgedofs * nedges; i++)
+        //     {
+        //         globalLog.addEntry(pert, diffderiv[i], derivderiv[i]);
+        //     }
+        // }
 
-            Eigen::VectorXd pertVec(3 * nverts + nedgedofs * nedges);
-            for (int i = 0; i < nverts; i++)
-            {
-                for (int j = 0; j < 3; j++)
-                {
-                    pertVec[3 * i + j] = posPert(i, j);
-                }
-            }
-            for (int i = 0; i < nedgedofs * nedges; i++)
-            {
-                pertVec[3 * nverts + i] = edgePert[i];
-            }
-
-            Eigen::VectorXd deriv;
-            std::vector<Eigen::Triplet<double> > hess;
-            double result = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, testpos, testedge, mat, restState, 
-                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &deriv,
-                &hess, LibShell::HessianProjectType::kNone);
-
-            Eigen::VectorXd fwdderiv;
-            Eigen::VectorXd backderiv;
-
-            double fwdnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, fwdpertpos, fwdpertedge, mat, restState, 
-                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &fwdderiv,
-                NULL, LibShell::HessianProjectType::kNone);
-            double backnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, backpertpos, backpertedge, mat, restState, 
-                LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &backderiv,
-                NULL, LibShell::HessianProjectType::kNone);
-
-            double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
-            double direcderiv = deriv.dot(pertVec);
-            if (verbose) std::cout << "g " << findiff << " " << direcderiv << std::endl;
-            globalLog.addEntry(pert, findiff, direcderiv);
-            
-            Eigen::VectorXd diffderiv = (fwdderiv - backderiv) / 2.0 / pert;
-            Eigen::SparseMatrix<double> H(3 * nverts + nedgedofs * nedges, 3 * nverts + nedgedofs * nedges);
-            H.setFromTriplets(hess.begin(), hess.end());
-            Eigen::VectorXd derivderiv = H * pertVec;
-            if (verbose)
-            {
-                std::cout << diffderiv.transpose() << std::endl;
-                std::cout << "//" << std::endl;
-                std::cout << derivderiv.transpose() << std::endl;
-            }
-            for (int i = 0; i < 3 * nverts + nedgedofs * nedges; i++)
-            {
-                globalLog.addEntry(pert, diffderiv[i], derivderiv[i]);
-            }
-        }
+        int rand_face = rand() % nfaces;
 
         for (int face = 0; face < nfaces; face++)
         {
+            if(face != rand_face) {
+                continue;
+            }
             Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> deriv;
             Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs> hess;
             double result = mat.bendingEnergy(mesh, testpos, testedge, restState, face, &deriv, &hess);

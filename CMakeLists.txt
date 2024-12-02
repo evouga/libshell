@@ -19,13 +19,14 @@ if(MSVC)
 	add_definitions(-DEIGEN_STRONG_INLINE=inline)
 endif()
 
+add_subdirectory(Optimization)
+
 file(GLOB LIBFILES src/*.cpp src/SecondFundamentalForm/*.cpp src/MaterialModel/*.cpp)
 add_library(${PROJECT_NAME} STATIC ${LIBFILES} ${OPTFILES})
 target_link_libraries(${PROJECT_NAME} Eigen3::Eigen TBB::tbb)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_CURRENT_LIST_DIR}/lib)
 
-add_subdirectory(Optimization)
 add_subdirectory(example)
 
 file(GLOB TESTFILES tests/*.cpp)

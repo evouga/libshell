@@ -7,6 +7,7 @@
 #include "../include/MidedgeAverageFormulation.h"
 #include "../include/MidedgeAngleThetaFormulation.h"
 #include "../include/MidedgeAngleCompressiveFormulation.h"
+#include "../include/MidedgeAngleGeneralFormulation.h"
 
 #include "GeometryDerivatives.h"
 
@@ -21,307 +22,285 @@
 
 #include <tbb/parallel_for.h>
 
-
 namespace LibShell {
-   template <class DerivedA>
-    void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, const HessianProjectType& projType)
-    {
-        // no projection
-        if (projType == HessianProjectType::kNone)
-        {
-            return;
-        }
-        Eigen::SelfAdjointEigenSolver<DerivedA> eigenSolver(A);
-        if (eigenSolver.eigenvalues()[0] >= 0) {
-            return;
-        }
+template <class DerivedA>
+void projSymMatrix(Eigen::MatrixBase<DerivedA>& A, const HessianProjectType& projType) {
+    // no projection
+    if (projType == HessianProjectType::kNone) {
+        return;
+    }
+    Eigen::SelfAdjointEigenSolver<DerivedA> eigenSolver(A);
+    if (eigenSolver.eigenvalues()[0] >= 0) {
+        return;
+    }
 
-        using T = typename DerivedA::Scalar;
-        Eigen::Matrix<T, -1, 1> D = eigenSolver.eigenvalues();
-        for (int i = 0; i < A.rows(); ++i) {
-            if (D[i] < 0) {
-              if (projType == HessianProjectType::kMaxZero) {
+    using T = typename DerivedA::Scalar;
+    Eigen::Matrix<T, -1, 1> D = eigenSolver.eigenvalues();
+    for (int i = 0; i < A.rows(); ++i) {
+        if (D[i] < 0) {
+            if (projType == HessianProjectType::kMaxZero) {
                 D[i] = 0;
-              } else if (projType == HessianProjectType::kAbs) {
+            } else if (projType == HessianProjectType::kAbs) {
                 D[i] = -D[i];
-              } else {
+            } else {
                 std::cerr << "Unknown projection type, use Max(A, 0) instead!" << std::endl;
                 D[i] = 0;
-              }
-            } else {
-                break;
             }
+        } else {
+            break;
         }
-        A = eigenSolver.eigenvectors() * D.asDiagonal() * eigenSolver.eigenvectors().transpose();
+    }
+    A = eigenSolver.eigenvectors() * D.asDiagonal() * eigenSolver.eigenvectors().transpose();
+}
+
+template <class SFF>
+double ElasticShell<SFF>::elasticEnergy(const MeshConnectivity& mesh,
+                                        const Eigen::MatrixXd& curPos,
+                                        const Eigen::VectorXd& extraDOFs,
+                                        const MaterialModel<SFF>& mat,
+                                        const RestState& restState,
+                                        Eigen::VectorXd* derivative,  // positions, then thetas
+                                        std::vector<Eigen::Triplet<double>>* hessian,
+                                        const HessianProjectType projType) {
+    return elasticEnergy(mesh, curPos, extraDOFs, mat, restState, EnergyTerm::ET_BENDING | EnergyTerm::ET_STRETCHING,
+                         derivative, hessian, projType);
+}
+
+template <class SFF>
+double ElasticShell<SFF>::elasticEnergy(const MeshConnectivity& mesh,
+                                        const Eigen::MatrixXd& curPos,
+                                        const Eigen::VectorXd& extraDOFs,
+                                        const MaterialModel<SFF>& mat,
+                                        const RestState& restState,
+                                        int whichTerms,
+                                        Eigen::VectorXd* derivative,  // positions, then thetas
+                                        std::vector<Eigen::Triplet<double>>* hessian,
+                                        const HessianProjectType projType) {
+    int nfaces = mesh.nFaces();
+    int nedges = mesh.nEdges();
+    int nverts = (int)curPos.rows();
+
+    if (curPos.cols() != 3 || extraDOFs.size() != SFF::numExtraDOFs * nedges) {
+        return std::numeric_limits<double>::infinity();
     }
 
-    template <class SFF>
-    double ElasticShell<SFF>::elasticEnergy(
-        const MeshConnectivity& mesh,
-        const Eigen::MatrixXd& curPos,
-        const Eigen::VectorXd& extraDOFs,
-        const MaterialModel<SFF>& mat,
-        const RestState& restState,
-        Eigen::VectorXd* derivative, // positions, then thetas
-        std::vector<Eigen::Triplet<double> >* hessian,
-        const HessianProjectType projType)
-    {
-        return elasticEnergy(mesh, curPos, extraDOFs, mat, restState,
-            EnergyTerm::ET_BENDING | EnergyTerm::ET_STRETCHING,
-                             derivative, hessian, projType);
+    if (derivative) {
+        derivative->resize(3 * nverts + SFF::numExtraDOFs * nedges);
+        derivative->setZero();
+    }
+    if (hessian) {
+        hessian->clear();
     }
 
-    template <class SFF>
-    double ElasticShell<SFF>::elasticEnergy(
-        const MeshConnectivity& mesh,
-        const Eigen::MatrixXd& curPos,
-        const Eigen::VectorXd& extraDOFs,
-        const MaterialModel<SFF>& mat,
-        const RestState& restState,
-        int whichTerms,
-        Eigen::VectorXd* derivative, // positions, then thetas
-        std::vector<Eigen::Triplet<double> >* hessian,
-        const HessianProjectType projType)
-    {
-        int nfaces = mesh.nFaces();
-        int nedges = mesh.nEdges();
-        int nverts = (int)curPos.rows();
+    double result = 0;
 
-        if (curPos.cols() != 3 || extraDOFs.size() != SFF::numExtraDOFs * nedges)
-        {
-            return std::numeric_limits<double>::infinity();
+    // stretching terms
+    if (whichTerms & EnergyTerm::ET_STRETCHING) {
+        std::vector<double> stretch_energies(nfaces);
+        std::vector<Eigen::Matrix<double, 1, 9>> stretch_derivs;
+        std::vector<Eigen::Matrix<double, 9, 9>> stretch_hessians;
+
+        if (derivative) {
+            stretch_derivs.resize(nfaces);
         }
 
-        if (derivative)
-        {
-            derivative->resize(3 * nverts + SFF::numExtraDOFs * nedges);
-            derivative->setZero();
-        }
-        if (hessian)
-        {
-            hessian->clear();
+        if (hessian) {
+            stretch_hessians.resize(nfaces);
         }
 
-        double result = 0;
+        tbb::parallel_for(0, nfaces, [&](int i) {
+            stretch_energies[i] =
+                mat.stretchingEnergy(mesh, curPos, restState, i, derivative ? &stretch_derivs[i] : nullptr,
+                                     hessian ? &stretch_hessians[i] : nullptr);
+        });
 
-        // stretching terms
-        if (whichTerms & EnergyTerm::ET_STRETCHING)
-        {
-            std::vector<double> stretch_energies(nfaces);
-            std::vector<Eigen::Matrix<double, 1, 9>> stretch_derivs;
-            std::vector<Eigen::Matrix<double, 9, 9>> stretch_hessians;
-
+        for (int i = 0; i < nfaces; i++) {
+            result += stretch_energies[i];
             if (derivative) {
-                stretch_derivs.resize(nfaces);
+                Eigen::Matrix<double, 1, 9>& deriv = stretch_derivs[i];
+                for (int j = 0; j < 3; j++)
+                    derivative->segment<3>(3 * mesh.faceVertex(i, j)) += deriv.segment<3>(3 * j);
             }
-
             if (hessian) {
-                stretch_hessians.resize(nfaces);
-            }
-
-            tbb::parallel_for(0, nfaces, [&](int i) {
-                stretch_energies[i] =
-                    mat.stretchingEnergy(mesh, curPos, restState, i, derivative ? &stretch_derivs[i] : nullptr,
-                                         hessian ? &stretch_hessians[i] : nullptr);
-            });
-
-            for (int i = 0; i < nfaces; i++)
-            {
-                result += stretch_energies[i];
-                if (derivative)
-                {
-                    Eigen::Matrix<double, 1, 9>& deriv = stretch_derivs[i];
-                    for (int j = 0; j < 3; j++)
-                        derivative->segment<3>(3 * mesh.faceVertex(i, j)) += deriv.segment<3>(3 * j);
-                }
-                if (hessian)
-                {
-                    Eigen::Matrix<double, 9, 9>& hess = stretch_hessians[i];
-                    projSymMatrix(hess, projType);
-                    for (int j = 0; j < 3; j++)
-                    {
-                        for (int k = 0; k < 3; k++)
-                        {
-                            for (int l = 0; l < 3; l++)
-                            {
-                                for (int m = 0; m < 3; m++)
-                                {
-                                    hessian->push_back(Eigen::Triplet<double>(3 * mesh.faceVertex(i, j) + l, 3 * mesh.faceVertex(i, k) + m, hess(3 * j + l, 3 * k + m)));
-                                }
+                Eigen::Matrix<double, 9, 9>& hess = stretch_hessians[i];
+                projSymMatrix(hess, projType);
+                for (int j = 0; j < 3; j++) {
+                    for (int k = 0; k < 3; k++) {
+                        for (int l = 0; l < 3; l++) {
+                            for (int m = 0; m < 3; m++) {
+                                hessian->push_back(Eigen::Triplet<double>(3 * mesh.faceVertex(i, j) + l,
+                                                                          3 * mesh.faceVertex(i, k) + m,
+                                                                          hess(3 * j + l, 3 * k + m)));
                             }
                         }
                     }
                 }
             }
         }
+    }
 
-        // bending terms
-        if (whichTerms & EnergyTerm::ET_BENDING)
-        {
-            constexpr int nedgedofs = SFF::numExtraDOFs;
+    // bending terms
+    if (whichTerms & EnergyTerm::ET_BENDING) {
+        constexpr int nedgedofs = SFF::numExtraDOFs;
 
-            std::vector<double> bend_energies(nfaces);
-            std::vector<Eigen::Matrix<double, 1, 18 + 3 * nedgedofs>> bend_derivs;
-            std::vector<Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs>> bend_hessians;
+        std::vector<double> bend_energies(nfaces);
+        std::vector<Eigen::Matrix<double, 1, 18 + 3 * nedgedofs>> bend_derivs;
+        std::vector<Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs>> bend_hessians;
 
+        if (derivative) {
+            bend_derivs.resize(nfaces);
+        }
+
+        if (hessian) {
+            bend_hessians.resize(nfaces);
+        }
+
+        tbb::parallel_for(0, nfaces, [&](int i) {
+            bend_energies[i] =
+                mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &bend_derivs[i] : nullptr,
+                                  hessian ? &bend_hessians[i] : nullptr);
+        });
+
+        for (int i = 0; i < nfaces; i++) {
+            result += bend_energies[i];
             if (derivative) {
-                bend_derivs.resize(nfaces);
+                Eigen::Matrix<double, 1, 18 + 3 * nedgedofs>& deriv = bend_derivs[i];
+                for (int j = 0; j < 3; j++) {
+                    derivative->segment<3>(3 * mesh.faceVertex(i, j)) +=
+                        deriv.template block<1, 3>(0, 3 * j).transpose();
+                    int oppidx = mesh.vertexOppositeFaceEdge(i, j);
+                    if (oppidx != -1)
+                        derivative->segment<3>(3 * oppidx) += deriv.template block<1, 3>(0, 9 + 3 * j).transpose();
+                    for (int k = 0; k < nedgedofs; k++) {
+                        (*derivative)[3 * nverts + nedgedofs * mesh.faceEdge(i, j) + k] +=
+                            deriv(0, 18 + nedgedofs * j + k);
+                    }
+                }
             }
-
             if (hessian) {
-                bend_hessians.resize(nfaces);
-            }
-
-            tbb::parallel_for(0, nfaces, [&](int i) {
-                bend_energies[i] =
-                    mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &bend_derivs[i] : nullptr,
-                                                     hessian ? &bend_hessians[i] : nullptr);
-            });
-
-            for (int i = 0; i < nfaces; i++)
-            {
-                result += bend_energies[i];
-                if (derivative)
-                {
-                    Eigen::Matrix<double, 1, 18 + 3 * nedgedofs>& deriv = bend_derivs[i];
-                    for (int j = 0; j < 3; j++)
-                    {
-                        derivative->segment<3>(3 * mesh.faceVertex(i, j)) += deriv.template block<1, 3>(0, 3 * j).transpose();
-                        int oppidx = mesh.vertexOppositeFaceEdge(i, j);
-                        if (oppidx != -1)
-                            derivative->segment<3>(3 * oppidx) += deriv.template block<1, 3>(0, 9 + 3 * j).transpose();
-                        for (int k = 0; k < nedgedofs; k++)
-                        {
-                            (*derivative)[3 * nverts + nedgedofs * mesh.faceEdge(i, j) + k] += deriv(0, 18 + nedgedofs * j + k);
-                        }
-                    }
-                }
-                if (hessian)
-                {
-                    Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs>& hess = bend_hessians[i];
-                    projSymMatrix(hess, projType);
-                    for (int j = 0; j < 3; j++)
-                    {
-                        for (int k = 0; k < 3; k++)
-                        {
-                            for (int l = 0; l < 3; l++)
-                            {
-                                for (int m = 0; m < 3; m++)
-                                {
-                                    hessian->push_back(Eigen::Triplet<double>(3 * mesh.faceVertex(i, j) + l, 3 * mesh.faceVertex(i, k) + m, hess(3 * j + l, 3 * k + m)));
-                                    int oppidxk = mesh.vertexOppositeFaceEdge(i, k);
-                                    if (oppidxk != -1)
-                                        hessian->push_back(Eigen::Triplet<double>(3 * mesh.faceVertex(i, j) + l, 3 * oppidxk + m, hess(3 * j + l, 9 + 3 * k + m)));
-                                    int oppidxj = mesh.vertexOppositeFaceEdge(i, j);
-                                    if (oppidxj != -1)
-                                        hessian->push_back(Eigen::Triplet<double>(3 * oppidxj + l, 3 * mesh.faceVertex(i, k) + m, hess(9 + 3 * j + l, 3 * k + m)));
-                                    if (oppidxj != -1 && oppidxk != -1)
-                                        hessian->push_back(Eigen::Triplet<double>(3 * oppidxj + l, 3 * oppidxk + m, hess(9 + 3 * j + l, 9 + 3 * k + m)));
-                                }
-                                for (int m = 0; m < nedgedofs; m++)
-                                {
-                                    hessian->push_back(Eigen::Triplet<double>(3 * mesh.faceVertex(i, j) + l, 3 * nverts + nedgedofs * mesh.faceEdge(i, k) + m, hess(3 * j + l, 18 + nedgedofs * k + m)));
-                                    hessian->push_back(Eigen::Triplet<double>(3 * nverts + nedgedofs * mesh.faceEdge(i, k) + m, 3 * mesh.faceVertex(i, j) + l, hess(18 + nedgedofs * k + m, 3 * j + l)));
-                                    int oppidxj = mesh.vertexOppositeFaceEdge(i, j);
-                                    if (oppidxj != -1)
-                                    {
-                                        hessian->push_back(Eigen::Triplet<double>(3 * oppidxj + l, 3 * nverts + nedgedofs * mesh.faceEdge(i, k) + m, hess(9 + 3 * j + l, 18 + nedgedofs * k + m)));
-                                        hessian->push_back(Eigen::Triplet<double>(3 * nverts + nedgedofs * mesh.faceEdge(i, k) + m, 3 * oppidxj + l, hess(18 + nedgedofs * k + m, 9 + 3 * j + l)));
-                                    }
+                Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs>& hess = bend_hessians[i];
+                projSymMatrix(hess, projType);
+                for (int j = 0; j < 3; j++) {
+                    for (int k = 0; k < 3; k++) {
+                        for (int l = 0; l < 3; l++) {
+                            for (int m = 0; m < 3; m++) {
+                                hessian->push_back(Eigen::Triplet<double>(3 * mesh.faceVertex(i, j) + l,
+                                                                          3 * mesh.faceVertex(i, k) + m,
+                                                                          hess(3 * j + l, 3 * k + m)));
+                                int oppidxk = mesh.vertexOppositeFaceEdge(i, k);
+                                if (oppidxk != -1)
+                                    hessian->push_back(Eigen::Triplet<double>(3 * mesh.faceVertex(i, j) + l,
+                                                                              3 * oppidxk + m,
+                                                                              hess(3 * j + l, 9 + 3 * k + m)));
+                                int oppidxj = mesh.vertexOppositeFaceEdge(i, j);
+                                if (oppidxj != -1)
+                                    hessian->push_back(Eigen::Triplet<double>(3 * oppidxj + l,
+                                                                              3 * mesh.faceVertex(i, k) + m,
+                                                                              hess(9 + 3 * j + l, 3 * k + m)));
+                                if (oppidxj != -1 && oppidxk != -1)
+                                    hessian->push_back(Eigen::Triplet<double>(3 * oppidxj + l, 3 * oppidxk + m,
+                                                                              hess(9 + 3 * j + l, 9 + 3 * k + m)));
+                            }
+                            for (int m = 0; m < nedgedofs; m++) {
+                                hessian->push_back(Eigen::Triplet<double>(
+                                    3 * mesh.faceVertex(i, j) + l, 3 * nverts + nedgedofs * mesh.faceEdge(i, k) + m,
+                                    hess(3 * j + l, 18 + nedgedofs * k + m)));
+                                hessian->push_back(Eigen::Triplet<double>(
+                                    3 * nverts + nedgedofs * mesh.faceEdge(i, k) + m, 3 * mesh.faceVertex(i, j) + l,
+                                    hess(18 + nedgedofs * k + m, 3 * j + l)));
+                                int oppidxj = mesh.vertexOppositeFaceEdge(i, j);
+                                if (oppidxj != -1) {
+                                    hessian->push_back(Eigen::Triplet<double>(
+                                        3 * oppidxj + l, 3 * nverts + nedgedofs * mesh.faceEdge(i, k) + m,
+                                        hess(9 + 3 * j + l, 18 + nedgedofs * k + m)));
+                                    hessian->push_back(Eigen::Triplet<double>(
+                                        3 * nverts + nedgedofs * mesh.faceEdge(i, k) + m, 3 * oppidxj + l,
+                                        hess(18 + nedgedofs * k + m, 9 + 3 * j + l)));
                                 }
                             }
-                            for (int m = 0; m < nedgedofs; m++)
-                            {
-                                for (int n = 0; n < nedgedofs; n++)
-                                {
-                                    hessian->push_back(Eigen::Triplet<double>(3 * nverts + nedgedofs * mesh.faceEdge(i, j) + m, 3 * nverts + nedgedofs * mesh.faceEdge(i, k) + n, hess(18 + nedgedofs * j + m, 18 + nedgedofs * k + n)));
-                                }
+                        }
+                        for (int m = 0; m < nedgedofs; m++) {
+                            for (int n = 0; n < nedgedofs; n++) {
+                                hessian->push_back(
+                                    Eigen::Triplet<double>(3 * nverts + nedgedofs * mesh.faceEdge(i, j) + m,
+                                                           3 * nverts + nedgedofs * mesh.faceEdge(i, k) + n,
+                                                           hess(18 + nedgedofs * j + m, 18 + nedgedofs * k + n)));
                             }
                         }
                     }
                 }
             }
         }
-        return result;
+    }
+    return result;
+}
+
+template <class SFF>
+std::vector<double> ElasticShell<SFF>::elasticEnergyPerElement(const MeshConnectivity& mesh,
+                                                               const Eigen::MatrixXd& curPos,
+                                                               const Eigen::VectorXd& extraDOFs,
+                                                               const MaterialModel<SFF>& mat,
+                                                               const RestState& restState,
+                                                               int whichTerms) {
+    int nfaces = mesh.nFaces();
+    int nedges = mesh.nEdges();
+    int nverts = (int)curPos.rows();
+
+    if (curPos.cols() != 3 || extraDOFs.size() != SFF::numExtraDOFs * nedges) {
+        return std::vector<double>(nfaces, std::numeric_limits<double>::infinity());
     }
 
-    template <class SFF>
-    std::vector<double> ElasticShell<SFF>::elasticEnergyPerElement(
-        const MeshConnectivity& mesh,
-        const Eigen::MatrixXd& curPos,
-        const Eigen::VectorXd& extraDOFs,
-        const MaterialModel<SFF>& mat,
-        const RestState& restState,
-        int whichTerms)
-    {
-        int nfaces = mesh.nFaces();
-        int nedges = mesh.nEdges();
-        int nverts = (int)curPos.rows();
+    std::vector<double> results(nfaces);
 
-        if (curPos.cols() != 3 || extraDOFs.size() != SFF::numExtraDOFs * nedges)
-        {
-            return std::vector<double>(nfaces, std::numeric_limits<double>::infinity());
-        }
-
-        std::vector<double> results(nfaces);
-
-        // stretching terms
-        if (whichTerms & EnergyTerm::ET_STRETCHING)
-        {
-            for (int i = 0; i < nfaces; i++)
-            {
-                results[i] += mat.stretchingEnergy(mesh, curPos, restState, i, NULL, NULL);
-            }
-        }
-
-        // bending terms
-        if (whichTerms & EnergyTerm::ET_BENDING)
-        {
-            constexpr int nedgedofs = SFF::numExtraDOFs;
-            for (int i = 0; i < nfaces; i++)
-            {
-                results[i] += mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, NULL, NULL);
-            }
-        }
-        return results;
-    }
-
-    template <class SFF>
-    void ElasticShell<SFF>::firstFundamentalForms(const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos, std::vector<Eigen::Matrix2d>& abars)
-    {
-        int nfaces = mesh.nFaces();
-        abars.resize(nfaces);
-        for (int i = 0; i < nfaces; i++)
-        {
-            abars[i] = firstFundamentalForm(mesh, curPos, i, NULL, NULL);
+    // stretching terms
+    if (whichTerms & EnergyTerm::ET_STRETCHING) {
+        for (int i = 0; i < nfaces; i++) {
+            results[i] += mat.stretchingEnergy(mesh, curPos, restState, i, NULL, NULL);
         }
     }
 
-    template <class SFF>
-    void ElasticShell<SFF>::secondFundamentalForms(const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos, const Eigen::VectorXd& edgeDOFs, std::vector<Eigen::Matrix2d>& bbars)
-    {
-        int nfaces = mesh.nFaces();
-        bbars.resize(nfaces);
-        for (int i = 0; i < nfaces; i++)
-        {
-            bbars[i] = SFF::secondFundamentalForm(mesh, curPos, edgeDOFs, i, NULL, NULL);
+    // bending terms
+    if (whichTerms & EnergyTerm::ET_BENDING) {
+        constexpr int nedgedofs = SFF::numExtraDOFs;
+        for (int i = 0; i < nfaces; i++) {
+            results[i] += mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, NULL, NULL);
         }
     }
+    return results;
+}
 
-    // instantions
-    template class ElasticShell<MidedgeAngleThetaFormulation>;
-    template class ElasticShell<MidedgeAngleSinFormulation>;
-    template class ElasticShell<MidedgeAngleTanFormulation>;
-    template class ElasticShell<MidedgeAverageFormulation>;
-    template class ElasticShell<MidedgeAngleCompressiveFormulation>;
+template <class SFF>
+void ElasticShell<SFF>::firstFundamentalForms(const MeshConnectivity& mesh,
+                                              const Eigen::MatrixXd& curPos,
+                                              std::vector<Eigen::Matrix2d>& abars) {
+    int nfaces = mesh.nFaces();
+    abars.resize(nfaces);
+    for (int i = 0; i < nfaces; i++) {
+        abars[i] = firstFundamentalForm(mesh, curPos, i, NULL, NULL);
+    }
+}
 
-    template void
-    projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 9, 9>> &symA,
-                  const HessianProjectType& projType);
-    template void
-    projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 18, 18>> &symA,
-                  const HessianProjectType &projType);
-    template void
-    projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 21, 21>> &symA,
-                  const HessianProjectType &projType);
-};
+template <class SFF>
+void ElasticShell<SFF>::secondFundamentalForms(const MeshConnectivity& mesh,
+                                               const Eigen::MatrixXd& curPos,
+                                               const Eigen::VectorXd& edgeDOFs,
+                                               std::vector<Eigen::Matrix2d>& bbars) {
+    int nfaces = mesh.nFaces();
+    bbars.resize(nfaces);
+    for (int i = 0; i < nfaces; i++) {
+        bbars[i] = SFF::secondFundamentalForm(mesh, curPos, edgeDOFs, i, NULL, NULL);
+    }
+}
+
+// instantions
+template class ElasticShell<MidedgeAngleThetaFormulation>;
+template class ElasticShell<MidedgeAngleSinFormulation>;
+template class ElasticShell<MidedgeAngleTanFormulation>;
+template class ElasticShell<MidedgeAverageFormulation>;
+template class ElasticShell<MidedgeAngleCompressiveFormulation>;
+template class ElasticShell<MidedgeAngleGeneralFormulation>;
+
+template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 9, 9>>& symA, const HessianProjectType& projType);
+template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 18, 18>>& symA, const HessianProjectType& projType);
+template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 21, 21>>& symA, const HessianProjectType& projType);
+};  // namespace LibShell
