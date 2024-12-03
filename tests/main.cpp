@@ -514,7 +514,7 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
 
 int main()
 {
-    int dim = 2;
+    int dim = 3;
     bool verbose = false;
     bool testderivatives = true;
     bool testconsistency = true;
@@ -540,7 +540,7 @@ int main()
 
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 2; j++) {
-            if(i != 1 || j != 0) {
+            if(i != 0 || j != 0) {
                 continue;
             }
             std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
@@ -564,13 +564,16 @@ int main()
     std::cout << "edge DOFs: " << edgeDOFs.transpose() << std::endl;
     std::cout << "sin edge dofs: " << sin_edgeDOFs.transpose() << std::endl;
 
-    Eigen::Matrix2d sin_II;
-    sin_II = LibShell::MidedgeAngleSinFormulation::secondFundamentalForm(mesh, V, sin_edgeDOFs, rand_face, nullptr, nullptr);
+    for(int face = 0; face < mesh.nFaces(); face++) {
+        Eigen::Matrix2d sin_II;
+        sin_II = LibShell::MidedgeAngleSinFormulation::secondFundamentalForm(mesh, V, sin_edgeDOFs, face, nullptr, nullptr);
 
-    general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, rand_face, nullptr, nullptr);
+        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
 
-    std::cout << "General II: \n" << general_II << std::endl;
-    std::cout << "sin II: \n" << sin_II << std::endl;
+        std::cout << "General II: \n" << general_II << std::endl;
+        std::cout << "sin II: \n" << sin_II << std::endl;
+    }
+
 
     std::cout << "MidedgeAngleGeneralFormulation ==================\n";
     differenceTest<LibShell::MidedgeAngleGeneralFormulation>(mesh, V, 1, verbose);
