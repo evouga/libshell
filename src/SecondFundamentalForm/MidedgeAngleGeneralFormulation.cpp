@@ -245,7 +245,7 @@ double MidedgeAngleGeneralFormulation::compute_nibj(const MeshConnectivity& mesh
 
     // ni^T bj = mi cos(sigma) |ei| * sign(bj^T ei)
     if (vector_relationship == VectorRelationship::kSameDirection ||
-        vector_relationship == VectorRelationship::kNegativeOrientation) {
+        vector_relationship == VectorRelationship::kOppositeDirection) {
         double sign = vector_relationship == VectorRelationship::kSameDirection ? 1.0 : -1.0;
         double res = mi * std::cos(sigma) * enorm * sign;
 
@@ -655,41 +655,41 @@ Eigen::Matrix2d MidedgeAngleGeneralFormulation::secondFundamentalForm(
     };
 
     Eigen::Matrix2d II;
-    // first entry: II(0, 0) = n1^T b0 - n0^T b0
-    II(0, 0) = nibj[get_idx(1, 0)] - nibj[get_idx(0, 0)];
+    // first entry: II(0, 0) = 2(n1^T b0 - n0^T b0)
+    II(0, 0) = 2 * (nibj[get_idx(1, 0)] - nibj[get_idx(0, 0)]);
     if(derivative) {
-        derivative->block<1, 30>(0, 0) = nibj_deriv[get_idx(1, 0)] - nibj_deriv[get_idx(0, 0)];
+        derivative->block<1, 30>(0, 0) = 2 * (nibj_deriv[get_idx(1, 0)] - nibj_deriv[get_idx(0, 0)]);
     }
     if(hessian) {
-        (*hessian)[0] = nibj_hessian[get_idx(1, 0)] - nibj_hessian[get_idx(0, 0)];
+        (*hessian)[0] = 2 * (nibj_hessian[get_idx(1, 0)] - nibj_hessian[get_idx(0, 0)]);
     }
 
 
-    // second entry: II(0, 1) = n1^T b1 - n0^T b1
-    II(0, 1) = nibj[get_idx(1, 1)] - nibj[get_idx(0, 1)];
+    // second entry: II(0, 1) = 2(n1^T b1 - n0^T b1)
+    II(0, 1) = 2 * (nibj[get_idx(1, 1)] - nibj[get_idx(0, 1)]);
     if(derivative) {
-        derivative->block<1, 30>(1, 0) = nibj_deriv[get_idx(1, 1)] - nibj_deriv[get_idx(0, 1)];
+        derivative->block<1, 30>(1, 0) = 2 * (nibj_deriv[get_idx(1, 1)] - nibj_deriv[get_idx(0, 1)]);
     }
     if(hessian) {
-        (*hessian)[1] = nibj_hessian[get_idx(1, 1)] - nibj_hessian[get_idx(0, 1)];
+        (*hessian)[1] = 2 * (nibj_hessian[get_idx(1, 1)] - nibj_hessian[get_idx(0, 1)]);
     }
 
-    // third entry: II(1, 0) = n2^T b0 - n0^T b0
-    II(1, 0) = nibj[get_idx(2, 0)] - nibj[get_idx(0, 0)];
+    // third entry: II(1, 0) = 2(n2^T b0 - n0^T b0)
+    II(1, 0) = 2 * (nibj[get_idx(2, 0)] - nibj[get_idx(0, 0)]);
     if(derivative) {
-        derivative->block<1, 30>(2, 0) = nibj_deriv[get_idx(2, 0)] - nibj_deriv[get_idx(0, 0)];
+        derivative->block<1, 30>(2, 0) = 2 * (nibj_deriv[get_idx(2, 0)] - nibj_deriv[get_idx(0, 0)]);
     }
     if(hessian) {
-        (*hessian)[2] = nibj_hessian[get_idx(2, 0)] - nibj_hessian[get_idx(0, 0)];
+        (*hessian)[2] = 2 * (nibj_hessian[get_idx(2, 0)] - nibj_hessian[get_idx(0, 0)]);
     }
 
-    // fourth entry: II(1, 1) = n2^T b1 - n0^T b1
-    II(1, 1) = nibj[get_idx(2, 1)] - nibj[get_idx(0, 1)];
+    // fourth entry: II(1, 1) = 2(n2^T b1 - n0^T b1)
+    II(1, 1) = 2 * (nibj[get_idx(2, 1)] - nibj[get_idx(0, 1)]);
     if(derivative) {
-        derivative->block<1, 30>(3, 0) = nibj_deriv[get_idx(2, 1)] - nibj_deriv[get_idx(0, 1)];
+        derivative->block<1, 30>(3, 0) = 2 * (nibj_deriv[get_idx(2, 1)] - nibj_deriv[get_idx(0, 1)]);
     }
     if(hessian) {
-        (*hessian)[3] = nibj_hessian[get_idx(2, 1)] - nibj_hessian[get_idx(0, 1)];
+        (*hessian)[3] = 2 * (nibj_hessian[get_idx(2, 1)] - nibj_hessian[get_idx(0, 1)]);
     }
 
     return II;
@@ -704,6 +704,9 @@ void MidedgeAngleGeneralFormulation::initializeExtraDOFs(Eigen::VectorXd& extraD
     m_edge_face_basis_sign.clear();
 
     for (int i = 0; i < nedges; i++) {
+        if(i == 4) {
+            std::cout << "debug" << std::endl;
+        }
         // assign the initial angle value to be zero, and the initial magnitude to be 1
         for (int j = 2; j < numExtraDOFs; j++) {
             extraDOFs[numExtraDOFs * i + j] = 1;

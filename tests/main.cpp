@@ -524,6 +524,9 @@ int main()
     Eigen::MatrixXi F;
     makeSquareMesh(dim, V, F);
 
+    std::cout << "V:\n" << V << std::endl;
+    std::cout << "F:\n" << F << std::endl;
+
     LibShell::MeshConnectivity mesh(F);
 
     Eigen::VectorXd edgeDOFs;
@@ -547,27 +550,27 @@ int main()
 
     LibShell::MidedgeAngleGeneralFormulation::test_second_fund_form(mesh, V, edgeDOFs, rand_face);
 
-    Eigen::VectorXd compressive_edgeDOFs;
-    LibShell::MidedgeAngleCompressiveFormulation::initializeExtraDOFs(compressive_edgeDOFs, mesh, V);
-    compressive_edgeDOFs.setRandom();
+    Eigen::VectorXd sin_edgeDOFs;
+    LibShell::MidedgeAngleSinFormulation::initializeExtraDOFs(sin_edgeDOFs, mesh, V);
+    sin_edgeDOFs.setRandom();
 
     for(int i = 0; i < mesh.nEdges(); i++) {
-        edgeDOFs[4 * i + 0] = compressive_edgeDOFs[3 * i + 0];
+        edgeDOFs[4 * i + 0] = sin_edgeDOFs[i];
         edgeDOFs[4 * i + 1] = M_PI_2;
-        edgeDOFs[4 * i + 2] = compressive_edgeDOFs[3 * i + 1];
-        edgeDOFs[4 * i + 3] = compressive_edgeDOFs[3 * i + 2];
+        edgeDOFs[4 * i + 2] = 1;
+        edgeDOFs[4 * i + 3] = 1;
     }
 
-    Eigen::Matrix2d compressive_II;
-    compressive_II = LibShell::MidedgeAngleCompressiveFormulation::secondFundamentalForm(mesh, V, compressive_edgeDOFs, rand_face, nullptr, nullptr);
+    std::cout << "edge DOFs: " << edgeDOFs.transpose() << std::endl;
+    std::cout << "sin edge dofs: " << sin_edgeDOFs.transpose() << std::endl;
+
+    Eigen::Matrix2d sin_II;
+    sin_II = LibShell::MidedgeAngleSinFormulation::secondFundamentalForm(mesh, V, sin_edgeDOFs, rand_face, nullptr, nullptr);
 
     general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, rand_face, nullptr, nullptr);
 
     std::cout << "General II: \n" << general_II << std::endl;
-    std::cout << "Compressive II: \n" << compressive_II << std::endl;
-
-    std::cout << "edge DOFs: " << edgeDOFs.transpose() << std::endl;
-    std::cout << "compressive edge dofs: " << compressive_edgeDOFs.transpose() << std::endl;
+    std::cout << "sin II: \n" << sin_II << std::endl;
 
     std::cout << "MidedgeAngleGeneralFormulation ==================\n";
     differenceTest<LibShell::MidedgeAngleGeneralFormulation>(mesh, V, 1, verbose);

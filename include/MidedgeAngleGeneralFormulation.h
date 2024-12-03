@@ -79,9 +79,9 @@ public:
         kUndefined = 4
     };
 
-    // ni^T bj = mi cos(sigma) bj^T ei / |ei| - mi sin(sigma) sin(zeta) sij * |bj x ei| / |ei|
-    //         = mi cos(sigma) bj^T ei / |ei| - mi sin(sigma) sin(zeta) sij * hi, if bj is not parallel to ei
-    //         = mi cos(sigma) |ei| * sign(bj^T ei), if bj is parallel to ei
+    // ni^T bj = mi cos(sigma_i) bj^T ei / |ei| - mi sin(sigma_i) sin(zeta_i) sij * |bj x ei| / |ei|
+    //         = mi cos(sigma_i) bj^T ei / |ei| - mi sin(sigma_i) sin(zeta_i) sij * hi, if bj is not parallel to ei
+    //         = mi cos(sigma_i) |ei| * sign(bj^T ei), if bj is parallel to ei
     static double compute_nibj(const MeshConnectivity& mesh,
                                const Eigen::MatrixXd& curPos,
                                const Eigen::VectorXd& edgeDOFs,
