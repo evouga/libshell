@@ -100,11 +100,22 @@ class MeshConnectivity;
  *   II = -1/2 (dn^T dr + dr^T dn),
  *
  * in the smooth setting.
+ *
+ * ** Sin-Formulation: **
+ * In the sin-formulation, we treat the edge normals are always unit, that is mi = 1, leading to
+ * two degrees of freedom for each edge:
+ *  - Two angles: γ (gamma) and σ (sigma).
+ *
+ * and corresponding ni^^ bj is given as:
+ *   ni^T bj = cos(σ) (bj^T ei) / |ei| - sin(σ) sin(ζ) s_ij * |bj x ei| / |ei|,
+ *           = cos(σ) (bj^T ei) / |ei| - sin(σ) sin(ζ) s_ij * h_i (if bj is not parallel to ei),
+ *           = cos(σ) |ei| * sign(bj^T ei) (if bj is parallel to ei),
  */
 
-class MidedgeAngleGeneralFormulation {
+
+class MidedgeAngleGeneralSinFormulation {
 public:
-    constexpr static int numExtraDOFs = 4;
+    constexpr static int numExtraDOFs = 2;
 
     /*
      * Initialize the extra dofs, as well as the sign sij,
@@ -198,9 +209,9 @@ public:
      * @return:                     ni^T bj
      *
      * @note:
-     * ni^T bj = mi cos(sigma_i) bj^T ei / |ei| - mi sin(sigma_i) sin(zeta_i) sij * |bj x ei| / |ei|
-     *         = mi cos(sigma_i) bj^T ei / |ei| - mi sin(sigma_i) sin(zeta_i) sij * hi, if bj is not parallel to ei
-     *         = mi cos(sigma_i) |ei| * sign(bj^T ei), if bj is parallel to ei
+     * ni^T bj = cos(sigma_i) bj^T ei / |ei| - sin(sigma_i) sin(zeta_i) sij * |bj x ei| / |ei|
+     *         = cos(sigma_i) bj^T ei / |ei| - sin(sigma_i) sin(zeta_i) sij * hi, if bj is not parallel to ei
+     *         = cos(sigma_i) |ei| * sign(bj^T ei), if bj is parallel to ei
      */
     static double compute_nibj(const MeshConnectivity& mesh,
                                const Eigen::MatrixXd& curPos,

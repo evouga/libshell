@@ -9,6 +9,7 @@
 #include "../../include/MidedgeAngleThetaFormulation.h"
 #include "../../include/MidedgeAngleCompressiveFormulation.h"
 #include "../../include/MidedgeAngleGeneralFormulation.h"
+#include "../../include/MidedgeAngleGeneralSinFormulation.h"
 #include "../../include/RestState.h"
 
 namespace LibShell {
@@ -197,4 +198,5 @@ template class TensionFieldStVKMaterial<MidedgeAverageFormulation>;
 template class TensionFieldStVKMaterial<MidedgeAngleThetaFormulation>;
 template class TensionFieldStVKMaterial<MidedgeAngleCompressiveFormulation>;
 template class TensionFieldStVKMaterial<MidedgeAngleGeneralFormulation>;
+template class TensionFieldStVKMaterial<MidedgeAngleGeneralSinFormulation>;
 };  // namespace LibShell

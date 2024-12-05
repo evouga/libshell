@@ -100,11 +100,22 @@ class MeshConnectivity;
  *   II = -1/2 (dn^T dr + dr^T dn),
  *
  * in the smooth setting.
+ *
+ * ** Tan-Formulation: **
+ * In the tan-formulation, we treat the edge normals are always unit along the face normal direction, in other words the extruded prism has the constant thickness,
+ * that is mi di^nf = 1, leading to
+ *  - mi = 1 / (sin(σ) cos(ζ))
+ *  - two degrees of freedom for each edge: Two angles: γ (gamma) and σ (sigma).
+ *
+ * and corresponding ni^^ bj is given as:
+ *   ni^T bj = cot(σ) / cos(ζ) (bj^T ei) / |ei| - tan(ζ) s_ij * |bj x ei| / |ei|,
+ *           = cot(σ) / cos(ζ) (bj^T ei) / |ei| - tan(ζ) s_ij * h_i (if bj is not parallel to ei),
+ *           = cot(σ) / cos(ζ) |ei| * sign(bj^T ei) (if bj is parallel to ei),
  */
 
-class MidedgeAngleGeneralFormulation {
+class MidedgeAngleGeneralTanFormulation {
 public:
-    constexpr static int numExtraDOFs = 4;
+    constexpr static int numExtraDOFs = 2;
 
     /*
      * Initialize the extra dofs, as well as the sign sij,
@@ -198,9 +209,9 @@ public:
      * @return:                     ni^T bj
      *
      * @note:
-     * ni^T bj = mi cos(sigma_i) bj^T ei / |ei| - mi sin(sigma_i) sin(zeta_i) sij * |bj x ei| / |ei|
-     *         = mi cos(sigma_i) bj^T ei / |ei| - mi sin(sigma_i) sin(zeta_i) sij * hi, if bj is not parallel to ei
-     *         = mi cos(sigma_i) |ei| * sign(bj^T ei), if bj is parallel to ei
+     * ni^T bj = cos(sigma_i) bj^T ei / |ei| - sin(sigma_i) sin(zeta_i) sij * |bj x ei| / |ei|
+     *         = cos(sigma_i) bj^T ei / |ei| - sin(sigma_i) sin(zeta_i) sij * hi, if bj is not parallel to ei
+     *         = cos(sigma_i) |ei| * sign(bj^T ei), if bj is parallel to ei
      */
     static double compute_nibj(const MeshConnectivity& mesh,
                                const Eigen::MatrixXd& curPos,

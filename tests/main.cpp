@@ -10,6 +10,7 @@
 #include "../include/MidedgeAngleThetaFormulation.h"
 #include "../include/MidedgeAngleCompressiveFormulation.h"
 #include "../include/MidedgeAngleGeneralFormulation.h"
+#include "../include/MidedgeAngleGeneralSinFormulation.h"
 #include "../include/StVKMaterial.h"
 #include "../include/BilayerStVKMaterial.h"
 #include "../include/TensionFieldStVKMaterial.h"
@@ -524,8 +525,8 @@ int main()
     Eigen::MatrixXi F;
     makeSquareMesh(dim, V, F);
 
-    std::cout << "V:\n" << V << std::endl;
-    std::cout << "F:\n" << F << std::endl;
+    V.col(2).setRandom();
+
 
     LibShell::MeshConnectivity mesh(F);
 
@@ -537,18 +538,29 @@ int main()
     Eigen::Matrix2d general_II;
     int rand_face = std::rand() % mesh.nFaces();
 
+    std::cout << "\n======================== Most General II Formulation ==========================="<< std::endl;
 
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 2; j++) {
-            if(i != 0 || j != 0) {
-                continue;
-            }
             std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
             LibShell::MidedgeAngleGeneralFormulation::test_compute_nibj(mesh, V, edgeDOFs, rand_face, i, j);
         }
     }
 
     LibShell::MidedgeAngleGeneralFormulation::test_second_fund_form(mesh, V, edgeDOFs, rand_face);
+
+    std::cout << "\n======================== General II Formulation (Sin-based) ==========================="<< std::endl;
+    Eigen::VectorXd general_sin_edgeDOFs;
+    LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(general_sin_edgeDOFs, mesh, V);
+
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < 2; j++) {
+            std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
+            LibShell::MidedgeAngleGeneralSinFormulation::test_compute_nibj(mesh, V, general_sin_edgeDOFs, rand_face, i, j);
+        }
+    }
+
+    LibShell::MidedgeAngleGeneralSinFormulation::test_second_fund_form(mesh, V, general_sin_edgeDOFs, rand_face);
 
     Eigen::VectorXd sin_edgeDOFs;
     LibShell::MidedgeAngleSinFormulation::initializeExtraDOFs(sin_edgeDOFs, mesh, V);
@@ -559,10 +571,10 @@ int main()
         edgeDOFs[4 * i + 1] = M_PI_2;
         edgeDOFs[4 * i + 2] = 1;
         edgeDOFs[4 * i + 3] = 1;
-    }
 
-    std::cout << "edge DOFs: " << edgeDOFs.transpose() << std::endl;
-    std::cout << "sin edge dofs: " << sin_edgeDOFs.transpose() << std::endl;
+        general_sin_edgeDOFs[2 * i + 0] = sin_edgeDOFs[i];
+        general_sin_edgeDOFs[2 * i + 1] = M_PI_2;
+    }
 
     for(int face = 0; face < mesh.nFaces(); face++) {
         Eigen::Matrix2d sin_II;
@@ -570,13 +582,24 @@ int main()
 
         general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
 
-        std::cout << "General II: \n" << general_II << std::endl;
-        std::cout << "sin II: \n" << sin_II << std::endl;
+        Eigen::Matrix2d general_sin_II;
+        general_sin_II = LibShell::MidedgeAngleGeneralSinFormulation::secondFundamentalForm(mesh, V, general_sin_edgeDOFs, face, nullptr, nullptr);
+
+        if((sin_II - general_II).norm() > 1e-10 || (sin_II - general_sin_II).norm() > 1e-10) {
+            std::cout << "Miss matched II for face: " << face << std::endl;
+            std::cout << "Sin II: \n" << sin_II << std::endl;
+            std::cout << "General II: \n" << general_II << std::endl;
+            std::cout << "General Sin II: \n" << general_sin_II << std::endl;
+        }
     }
 
 
     std::cout << "MidedgeAngleGeneralFormulation ==================\n";
     differenceTest<LibShell::MidedgeAngleGeneralFormulation>(mesh, V, 1, verbose);
+
+    std::cout << "MidedgeAngleGeneralSinFormulation ==================\n";
+    differenceTest<LibShell::MidedgeAngleGeneralSinFormulation>(mesh, V, 1, verbose);
+
     return EXIT_SUCCESS;
 
     if (testderivatives)
