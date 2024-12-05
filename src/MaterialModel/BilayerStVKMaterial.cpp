@@ -10,6 +10,7 @@
 #include "../../include/MidedgeAngleCompressiveFormulation.h"
 #include "../../include/MidedgeAngleGeneralFormulation.h"
 #include "../../include/MidedgeAngleGeneralSinFormulation.h"
+#include "../../include/MidedgeAngleGeneralTanFormulation.h"
 #include "../../include/RestState.h"
 #include <iostream>
 
@@ -292,4 +293,5 @@ template class BilayerStVKMaterial<MidedgeAngleThetaFormulation>;
 template class BilayerStVKMaterial<MidedgeAngleCompressiveFormulation>;
 template class BilayerStVKMaterial<MidedgeAngleGeneralFormulation>;
 template class BilayerStVKMaterial<MidedgeAngleGeneralSinFormulation>;
+template class BilayerStVKMaterial<MidedgeAngleGeneralTanFormulation>;
 };  // namespace LibShell

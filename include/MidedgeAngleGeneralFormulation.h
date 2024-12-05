@@ -169,6 +169,25 @@ public:
                                       const Eigen::VectorXd& edgeDOFs,
                                       int face);
 
+    /*
+     * Get per edge face sigma and zeta, for the general tan formulation, the magnitude mi = 1 / (sin(σ) cos(ζ))
+     * @param[in] mesh:             the mesh connectivity
+     * @param[in] curPos:           the current vertex position
+     * @param[in] extraDOFs:        the current edge dofs
+     * @param[in] edge:             the edge id
+     * @param[in] face:             the face id in {0, 1}
+     *
+     * @param[out] sigma:           the angle between the edge direction d and the edge e
+     * @param[out] zeta:            the rotation angle from face normal nf to edge direction d with e as the rotation axis
+     */
+    static void get_per_edge_face_sigma_zeta(const MeshConnectivity& mesh,
+                                             const Eigen::MatrixXd& curPos,
+                                             const Eigen::VectorXd& edgeDOFs,
+                                             int edge,
+                                             int face,
+                                             double& sigma,
+                                             double& zeta);
+
 public:
     /*
      * The relationships between two vectors with the rotation axis ehat

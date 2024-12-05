@@ -11,6 +11,7 @@
 #include "../include/MidedgeAngleCompressiveFormulation.h"
 #include "../include/MidedgeAngleGeneralFormulation.h"
 #include "../include/MidedgeAngleGeneralSinFormulation.h"
+#include "../include/MidedgeAngleGeneralTanFormulation.h"
 #include "../include/StVKMaterial.h"
 #include "../include/BilayerStVKMaterial.h"
 #include "../include/TensionFieldStVKMaterial.h"
@@ -512,6 +513,166 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
     }
 }
 
+template <class SFF> void general_II_derivative_test(const Eigen::MatrixXd& V, const LibShell::MeshConnectivity& mesh, const Eigen::VectorXd& edgeDOFs, int face) {
+    std::cout << "======================== Different Test for Elastic Energy ===========================\n";
+    differenceTest<SFF>(mesh, V, 1, false);
+
+    std::cout << "======================== Edge Normal dot Basis Test ===========================\n";
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < 2; j++) {
+            std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
+            SFF::test_compute_nibj(mesh, V, edgeDOFs, face, i, j);
+        }
+    }
+
+    std::cout << "======================== Second Fundamental Form Entry Test ===========================\n";
+    SFF::test_second_fund_form(mesh, V, edgeDOFs, face);
+}
+
+void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshConnectivity& mesh) {
+    int rand_face = std::rand() % mesh.nFaces();
+
+    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
+    std::cout << "---------------------------------- Testing General II Formulation Derivatives, Face id " << rand_face << " ---------------------------------\n";
+    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
+
+    std::cout << "\n======================== Most General II Formulation ==========================="<< std::endl;
+    Eigen::VectorXd edgeDOFs;
+    LibShell::MidedgeAngleGeneralFormulation::initializeExtraDOFs(edgeDOFs, mesh, V);
+    edgeDOFs.setRandom();
+    general_II_derivative_test<LibShell::MidedgeAngleGeneralFormulation>(V, mesh, edgeDOFs, rand_face);
+
+
+    std::cout << "\n======================== General II Formulation (Sin-based) ==========================="<< std::endl;
+    Eigen::VectorXd general_sin_edgeDOFs;
+    LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(general_sin_edgeDOFs, mesh, V);
+    general_sin_edgeDOFs.setRandom();
+    general_II_derivative_test<LibShell::MidedgeAngleGeneralSinFormulation>(V, mesh, general_sin_edgeDOFs, rand_face);
+
+
+    std::cout << "\n======================== General II Formulation (Tan-based) ==========================="<< std::endl;
+    Eigen::VectorXd general_tan_edgeDOFs;
+    LibShell::MidedgeAngleGeneralTanFormulation::initializeExtraDOFs(general_tan_edgeDOFs, mesh, V);
+    general_tan_edgeDOFs.setRandom();
+    general_II_derivative_test<LibShell::MidedgeAngleGeneralTanFormulation>(V, mesh, general_tan_edgeDOFs, rand_face);
+
+
+    std::cout << "\n------------------------------------------------------------------------------------------------------------------------\n";
+    std::cout << "---------------------------------- Testing General II Formulation Consistency ------------------------------------------\n";
+    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
+
+    // general sin formulation and general tan formulation should be consistent with sin formulation with specific choice of edge dofs
+    bool sin_consistent = true;
+    Eigen::VectorXd sin_edgeDOFs;
+    LibShell::MidedgeAngleSinFormulation::initializeExtraDOFs(sin_edgeDOFs, mesh, V);
+    sin_edgeDOFs.setRandom();
+
+    for(int i = 0; i < mesh.nEdges(); i++) {
+        edgeDOFs[4 * i + 0] = sin_edgeDOFs[i];
+        edgeDOFs[4 * i + 1] = M_PI_2;
+        edgeDOFs[4 * i + 2] = 1;
+        edgeDOFs[4 * i + 3] = 1;
+
+        general_sin_edgeDOFs[2 * i + 0] = sin_edgeDOFs[i];
+        general_sin_edgeDOFs[2 * i + 1] = M_PI_2;
+    }
+
+    for(int face = 0; face < mesh.nFaces(); face++) {
+        Eigen::Matrix2d sin_II, general_II, general_sin_II;
+        sin_II = LibShell::MidedgeAngleSinFormulation::secondFundamentalForm(mesh, V, sin_edgeDOFs, face, nullptr, nullptr);
+        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
+        general_sin_II = LibShell::MidedgeAngleGeneralSinFormulation::secondFundamentalForm(mesh, V, general_sin_edgeDOFs, face, nullptr, nullptr);
+
+        if((sin_II - general_II).norm() > 1e-10 || (sin_II - general_sin_II).norm() > 1e-10) {
+            std::cout << "Miss matched II for face: " << face << std::endl;
+            std::cout << "Sin II: \n" << sin_II << std::endl;
+            std::cout << "General II: \n" << general_II << std::endl;
+            std::cout << "General Sin II: \n" << general_sin_II << std::endl;
+            sin_consistent = false;
+        }
+    }
+    std::cout << "Sin Consistent: " << sin_consistent << std::endl;
+
+    // general tan formulation should be consistent with tan formulation with specific choice of edge dofs
+    bool tan_consistent = true;
+    Eigen::VectorXd tan_edgeDOFs;
+    LibShell::MidedgeAngleTanFormulation::initializeExtraDOFs(tan_edgeDOFs, mesh, V);
+    tan_edgeDOFs.setRandom();
+
+    for(int i = 0; i < mesh.nEdges(); i++) {
+        general_tan_edgeDOFs[2 * i + 0] = tan_edgeDOFs[i];
+        general_tan_edgeDOFs[2 * i + 1] = M_PI_2;
+
+        edgeDOFs[4 * i + 0] = tan_edgeDOFs[i];
+        edgeDOFs[4 * i + 1] = M_PI_2;
+        for(int j = 0; j < 2; j++) {
+            double sigma, zeta;
+            LibShell::MidedgeAngleGeneralFormulation::get_per_edge_face_sigma_zeta(mesh, V, edgeDOFs, i, j, sigma, zeta);
+            edgeDOFs[4 * i + 2 + j] = 1 / (std::sin(sigma) * std::cos(zeta));
+        }
+    }
+
+    for(int face = 0; face < mesh.nFaces(); face++) {
+        Eigen::Matrix2d tan_II, general_II, general_tan_II;
+        tan_II = LibShell::MidedgeAngleTanFormulation::secondFundamentalForm(mesh, V, tan_edgeDOFs, face, nullptr, nullptr);
+        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
+        general_tan_II = LibShell::MidedgeAngleGeneralTanFormulation::secondFundamentalForm(mesh, V, general_tan_edgeDOFs, face, nullptr, nullptr);
+
+        if((tan_II - general_II).norm() > 1e-10 || (tan_II - general_tan_II).norm() > 1e-10) {
+            std::cout << "Miss matched II for face: " << face << std::endl;
+            std::cout << "Tan II: \n" << tan_II << std::endl;
+            std::cout << "General II: \n" << general_II << std::endl;
+            std::cout << "General Tan II: \n" << general_tan_II << std::endl;
+            tan_consistent = false;
+        }
+    }
+    std::cout << "Tan Consistent: " << tan_consistent << std::endl;
+
+    // general sin (general tan) and general formulation should be consistent with specific choice of edge dofs
+    bool general_consistent = true;
+    Eigen::VectorXd edgeDOFs1 = edgeDOFs;
+
+    for(int i = 0; i < mesh.nEdges(); i++) {
+        general_sin_edgeDOFs[2 * i + 0] = edgeDOFs[4 * i + 0];
+        general_sin_edgeDOFs[2 * i + 1] = edgeDOFs[4 * i + 1];
+        edgeDOFs[4 * i + 2] = 1;
+        edgeDOFs[4 * i + 3] = 1;
+
+        general_tan_edgeDOFs[2 * i + 0] = edgeDOFs1[4 * i + 0];
+        general_tan_edgeDOFs[2 * i + 1] = edgeDOFs1[4 * i + 1];
+        for(int j = 0; j < 2; j++) {
+            double sigma, zeta;
+            LibShell::MidedgeAngleGeneralFormulation::get_per_edge_face_sigma_zeta(mesh, V, edgeDOFs1, i, j, sigma, zeta);
+            edgeDOFs1[4 * i + 2 + j] = 1 / (std::sin(sigma) * std::cos(zeta));
+        }
+    }
+
+    for(int face = 0; face < mesh.nFaces(); face++) {
+        Eigen::Matrix2d general_sin_II, general_II;
+        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
+        general_sin_II = LibShell::MidedgeAngleGeneralSinFormulation::secondFundamentalForm(mesh, V, general_sin_edgeDOFs, face, nullptr, nullptr);
+
+        if((general_sin_II - general_II).norm() > 1e-10) {
+            std::cout << "Miss matched II (General sin) for face: " << face << std::endl;
+            std::cout << "General II: \n" << general_II << std::endl;
+            std::cout << "General Sin II: \n" << general_sin_II << std::endl;
+            general_consistent = false;
+        }
+
+        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs1, face, nullptr, nullptr);
+        Eigen::Matrix2d general_tan_II = LibShell::MidedgeAngleGeneralTanFormulation::secondFundamentalForm(mesh, V, general_tan_edgeDOFs, face, nullptr, nullptr);
+
+        if((general_tan_II - general_II).norm() > 1e-10) {
+            std::cout << "Miss matched II (General tan) for face: " << face << std::endl;
+            std::cout << "General II: \n" << general_II << std::endl;
+            std::cout << "General Tan II: \n" << general_tan_II << std::endl;
+            general_consistent = false;
+        }
+
+    }
+    std::cout << "General Consistent: " << general_consistent << std::endl;
+}
+
 
 int main()
 {
@@ -530,76 +691,7 @@ int main()
 
     LibShell::MeshConnectivity mesh(F);
 
-    Eigen::VectorXd edgeDOFs;
-    LibShell::MidedgeAngleGeneralFormulation::initializeExtraDOFs(edgeDOFs, mesh, V);
-
-    edgeDOFs.setRandom();
-
-    Eigen::Matrix2d general_II;
-    int rand_face = std::rand() % mesh.nFaces();
-
-    std::cout << "\n======================== Most General II Formulation ==========================="<< std::endl;
-
-    for(int i = 0; i < 3; i++) {
-        for(int j = 0; j < 2; j++) {
-            std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
-            LibShell::MidedgeAngleGeneralFormulation::test_compute_nibj(mesh, V, edgeDOFs, rand_face, i, j);
-        }
-    }
-
-    LibShell::MidedgeAngleGeneralFormulation::test_second_fund_form(mesh, V, edgeDOFs, rand_face);
-
-    std::cout << "\n======================== General II Formulation (Sin-based) ==========================="<< std::endl;
-    Eigen::VectorXd general_sin_edgeDOFs;
-    LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(general_sin_edgeDOFs, mesh, V);
-
-    for(int i = 0; i < 3; i++) {
-        for(int j = 0; j < 2; j++) {
-            std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
-            LibShell::MidedgeAngleGeneralSinFormulation::test_compute_nibj(mesh, V, general_sin_edgeDOFs, rand_face, i, j);
-        }
-    }
-
-    LibShell::MidedgeAngleGeneralSinFormulation::test_second_fund_form(mesh, V, general_sin_edgeDOFs, rand_face);
-
-    Eigen::VectorXd sin_edgeDOFs;
-    LibShell::MidedgeAngleSinFormulation::initializeExtraDOFs(sin_edgeDOFs, mesh, V);
-    sin_edgeDOFs.setRandom();
-
-    for(int i = 0; i < mesh.nEdges(); i++) {
-        edgeDOFs[4 * i + 0] = sin_edgeDOFs[i];
-        edgeDOFs[4 * i + 1] = M_PI_2;
-        edgeDOFs[4 * i + 2] = 1;
-        edgeDOFs[4 * i + 3] = 1;
-
-        general_sin_edgeDOFs[2 * i + 0] = sin_edgeDOFs[i];
-        general_sin_edgeDOFs[2 * i + 1] = M_PI_2;
-    }
-
-    for(int face = 0; face < mesh.nFaces(); face++) {
-        Eigen::Matrix2d sin_II;
-        sin_II = LibShell::MidedgeAngleSinFormulation::secondFundamentalForm(mesh, V, sin_edgeDOFs, face, nullptr, nullptr);
-
-        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
-
-        Eigen::Matrix2d general_sin_II;
-        general_sin_II = LibShell::MidedgeAngleGeneralSinFormulation::secondFundamentalForm(mesh, V, general_sin_edgeDOFs, face, nullptr, nullptr);
-
-        if((sin_II - general_II).norm() > 1e-10 || (sin_II - general_sin_II).norm() > 1e-10) {
-            std::cout << "Miss matched II for face: " << face << std::endl;
-            std::cout << "Sin II: \n" << sin_II << std::endl;
-            std::cout << "General II: \n" << general_II << std::endl;
-            std::cout << "General Sin II: \n" << general_sin_II << std::endl;
-        }
-    }
-
-
-    std::cout << "MidedgeAngleGeneralFormulation ==================\n";
-    differenceTest<LibShell::MidedgeAngleGeneralFormulation>(mesh, V, 1, verbose);
-
-    std::cout << "MidedgeAngleGeneralSinFormulation ==================\n";
-    differenceTest<LibShell::MidedgeAngleGeneralSinFormulation>(mesh, V, 1, verbose);
-
+    test_general_II_formulation(V, mesh);
     return EXIT_SUCCESS;
 
     if (testderivatives)

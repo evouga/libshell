@@ -592,5 +592,26 @@ void MidedgeAngleGeneralFormulation::test_second_fund_form(const MeshConnectivit
     }
 }
 
+void MidedgeAngleGeneralFormulation::get_per_edge_face_sigma_zeta(const MeshConnectivity& mesh,
+                                                                  const Eigen::MatrixXd& curPos,
+                                                                  const Eigen::VectorXd& edgeDOFs,
+                                                                  int edge,
+                                                                  int face,
+                                                                  double& sigma,
+                                                                  double& zeta) {
+    sigma = edgeDOFs(edge * numExtraDOFs + 1);
+    zeta = 0;
+    int face_id = mesh.edgeFace(edge, face);
+    if(face_id == -1) {
+        return;
+    }
+    double theta =
+           edgeTheta(mesh, curPos, edge, nullptr, nullptr);
+
+    double orient = face == 0 ? 1.0 : -1.0;
+    zeta = orient * 0.5 * theta + edgeDOFs[numExtraDOFs * edge];
+}
+
+
 
 };  // namespace LibShell

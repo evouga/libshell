@@ -10,6 +10,7 @@
 #include "../../include/MidedgeAngleCompressiveFormulation.h"
 #include "../../include/MidedgeAngleGeneralFormulation.h"
 #include "../../include/MidedgeAngleGeneralSinFormulation.h"
+#include "../../include/MidedgeAngleGeneralTanFormulation.h"
 #include "../../include/RestState.h"
 
 namespace LibShell {
@@ -133,4 +134,5 @@ template class StVKMaterial<MidedgeAngleThetaFormulation>;
 template class StVKMaterial<MidedgeAngleCompressiveFormulation>;
 template class StVKMaterial<MidedgeAngleGeneralFormulation>;
 template class StVKMaterial<MidedgeAngleGeneralSinFormulation>;
+template class StVKMaterial<MidedgeAngleGeneralTanFormulation>;
 };  // namespace LibShell

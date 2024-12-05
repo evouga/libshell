@@ -9,6 +9,7 @@
 #include "../include/MidedgeAngleCompressiveFormulation.h"
 #include "../include/MidedgeAngleGeneralFormulation.h"
 #include "../include/MidedgeAngleGeneralSinFormulation.h"
+#include "../include/MidedgeAngleGeneralTanFormulation.h"
 
 #include "GeometryDerivatives.h"
 
@@ -301,6 +302,7 @@ template class ElasticShell<MidedgeAverageFormulation>;
 template class ElasticShell<MidedgeAngleCompressiveFormulation>;
 template class ElasticShell<MidedgeAngleGeneralFormulation>;
 template class ElasticShell<MidedgeAngleGeneralSinFormulation>;
+template class ElasticShell<MidedgeAngleGeneralTanFormulation>;
 
 template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 9, 9>>& symA, const HessianProjectType& projType);
 template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 18, 18>>& symA, const HessianProjectType& projType);

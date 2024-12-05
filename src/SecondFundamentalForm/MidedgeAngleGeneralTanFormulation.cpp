@@ -113,6 +113,10 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
     Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs> tan_cos_deriv;
     Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> tan_cos_hess;
 
+    Eigen::Matrix<double, 1, 9> norm_deriv_full;
+
+    Eigen::Matrix<double, 9, 9> norm_hess_full;
+
     if(derivative || hessian) {
         tan_cos_deriv.setZero();
         for (int k = 0; k < 4; k++) {
@@ -122,6 +126,10 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
 
         tan_cos_deriv(18 + i * numExtraDOFs) = -std::tan(sigma) * std::sin(zeta);
         tan_cos_deriv(18 + i * numExtraDOFs + 1) = std::cos(zeta) / (std::cos(sigma) * std::cos(sigma));
+
+        norm_deriv_full.setZero();
+        norm_deriv_full.block<1, 3>(0, 3 * ev[0]) = -norm_deriv;
+        norm_deriv_full.block<1, 3>(0, 3 * ev[1]) = norm_deriv;
 
         if(hessian) {
             tan_cos_hess.setZero();
@@ -147,8 +155,14 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
                 tan_cos_hess.block<3, 1>(3 * av[k], 18 + i * numExtraDOFs + 1) += -std::sin(zeta) / (std::cos(sigma) * std::cos(sigma)) * orient * 0.5 * thetaderiv.block<1, 3>(0, 3 * k).transpose();
             }
 
+            norm_hess_full.setZero();
+            norm_hess_full.block<3, 3>(3 * ev[0], 3 * ev[0]) = norm_hess;
+            norm_hess_full.block<3, 3>(3 * ev[0], 3 * ev[1]) = -norm_hess;
+            norm_hess_full.block<3, 3>(3 * ev[1], 3 * ev[0]) = -norm_hess;
+            norm_hess_full.block<3, 3>(3 * ev[1], 3 * ev[1]) = norm_hess;
         }
     }
+
 
     // ni^T bj = cot(σ) / cos(ζ) |ei| * sign(bj^T ei)
     if (vector_relationship == VectorRelationship::kSameDirection ||
@@ -156,55 +170,39 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
         double sign = vector_relationship == VectorRelationship::kSameDirection ? 1.0 : -1.0;
         double res = enorm / tan_cos * sign;
 
-
         if (derivative) {
-            (*derivative)(18 + i * numExtraDOFs + 1) = sign * -std::sin(sigma) * enorm;
-            derivative->block<1, 3>(0, 3 * ev[0]) = -sign * std::cos(sigma) * norm_deriv;
-            derivative->block<1, 3>(0, 3 * ev[1]) = sign * std::cos(sigma) * norm_deriv;
+            (*derivative) = -sign * enorm * tan_cos_deriv / (tan_cos * tan_cos);
+            derivative->block<1, 9>(0, 0) += sign * norm_deriv_full / tan_cos;
         }
 
         if (hessian) {
-            (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + 1) = -std::cos(sigma) * enorm * sign;
-            hessian->block<1, 3>(18 + i * numExtraDOFs + 1, 3 * ev[0]) =
-                std::sin(sigma) * sign * norm_deriv.transpose();
-            hessian->block<1, 3>(18 + i * numExtraDOFs + 1, 3 * ev[1]) =
-                -std::sin(sigma) * sign * norm_deriv.transpose();
+            (*hessian) += sign * (-enorm / (tan_cos * tan_cos) * tan_cos_hess + 2 * enorm / (tan_cos * tan_cos * tan_cos) * tan_cos_deriv.transpose() * tan_cos_deriv);
 
-            hessian->block<3, 1>(3 * ev[0], 18 + i * numExtraDOFs + 1) = std::sin(sigma) * sign * norm_deriv;
-            hessian->block<3, 3>(3 * ev[0], 3 * ev[0]) = std::cos(sigma) * sign * norm_hess;
-            hessian->block<3, 3>(3 * ev[0], 3 * ev[1]) = -std::cos(sigma) * sign * norm_hess;
+            hessian->block<9, 18 + 3 * numExtraDOFs>(0, 0) += -sign / (tan_cos * tan_cos) * norm_deriv_full.transpose() * tan_cos_deriv;
+            hessian->block<18 + 3 * numExtraDOFs, 9>(0, 0) += -sign / (tan_cos * tan_cos) * tan_cos_deriv.transpose() * norm_deriv_full;
 
-            hessian->block<3, 1>(3 * ev[1], 18 + i * numExtraDOFs + 1) = -std::sin(sigma) * sign * norm_deriv;
-            hessian->block<3, 3>(3 * ev[1], 3 * ev[1]) = std::cos(sigma) * sign * norm_hess;
-            hessian->block<3, 3>(3 * ev[1], 3 * ev[0]) = -std::cos(sigma) * sign * norm_hess;
+            hessian->block<9, 9>(0, 0) += sign * (1.0 / tan_cos * norm_hess_full);
         }
-        
         return res;
     } else {
-        // ni^T bj = mi cos(sigma) bj^T ei / |ei| - mi sin(sigma) sin(zeta) sij * hi, if bj is not parallel to ei
+        // ni^T bj = cot(σ) / cos(ζ) (bj^T ei) / |ei| - tan(ζ) s_ij * h_i (if bj is not parallel to ei),
         Eigen::Vector3d bj = curPos.row(mesh.faceVertex(face, (j + 1) % 3)) - curPos.row(mesh.faceVertex(face, 0));
         double dot_prod = bj.dot(e);
         double dot_over_norm = dot_prod / enorm;
-        double part1 = std::cos(sigma) * dot_over_norm;
+        double part1 = dot_over_norm / tan_cos;
 
         Eigen::Matrix<double, 1, 9> hderiv;
         Eigen::Matrix<double, 9, 9> hhess;
         double altitude =
             triangleAltitude(mesh, curPos, face, i, (derivative || hessian) ? &hderiv : nullptr, hessian ? &hhess : nullptr);
-        
 
         double sij = vector_relationship == VectorRelationship::kPositiveOrientation ? 1.0 : -1.0;
-        double part2 = -sij * std::sin(sigma) * std::sin(zeta) * altitude;
+        double part2 = -sij * std::tan(zeta) * altitude;
 
         if (derivative || hessian) {
             // derivatives and hessian from first part
             {
-                // mi cos(sigma) bj^T ei / |ei|
-                Eigen::Matrix<double, 1, 9> norm_deriv_full;
-                norm_deriv_full.setZero();
-                norm_deriv_full.block<1, 3>(0, 3 * ev[0]) = -norm_deriv;
-                norm_deriv_full.block<1, 3>(0, 3 * ev[1]) = norm_deriv;
-
+                // cot(σ) / cos(ζ) (bj^T ei) / |ei|
                 Eigen::Matrix<double, 1, 9> dot_deriv;
                 Eigen::Matrix<double, 3, 9> grad_e = Eigen::Matrix<double, 3, 9>::Zero();
                 Eigen::Matrix<double, 3, 9> grad_b = Eigen::Matrix<double, 3, 9>::Zero();
@@ -222,18 +220,11 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
                     dot_deriv / enorm - dot_prod * norm_deriv_full / (enorm * enorm);
 
                 if (derivative) {
-                    (*derivative)(18 + i * numExtraDOFs + 1) += -dot_over_norm * std::sin(sigma);
-                    derivative->block<1, 9>(0, 0) += std::cos(sigma) * dot_over_norm_deriv;
+                    (*derivative) = -dot_over_norm / (tan_cos * tan_cos) * tan_cos_deriv;
+                    derivative->block<1, 9>(0, 0) +=  dot_over_norm_deriv / tan_cos;
                 }
 
                 if (hessian) {
-                    Eigen::Matrix<double, 9, 9> norm_hess_full;
-                    norm_hess_full.setZero();
-                    norm_hess_full.block<3, 3>(3 * ev[0], 3 * ev[0]) = norm_hess;
-                    norm_hess_full.block<3, 3>(3 * ev[0], 3 * ev[1]) = -norm_hess;
-                    norm_hess_full.block<3, 3>(3 * ev[1], 3 * ev[0]) = -norm_hess;
-                    norm_hess_full.block<3, 3>(3 * ev[1], 3 * ev[1]) = norm_hess;
-
                     Eigen::Matrix<double, 9, 9> dot_hess;
                     dot_hess = grad_b.transpose() * grad_e + grad_e.transpose() * grad_b;
 
@@ -245,15 +236,12 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
                         2 * dot_prod * norm_deriv_full.transpose() * norm_deriv_full /
                             (enorm * enorm * enorm);
 
-                    // hessian->block<9, 9>(0, 0) += norm_hess_full;
+                    (*hessian) += -dot_over_norm / (tan_cos * tan_cos) * tan_cos_hess + 2 * dot_over_norm / (tan_cos * tan_cos * tan_cos) * tan_cos_deriv.transpose() * tan_cos_deriv;
 
-                    (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + 1) +=
-                        -dot_over_norm * std::cos(sigma);
-                    hessian->block<1, 9>(18 + i * numExtraDOFs + 1, 0) += -std::sin(sigma) * dot_over_norm_deriv;
+                    hessian->block<9, 18 + 3 * numExtraDOFs>(0, 0) += -1.0 / (tan_cos * tan_cos) * dot_over_norm_deriv.transpose() * tan_cos_deriv;
+                    hessian->block<18 + 3 * numExtraDOFs, 9>(0, 0) += -1.0 / (tan_cos * tan_cos) * tan_cos_deriv.transpose() * dot_over_norm_deriv;
 
-                    hessian->block<9, 9>(0, 0) += std::cos(sigma) * dot_over_norm_hess;
-                    hessian->block<9, 1>(0, 18 + i * numExtraDOFs + 1) +=
-                        -std::sin(sigma) * dot_over_norm_deriv.transpose();
+                    hessian->block<9, 9>(0, 0) +=  1.0 / tan_cos * dot_over_norm_hess;
                 }
             }
 
@@ -264,35 +252,34 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
                     hv[k] = (i + k) % 3;
                 }
 
-                // -sij * std::sin(sigma) * std::sin(zeta) * altitude;
-                double sin_zeta_altitude = std::sin(zeta) * altitude;
-                Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs> sin_zeta_altitude_deriv;
-                sin_zeta_altitude_deriv.setZero();
+                // - tan(ζ) s_ij * h_i;
+                double tan_zeta_altitude = std::tan(zeta) * altitude;
+                Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs> tan_zeta_altitude_deriv;
+                tan_zeta_altitude_deriv.setZero();
                 
                 for (int k = 0; k < 3; k++) {
-                    sin_zeta_altitude_deriv.block<1, 3>(0, 3 * hv[k]) += sin(zeta) * hderiv.block<1, 3>(0, 3 * k);
+                    tan_zeta_altitude_deriv.block<1, 3>(0, 3 * hv[k]) += std::tan(zeta) * hderiv.block<1, 3>(0, 3 * k);
                 }
 
                 for (int k = 0; k < 4; k++) {
-                    sin_zeta_altitude_deriv.block<1, 3>(0, 3 * av[k]) +=
-                        orient * 0.5 * altitude * cos(zeta) * thetaderiv.block<1, 3>(0, 3 * k);
+                    tan_zeta_altitude_deriv.block<1, 3>(0, 3 * av[k]) +=
+                        orient * 0.5 * altitude / (std::cos(zeta) * std::cos(zeta)) * thetaderiv.block<1, 3>(0, 3 * k);
                 }
-                sin_zeta_altitude_deriv(0, 18 + i * numExtraDOFs) += altitude * cos(zeta);
+                tan_zeta_altitude_deriv(0, 18 + i * numExtraDOFs) += altitude / (std::cos(zeta) * std::cos(zeta));
 
                 if(derivative) {
-                    (*derivative) += -sij * std::sin(sigma) * sin_zeta_altitude_deriv;
-                    (*derivative)(0, 18 + i * numExtraDOFs + 1) += -sij * std::cos(sigma) * sin_zeta_altitude;
+                    (*derivative) += -sij * tan_zeta_altitude_deriv;
                 }
                 
                 if(hessian) {
-                    Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> sin_altitude_hess;
-                    sin_altitude_hess.setZero();
+                    Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> tan_altitude_hess;
+                    tan_altitude_hess.setZero();
 
                     for (int m = 0; m < 3; m++)
                     {
                         for (int k = 0; k < 3; k++)
                         {
-                            sin_altitude_hess.block<3, 3>(3 * hv[m], 3 * hv[k]) += sin(zeta) * hhess.block<3, 3>(3 * m, 3 * k);
+                            tan_altitude_hess.block<3, 3>(3 * hv[m], 3 * hv[k]) += std::tan(zeta) * hhess.block<3, 3>(3 * m, 3 * k);
                         }
                     }
 
@@ -300,32 +287,27 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
                     {
                         for (int m = 0; m < 4; m++)
                         {
-                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * hv[k]) += orient * 0.5 * cos(zeta) * thetaderiv.block(0, 3 * m, 1, 3).transpose() * hderiv.block(0, 3 * k, 1, 3);
-                            sin_altitude_hess.block<3, 3>(3 * hv[k], 3 * av[m]) += orient * 0.5 * cos(zeta) * hderiv.block(0, 3 * k, 1, 3).transpose() * thetaderiv.block(0, 3 * m, 1, 3);
+                            tan_altitude_hess.block<3, 3>(3 * av[m], 3 * hv[k]) += orient * 0.5 / (std::cos(zeta) * std::cos(zeta)) * thetaderiv.block(0, 3 * m, 1, 3).transpose() * hderiv.block(0, 3 * k, 1, 3);
+                            tan_altitude_hess.block<3, 3>(3 * hv[k], 3 * av[m]) += orient * 0.5 / (std::cos(zeta) * std::cos(zeta)) * hderiv.block(0, 3 * k, 1, 3).transpose() * thetaderiv.block(0, 3 * m, 1, 3);
                         }
-                        sin_altitude_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * hv[k]) += cos(zeta) * hderiv.block<1, 3>(0, 3 * k);
-                        sin_altitude_hess.block<3, 1>(3 * hv[k], 18 + i * numExtraDOFs) += cos(zeta) * hderiv.block<1, 3>(0, 3 * k).transpose();
+                        tan_altitude_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * hv[k]) += 1.0 / (std::cos(zeta) * std::cos(zeta)) * hderiv.block<1, 3>(0, 3 * k);
+                        tan_altitude_hess.block<3, 1>(3 * hv[k], 18 + i * numExtraDOFs) += 1.0 / (std::cos(zeta) * std::cos(zeta)) * hderiv.block<1, 3>(0, 3 * k).transpose();
                     }
 
                     for (int k = 0; k < 4; k++)
                     {
                         for (int m = 0; m < 4; m++)
                         {
-                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * av[k]) += orient * 0.5 * altitude * cos(zeta) * thetahess.block<3, 3>(3 * m, 3 * k);
-                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * av[k]) += -0.25 * altitude * sin(zeta) * thetaderiv.block<1, 3>(0, 3 * m).transpose() * thetaderiv.block<1, 3>(0, 3 * k);
+                            tan_altitude_hess.block<3, 3>(3 * av[m], 3 * av[k]) += orient * 0.5 * altitude / (std::cos(zeta) * std::cos(zeta)) * thetahess.block<3, 3>(3 * m, 3 * k);
+                            tan_altitude_hess.block<3, 3>(3 * av[m], 3 * av[k]) += 0.5 * altitude * std::tan(zeta) / (std::cos(zeta) * std::cos(zeta)) * thetaderiv.block<1, 3>(0, 3 * m).transpose() * thetaderiv.block<1, 3>(0, 3 * k);
                         }
-                        sin_altitude_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * av[k]) += -0.5 * altitude * sin(zeta) * orient * thetaderiv.block<1, 3>(0, 3 * k);
-                        sin_altitude_hess.block<3, 1>(3 * av[k], 18 + i * numExtraDOFs) += -0.5 * altitude * sin(zeta) * orient * thetaderiv.block<1, 3>(0, 3 * k).transpose();
+                        tan_altitude_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * av[k]) += altitude * std::tan(zeta) / (std::cos(zeta) * std::cos(zeta)) * orient * thetaderiv.block<1, 3>(0, 3 * k);
+                        tan_altitude_hess.block<3, 1>(3 * av[k], 18 + i * numExtraDOFs) += altitude * std::tan(zeta) / (std::cos(zeta) * std::cos(zeta)) * orient * thetaderiv.block<1, 3>(0, 3 * k).transpose();
                     }
 
-                    sin_altitude_hess(18 + i * numExtraDOFs, 18 + i * numExtraDOFs) += -altitude * sin(zeta);
+                    tan_altitude_hess(18 + i * numExtraDOFs, 18 + i * numExtraDOFs) += 2 * altitude * std::tan(zeta) / (std::cos(zeta) * std::cos(zeta));
 
-                    (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + 1) += sij * std::sin(sigma) * sin_zeta_altitude;
-                    hessian->block<1, 18 + 3 * numExtraDOFs>(18 + i * numExtraDOFs + 1, 0) += -sij * std::cos(sigma) * sin_zeta_altitude_deriv;
-
-                    (*hessian) += -sij * std::sin(sigma) * sin_altitude_hess;
-                    hessian->block<18 + 3 * numExtraDOFs, 1>(0, 18 + i * numExtraDOFs + 1) += -sij * std::cos(sigma) * sin_zeta_altitude_deriv.transpose();
-
+                    (*hessian) += -sij * tan_altitude_hess;
                 }
             }
         }

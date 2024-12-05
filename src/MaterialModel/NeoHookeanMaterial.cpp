@@ -11,6 +11,7 @@
 #include "../../include/MidedgeAngleCompressiveFormulation.h"
 #include "../../include/MidedgeAngleGeneralFormulation.h"
 #include "../../include/MidedgeAngleGeneralSinFormulation.h"
+#include "../../include/MidedgeAngleGeneralTanFormulation.h"
 #include "../../include/RestState.h"
 
 namespace LibShell {
@@ -465,4 +466,5 @@ template class NeoHookeanMaterial<MidedgeAngleThetaFormulation>;
 template class NeoHookeanMaterial<MidedgeAngleCompressiveFormulation>;
 template class NeoHookeanMaterial<MidedgeAngleGeneralFormulation>;
 template class NeoHookeanMaterial<MidedgeAngleGeneralSinFormulation>;
+template class NeoHookeanMaterial<MidedgeAngleGeneralTanFormulation>;
 };  // namespace LibShell
