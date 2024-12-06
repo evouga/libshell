@@ -157,11 +157,19 @@ double ElasticShell<SFF>::elasticEnergy(const MeshConnectivity& mesh,
             bend_hessians.resize(nfaces);
         }
 
-        tbb::parallel_for(0, nfaces, [&](int i) {
+        // In S2 version of SFF, we update the static variable of edge_face_basis_sign
+        // We should actually rewrite the code to avoid this!
+        for(int i = 0; i < nfaces; i++) {
             bend_energies[i] =
                 mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &bend_derivs[i] : nullptr,
                                   hessian ? &bend_hessians[i] : nullptr);
-        });
+        }
+
+        // tbb::parallel_for(0, nfaces, [&](int i) {
+        //     bend_energies[i] =
+        //         mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &bend_derivs[i] : nullptr,
+        //                           hessian ? &bend_hessians[i] : nullptr);
+        // });
 
         for (int i = 0; i < nfaces; i++) {
             result += bend_energies[i];

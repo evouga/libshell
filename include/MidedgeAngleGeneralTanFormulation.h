@@ -102,8 +102,8 @@ class MeshConnectivity;
  * in the smooth setting.
  *
  * ** Tan-Formulation: **
- * In the tan-formulation, we treat the edge normals are always unit along the face normal direction, in other words the extruded prism has the constant thickness,
- * that is mi di^nf = 1, leading to
+ * In the tan-formulation, we treat the edge normals are always unit along the face normal direction, in other words the
+ * extruded prism has the constant thickness, that is mi di^nf = 1, leading to
  *  - mi = 1 / (sin(σ) cos(ζ))
  *  - two degrees of freedom for each edge: Two angles: γ (gamma) and σ (sigma).
  *
@@ -127,6 +127,14 @@ public:
     static void initializeExtraDOFs(Eigen::VectorXd& extraDOFs,
                                     const MeshConnectivity& mesh,
                                     const Eigen::MatrixXd& curPos);
+
+    /*
+     * Initialize the edge face basis sign, which is used for all the computation
+     *
+     * @param[in] mesh:             the mesh connectivity
+     * @param[in] curPos:           the current vertex positions
+     */
+    static void initializeEdgeFaceBasisSign(const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos);
 
     /*
      * Compute the second fundamental form for the specific face
@@ -221,6 +229,8 @@ public:
                                int j,
                                Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
                                Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian);
+
+
     /*
      * The edge face basis sign
      */

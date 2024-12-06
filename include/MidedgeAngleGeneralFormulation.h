@@ -118,6 +118,15 @@ public:
                                     const Eigen::MatrixXd& curPos);
 
     /*
+     * Initialize the edge face basis sign, which is used for all the computation
+     *
+     * @param[in] mesh:             the mesh connectivity
+     * @param[in] curPos:           the current vertex positions
+     */
+    static void initializeEdgeFaceBasisSign(const MeshConnectivity& mesh,
+                                           const Eigen::MatrixXd& curPos);
+
+    /*
      * Compute the second fundamental form for the specific face
      *
      * @param[in] mesh:             the mesh connectivity

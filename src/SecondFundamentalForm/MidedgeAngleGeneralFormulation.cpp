@@ -324,6 +324,10 @@ Eigen::Matrix2d MidedgeAngleGeneralFormulation::secondFundamentalForm(
     int face,
     Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs>* derivative,
     std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>>* hessian) {
+
+    if (m_edge_face_basis_sign.size() != 2 * mesh.nEdges()) {
+        initializeExtraDOFs(const_cast<Eigen::VectorXd&>(extraDOFs), mesh, curPos);
+    }
     if (derivative) {
         derivative->setZero();
     }
@@ -405,7 +409,17 @@ void MidedgeAngleGeneralFormulation::initializeExtraDOFs(Eigen::VectorXd& extraD
             extraDOFs[numExtraDOFs * i + j] = 1;
         }
         extraDOFs[numExtraDOFs * i + 1] = M_PI_2;   // pi / 2, namely perpendicular to the edge
+    }
 
+    initializeEdgeFaceBasisSign(mesh, curPos);
+}
+
+void MidedgeAngleGeneralFormulation::initializeEdgeFaceBasisSign(const MeshConnectivity& mesh,
+                                                                 const Eigen::MatrixXd& curPos) {
+    int nedges = mesh.nEdges();
+    m_edge_face_basis_sign.clear();
+
+    for (int i = 0; i < nedges; i++) {
         Eigen::Vector3d e = curPos.row(mesh.edgeVertex(i, 1)) - curPos.row(mesh.edgeVertex(i, 0));
         for (int j = 0; j < 2; j++) {
             int fid = mesh.edgeFace(i, j);
@@ -445,6 +459,7 @@ void MidedgeAngleGeneralFormulation::initializeExtraDOFs(Eigen::VectorXd& extraD
         }
     }
 }
+
 
 
 void MidedgeAngleGeneralFormulation::test_compute_nibj(const MeshConnectivity& mesh,

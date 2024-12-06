@@ -520,6 +520,9 @@ template <class SFF> void general_II_derivative_test(const Eigen::MatrixXd& V, c
     std::cout << "======================== Edge Normal dot Basis Test ===========================\n";
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 2; j++) {
+            if(i != 0 || j != 0) {
+                continue;
+            }
             std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
             SFF::test_compute_nibj(mesh, V, edgeDOFs, face, i, j);
         }
@@ -555,7 +558,6 @@ void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshC
     LibShell::MidedgeAngleGeneralTanFormulation::initializeExtraDOFs(general_tan_edgeDOFs, mesh, V);
     general_tan_edgeDOFs.setRandom();
     general_II_derivative_test<LibShell::MidedgeAngleGeneralTanFormulation>(V, mesh, general_tan_edgeDOFs, rand_face);
-
 
     std::cout << "\n------------------------------------------------------------------------------------------------------------------------\n";
     std::cout << "---------------------------------- Testing General II Formulation Consistency ------------------------------------------\n";

@@ -8,9 +8,12 @@
 #include "../include/MaterialModel.h"
 #include "../include/NeoHookeanMaterial.h"
 #include "../include/StVKMaterial.h"
+#include "../include/MidedgeAngleSinFormulation.h"
 #include "../include/MidedgeAngleTanFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
 #include "../include/MidedgeAngleCompressiveFormulation.h"
+#include "../include/MidedgeAngleGeneralSinFormulation.h"
+#include "../include/MidedgeAngleGeneralTanFormulation.h"
 #include "../include/ElasticShell.h"
 #include "QuadraticExpansionBending.h"
 #include <igl/cotmatrix.h>
@@ -88,9 +91,34 @@ public:
     LibShell::NeoHookeanMaterial<LibShell::MidedgeAverageFormulation> mat_;
 };
 
-class NeohookeanDirectorShellEnergy : public ShellEnergy {
+class NeohookeanS1DirectorSinShellEnergy : public ShellEnergy {
 public:
-    NeohookeanDirectorShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+    NeohookeanS1DirectorSinShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+        : mesh_(mesh),
+          restState_(restState),
+          mat_() {}
+
+    virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
+                                 const Eigen::VectorXd& curEdgeDOFs,
+                                 bool bendingOnly,
+                                 Eigen::VectorXd* derivative,
+                                 std::vector<Eigen::Triplet<double>>* hessian,
+                                 LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
+        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_BENDING;
+        if (!bendingOnly)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_STRETCHING;
+        return LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::elasticEnergy(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    const LibShell::MeshConnectivity& mesh_;
+    const LibShell::RestState& restState_;
+    LibShell::NeoHookeanMaterial<LibShell::MidedgeAngleSinFormulation> mat_;
+};
+
+class NeohookeanS1DirectorTanShellEnergy : public ShellEnergy {
+public:
+    NeohookeanS1DirectorTanShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
         : mesh_(mesh),
           restState_(restState),
           mat_() {}
@@ -111,6 +139,56 @@ public:
     const LibShell::MeshConnectivity& mesh_;
     const LibShell::RestState& restState_;
     LibShell::NeoHookeanMaterial<LibShell::MidedgeAngleTanFormulation> mat_;
+};
+
+class NeohookeanS2DirectorSinShellEnergy : public ShellEnergy {
+public:
+    NeohookeanS2DirectorSinShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+        : mesh_(mesh),
+          restState_(restState),
+          mat_() {}
+
+    virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
+                                 const Eigen::VectorXd& curEdgeDOFs,
+                                 bool bendingOnly,
+                                 Eigen::VectorXd* derivative,
+                                 std::vector<Eigen::Triplet<double>>* hessian,
+                                 LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
+        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_BENDING;
+        if (!bendingOnly)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_STRETCHING;
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::elasticEnergy(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    const LibShell::MeshConnectivity& mesh_;
+    const LibShell::RestState& restState_;
+    LibShell::NeoHookeanMaterial<LibShell::MidedgeAngleGeneralSinFormulation> mat_;
+};
+
+class NeohookeanS2DirectorTanShellEnergy : public ShellEnergy {
+public:
+    NeohookeanS2DirectorTanShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+        : mesh_(mesh),
+          restState_(restState),
+          mat_() {}
+
+    virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
+                                 const Eigen::VectorXd& curEdgeDOFs,
+                                 bool bendingOnly,
+                                 Eigen::VectorXd* derivative,
+                                 std::vector<Eigen::Triplet<double>>* hessian,
+                                 LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
+        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_BENDING;
+        if (!bendingOnly)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_STRETCHING;
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::elasticEnergy(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    const LibShell::MeshConnectivity& mesh_;
+    const LibShell::RestState& restState_;
+    LibShell::NeoHookeanMaterial<LibShell::MidedgeAngleGeneralTanFormulation> mat_;
 };
 
 class NeohookeanCompressiveDirectorShellEnergy : public ShellEnergy {
@@ -165,9 +243,34 @@ public:
     LibShell::StVKMaterial<LibShell::MidedgeAverageFormulation> mat_;
 };
 
-class StVKDirectorShellEnergy : public ShellEnergy {
+class StVKS1DirectorSinShellEnergy : public ShellEnergy {
 public:
-    StVKDirectorShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+    StVKS1DirectorSinShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+        : mesh_(mesh),
+          restState_(restState),
+          mat_() {}
+
+    virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
+                                 const Eigen::VectorXd& curEdgeDOFs,
+                                 bool bendingOnly,
+                                 Eigen::VectorXd* derivative,
+                                 std::vector<Eigen::Triplet<double>>* hessian,
+                                 LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
+        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_BENDING;
+        if (!bendingOnly)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_STRETCHING;
+        return LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::elasticEnergy(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    const LibShell::MeshConnectivity& mesh_;
+    const LibShell::RestState& restState_;
+    LibShell::StVKMaterial<LibShell::MidedgeAngleSinFormulation> mat_;
+};
+
+class StVKS1DirectorTanShellEnergy : public ShellEnergy {
+public:
+    StVKS1DirectorTanShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
         : mesh_(mesh),
           restState_(restState),
           mat_() {}
@@ -188,6 +291,56 @@ public:
     const LibShell::MeshConnectivity& mesh_;
     const LibShell::RestState& restState_;
     LibShell::StVKMaterial<LibShell::MidedgeAngleTanFormulation> mat_;
+};
+
+class StVKS2DirectorSinShellEnergy : public ShellEnergy {
+public:
+    StVKS2DirectorSinShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+        : mesh_(mesh),
+          restState_(restState),
+          mat_() {}
+
+    virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
+                                 const Eigen::VectorXd& curEdgeDOFs,
+                                 bool bendingOnly,
+                                 Eigen::VectorXd* derivative,
+                                 std::vector<Eigen::Triplet<double>>* hessian,
+                                 LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
+        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_BENDING;
+        if (!bendingOnly)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_STRETCHING;
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::elasticEnergy(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    const LibShell::MeshConnectivity& mesh_;
+    const LibShell::RestState& restState_;
+    LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralSinFormulation> mat_;
+};
+
+class StVKS2DirectorTanShellEnergy : public ShellEnergy {
+public:
+    StVKS2DirectorTanShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+        : mesh_(mesh),
+          restState_(restState),
+          mat_() {}
+
+    virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
+                                 const Eigen::VectorXd& curEdgeDOFs,
+                                 bool bendingOnly,
+                                 Eigen::VectorXd* derivative,
+                                 std::vector<Eigen::Triplet<double>>* hessian,
+                                 LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
+        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_BENDING;
+        if (!bendingOnly)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_STRETCHING;
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::elasticEnergy(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    const LibShell::MeshConnectivity& mesh_;
+    const LibShell::RestState& restState_;
+    LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralTanFormulation> mat_;
 };
 
 class StVKCompressiveDirectorShellEnergy : public ShellEnergy {
