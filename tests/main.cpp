@@ -513,23 +513,52 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
     }
 }
 
-template <class SFF> void general_II_derivative_test(const Eigen::MatrixXd& V, const LibShell::MeshConnectivity& mesh, const Eigen::VectorXd& edgeDOFs, int face) {
+template <class SFF> bool general_II_derivative_test(const Eigen::MatrixXd& V, const LibShell::MeshConnectivity& mesh, const Eigen::VectorXd& edgeDOFs, int face) {
     std::cout << "======================== Different Test for Elastic Energy ===========================\n";
     differenceTest<SFF>(mesh, V, 1, false);
+
+    std::vector<Eigen::Vector3d> edge_normals = SFF::get_face_edge_normals(mesh, V, edgeDOFs, face);
+    std::vector<Eigen::Vector3d> bs(2);
+    bs[0] = V.row(mesh.faceVertex(face, 1)) - V.row(mesh.faceVertex(face, 0));
+    bs[1] = V.row(mesh.faceVertex(face, 2)) - V.row(mesh.faceVertex(face, 0));
+
+    bool nibj_consistent = true;
 
     std::cout << "======================== Edge Normal dot Basis Test ===========================\n";
     for(int i = 0; i < 3; i++) {
         for(int j = 0; j < 2; j++) {
-            if(i != 0 || j != 0) {
-                continue;
-            }
             std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
+
+            double nibj = SFF::compute_nibj(mesh, V, edgeDOFs, face, i, j, nullptr, nullptr);
+            double nibj_rewrite = edge_normals[i].dot(bs[j]);
+
+            if(std::abs(nibj - nibj_rewrite) > 1e-10) {
+                std::cout << "Mismatched nibj for edge: " << i << ", basis: " << j << std::endl;
+                std::cout << "nibj: " << nibj << ", nibj_rewrite: " << nibj_rewrite << std::endl;
+                nibj_consistent = false;
+            }
+
             SFF::test_compute_nibj(mesh, V, edgeDOFs, face, i, j);
         }
     }
 
     std::cout << "======================== Second Fundamental Form Entry Test ===========================\n";
     SFF::test_second_fund_form(mesh, V, edgeDOFs, face);
+
+    std::cout << "======================== Second Fundamental Form Rewrite Test ===========================\n";
+    Eigen::Matrix2d II = SFF::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
+    Eigen::Matrix2d II_rewrite;
+    II_rewrite << 2 * (edge_normals[1] - edge_normals[0]).dot(bs[0]), (edge_normals[2] - edge_normals[0]).dot(bs[0]) + (edge_normals[1] - edge_normals[0]).dot(bs[1]),
+                  (edge_normals[1] - edge_normals[0]).dot(bs[1]) + (edge_normals[2] - edge_normals[0]).dot(bs[0]), 2 * (edge_normals[2] - edge_normals[0]).dot(bs[1]);
+    II_rewrite *= -1;
+
+    if((II-II_rewrite).norm() > 1e-10) {
+        std::cout << "Rewrite II mismatched for face: " << face << std::endl;
+        std::cout << "II: \n" << II << std::endl;
+        std::cout << "II_rewrite: \n" << II_rewrite << std::endl;
+    }
+
+    return nibj_consistent;
 }
 
 void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshConnectivity& mesh) {
@@ -543,25 +572,99 @@ void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshC
     Eigen::VectorXd edgeDOFs;
     LibShell::MidedgeAngleGeneralFormulation::initializeExtraDOFs(edgeDOFs, mesh, V);
     edgeDOFs.setRandom();
-    general_II_derivative_test<LibShell::MidedgeAngleGeneralFormulation>(V, mesh, edgeDOFs, rand_face);
+    bool nibj_formula_consistent = general_II_derivative_test<LibShell::MidedgeAngleGeneralFormulation>(V, mesh, edgeDOFs, rand_face);
+    std::cout << "ni^bj formula rewrite consistent: " << nibj_formula_consistent << std::endl;
 
 
     std::cout << "\n======================== General II Formulation (Sin-based) ==========================="<< std::endl;
     Eigen::VectorXd general_sin_edgeDOFs;
     LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(general_sin_edgeDOFs, mesh, V);
     general_sin_edgeDOFs.setRandom();
-    general_II_derivative_test<LibShell::MidedgeAngleGeneralSinFormulation>(V, mesh, general_sin_edgeDOFs, rand_face);
+    nibj_formula_consistent = general_II_derivative_test<LibShell::MidedgeAngleGeneralSinFormulation>(V, mesh, general_sin_edgeDOFs, rand_face);
+    std::cout << "ni^bj formula rewrite consistent: " << nibj_formula_consistent << std::endl;
 
 
     std::cout << "\n======================== General II Formulation (Tan-based) ==========================="<< std::endl;
     Eigen::VectorXd general_tan_edgeDOFs;
     LibShell::MidedgeAngleGeneralTanFormulation::initializeExtraDOFs(general_tan_edgeDOFs, mesh, V);
     general_tan_edgeDOFs.setRandom();
-    general_II_derivative_test<LibShell::MidedgeAngleGeneralTanFormulation>(V, mesh, general_tan_edgeDOFs, rand_face);
+    nibj_formula_consistent = general_II_derivative_test<LibShell::MidedgeAngleGeneralTanFormulation>(V, mesh, general_tan_edgeDOFs, rand_face);
+    std::cout << "ni^bj formula rewrite consistent: " << nibj_formula_consistent << std::endl;
 
     std::cout << "\n------------------------------------------------------------------------------------------------------------------------\n";
     std::cout << "---------------------------------- Testing General II Formulation Consistency ------------------------------------------\n";
     std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
+
+    // direction consistency on the common edge
+    for(int i = 0; i < mesh.nEdges(); i++) {
+        int face0 = mesh.edgeFace(i, 0);
+        int face1 = mesh.edgeFace(i, 1);
+
+        if(face0 != -1 && face1 != -1) {
+            int eid0 = -1;
+            for(int j = 0; j < 3; j++) {
+                if(mesh.faceEdge(face0, j) == i) {
+                    eid0 = j;
+                    break;
+                }
+            }
+
+            int eid1 = -1;
+            for(int j = 0; j < 3; j++) {
+                if(mesh.faceEdge(face1, j) == i) {
+                    eid1 = j;
+                    break;
+                }
+            }
+
+            std::vector<Eigen::Vector3d> face_edge_normals_0 = LibShell::MidedgeAngleGeneralFormulation::get_face_edge_normals(mesh, V, edgeDOFs, face0);
+            std::vector<Eigen::Vector3d> face_edge_normals_1 = LibShell::MidedgeAngleGeneralFormulation::get_face_edge_normals(mesh, V, edgeDOFs, face1);
+
+            double m0 = edgeDOFs[4 * i + 2];
+            double m1 = edgeDOFs[4 * i + 3];
+
+            auto& edge_normal_0 = face_edge_normals_0[eid0] / m0;
+            auto& edge_normal_1 = face_edge_normals_1[eid1] / m1;
+
+            if((edge_normal_0 - edge_normal_1).norm() > 1e-10) {
+                std::cout << "direction doesn't match (General-formula) for edge: " << i << std::endl;
+            }
+            if(std::abs(edge_normal_0.norm() - 1) > 1e-10 || std::abs(edge_normal_1.norm() - 1) > 1e-10) {
+                std::cout << "norm doesn't match (General-formula) for edge: " << i << std::endl;
+            }
+
+            std::vector<Eigen::Vector3d> face_edge_normals_sin_0 = LibShell::MidedgeAngleGeneralSinFormulation::get_face_edge_normals(mesh, V, general_sin_edgeDOFs, face0);
+            std::vector<Eigen::Vector3d> face_edge_normals_sin_1 = LibShell::MidedgeAngleGeneralSinFormulation::get_face_edge_normals(mesh, V, general_sin_edgeDOFs, face1);
+            auto& edge_normal_sin_0 = face_edge_normals_sin_0[eid0];
+            auto& edge_normal_sin_1 = face_edge_normals_sin_1[eid1];
+
+            if((edge_normal_sin_0 - edge_normal_sin_1).norm() > 1e-10) {
+                std::cout << "direction doesn't match (Sin-formula) for edge: " << i << std::endl;
+            }
+            if(std::abs(edge_normal_sin_0.norm() - 1) > 1e-10 || std::abs(edge_normal_sin_1.norm() - 1) > 1e-10) {
+                std::cout << "norm doesn't match (Sin-formula) for edge: " << i << std::endl;
+            }
+
+            std::vector<Eigen::Vector3d> face_edge_normals_tan_0 = LibShell::MidedgeAngleGeneralTanFormulation::get_face_edge_normals(mesh, V, general_tan_edgeDOFs, face0);
+            std::vector<Eigen::Vector3d> face_edge_normals_tan_1 = LibShell::MidedgeAngleGeneralTanFormulation::get_face_edge_normals(mesh, V, general_tan_edgeDOFs, face1);
+            double sigma0, zeta0, sigma1, zeta1;
+            LibShell::MidedgeAngleGeneralTanFormulation::get_per_edge_face_sigma_zeta(mesh, V, general_tan_edgeDOFs, i, 0, sigma0, zeta0);
+            LibShell::MidedgeAngleGeneralTanFormulation::get_per_edge_face_sigma_zeta(mesh, V, general_tan_edgeDOFs, i, 1, sigma1, zeta1);
+
+            m0 = 1 / (std::sin(sigma0) * std::cos(zeta0));
+            m1 = 1 / (std::sin(sigma1) * std::cos(zeta1));
+
+            auto& edge_normal_tan_0 = face_edge_normals_tan_0[eid0] / m0;
+            auto& edge_normal_tan_1 = face_edge_normals_tan_1[eid1] / m1;
+
+            if((edge_normal_tan_0 - edge_normal_tan_1).norm() > 1e-10) {
+                std::cout << "direction doesn't match (Tan-formula) for edge: " << i << std::endl;
+            }
+            if(std::abs(edge_normal_tan_0.norm() - 1) > 1e-10 || std::abs(edge_normal_tan_1.norm() - 1) > 1e-10) {
+                std::cout << "norm doesn't match (Tan-formula) for edge: " << i << std::endl;
+            }
+        }
+    }
 
     // general sin formulation and general tan formulation should be consistent with sin formulation with specific choice of edge dofs
     bool sin_consistent = true;

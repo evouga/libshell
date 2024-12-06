@@ -19,7 +19,7 @@ class MeshConnectivity;
  *
  * The second fundamental form (II) is given as:
  *
- *   II = 2 * [(n1 - n0)^T(x1 - x0), (n1 - n0)^T(x2 - x0);
+ *   II = -2 * [(n1 - n0)^T(x1 - x0), (n1 - n0)^T(x2 - x0);
  *             (n2 - n0)^T(x1 - x0), (n2 - n0)^T(x2 - x0)]
  *
  * where:
@@ -36,7 +36,7 @@ class MeshConnectivity;
  *
  * Thus, di is expressed as:
  *
- *   di = cos(σ) ê + sin(σ) cos(γ) vb + sin(σ) sin(γ) (vb x ê),
+ *   di = cos(σ) ê + sin(σ) cos(γ) vb + sin(σ) sin(γ) (ê x vb),
  *
  * where:
  *   - σ (sigma): angle between di and ê, in [0, π].
@@ -53,7 +53,7 @@ class MeshConnectivity;
  * **Rewriting the Formula:**
  * For each face, we can rewrite the equation under the face normal basis nf as:
  *
- *   di = cos(σ) ê + sin(σ) cos(ζ) nf + sin(σ) sin(ζ) (nf x ê),
+ *   di = cos(σ) ê + sin(σ) cos(ζ) nf + sin(σ) sin(ζ) (ê x nf),
  *
  * where:
  *   - ζ (zeta) = γ + s * θ / 2.
@@ -67,16 +67,8 @@ class MeshConnectivity;
  *   - b1 = x2 - x0 (parallel to e1).
  *
  * Then:
- *
- *   ni^T bj = mi |bj| cos(σ) cos(θ_ji) - mi |bj| sin(σ) sin(ζ) sin(θ_ji),
- *
- * where:
- *   - θ_ji is the rotation angle from bj to ei, with nf as the rotation axis.
- *
- * This can be further rewritten as:
- *
- *   ni^T bj = mi cos(σ) (bj^T ei) / |ei| - mi sin(σ) sin(ζ) s_ij * |bj x ei| / |ei|,
- *           = mi cos(σ) (bj^T ei) / |ei| - mi sin(σ) sin(ζ) s_ij * h_i (if bj is not parallel to ei),
+ *   ni^T bj = mi cos(σ) (bj^T ei) / |ei| + mi sin(σ) sin(ζ) s_ij * |bj x ei| / |ei|,
+ *           = mi cos(σ) (bj^T ei) / |ei| + mi sin(σ) sin(ζ) s_ij * h_i (if bj is not parallel to ei),
  *           = mi cos(σ) |ei| * sign(bj^T ei) (if bj is parallel to ei),
  *
  * where:
@@ -92,12 +84,12 @@ class MeshConnectivity;
  *
  * To ensure symmetry in II, we redefine it as:
  *
- *   II = 2 * [(n1 - n0)^T(x1 - x0), 1/2 ((n1 - n0)^T(x2 - x0) + (n2 - n0)^T(x1 - x0));
+ *   II = -2 * [(n1 - n0)^T(x1 - x0), 1/2 ((n1 - n0)^T(x2 - x0) + (n2 - n0)^T(x1 - x0));
  *             1/2 ((n1 - n0)^T(x2 - x0) + (n2 - n0)^T(x1 - x0)), (n2 - n0)^T(x2 - x0)].
  *
  * This corresponds to defining II as:
  *
- *   II = -1/2 (dn^T dr + dr^T dn),
+ *   II = 1/2 (dn^T dr + dr^T dn),
  *
  * in the smooth setting.
  *
@@ -107,8 +99,8 @@ class MeshConnectivity;
  *  - Two angles: γ (gamma) and σ (sigma).
  *
  * and corresponding ni^^ bj is given as:
- *   ni^T bj = cos(σ) (bj^T ei) / |ei| - sin(σ) sin(ζ) s_ij * |bj x ei| / |ei|,
- *           = cos(σ) (bj^T ei) / |ei| - sin(σ) sin(ζ) s_ij * h_i (if bj is not parallel to ei),
+ *   ni^T bj = cos(σ) (bj^T ei) / |ei| + sin(σ) sin(ζ) s_ij * |bj x ei| / |ei|,
+ *           = cos(σ) (bj^T ei) / |ei| + sin(σ) sin(ζ) s_ij * h_i (if bj is not parallel to ei),
  *           = cos(σ) |ei| * sign(bj^T ei) (if bj is parallel to ei),
  */
 
@@ -186,6 +178,31 @@ public:
                                       const Eigen::MatrixXd& curPos,
                                       const Eigen::VectorXd& edgeDOFs,
                                       int face);
+
+    /*
+    * Get per edge face sigma and zeta, for the general tan formulation, the magnitude mi = 1 / (sin(σ) cos(ζ))
+    * @param[in] mesh:             the mesh connectivity
+    * @param[in] curPos:           the current vertex position
+    * @param[in] extraDOFs:        the current edge dofs
+    * @param[in] edge:             the edge id
+    * @param[in] face:             the face id in {0, 1}
+    *
+    * @param[out] sigma:           the angle between the edge direction d and the edge e
+    * @param[out] zeta:            the rotation angle from face normal nf to edge direction d with e as the rotation axis
+    */
+    static void get_per_edge_face_sigma_zeta(const MeshConnectivity& mesh,
+                                             const Eigen::MatrixXd& curPos,
+                                             const Eigen::VectorXd& edgeDOFs,
+                                             int edge,
+                                             int face,
+                                             double& sigma,
+                                             double& zeta);
+
+
+    static std::vector<Eigen::Vector3d> get_face_edge_normals(const MeshConnectivity& mesh,
+                                                             const Eigen::MatrixXd& curPos,
+                                                             const Eigen::VectorXd& edgeDOFs,
+                                                             int face);
 
 public:
     /*

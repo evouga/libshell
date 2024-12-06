@@ -43,8 +43,8 @@ std::vector<std::array<MidedgeAngleGeneralTanFormulation::VectorRelationship, 2>
     MidedgeAngleGeneralTanFormulation::m_edge_face_basis_sign;
 constexpr int MidedgeAngleGeneralTanFormulation::numExtraDOFs;
 
-// ni^T bj = cot(σ) / cos(ζ) (bj^T ei) / |ei| - tan(ζ) s_ij * |bj x ei| / |ei|,
-//         = cot(σ) / cos(ζ) (bj^T ei) / |ei| - tan(ζ) s_ij * h_i (if bj is not parallel to ei),
+// ni^T bj = cot(σ) / cos(ζ) (bj^T ei) / |ei| + tan(ζ) s_ij * |bj x ei| / |ei|,
+//         = cot(σ) / cos(ζ) (bj^T ei) / |ei| + tan(ζ) s_ij * h_i (if bj is not parallel to ei),
 //         = cot(σ) / cos(ζ) |ei| * sign(bj^T ei) (if bj is parallel to ei),
 double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& mesh,
                                                     const Eigen::MatrixXd& curPos,
@@ -193,13 +193,11 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
         }
         return res;
     } else {
-        // ni^T bj = cot(σ) / cos(ζ) (bj^T ei) / |ei| - tan(ζ) s_ij * h_i (if bj is not parallel to ei),
+        // ni^T bj = cot(σ) / cos(ζ) (bj^T ei) / |ei| + tan(ζ) s_ij * h_i (if bj is not parallel to ei),
         Eigen::Vector3d bj = curPos.row(mesh.faceVertex(face, (j + 1) % 3)) - curPos.row(mesh.faceVertex(face, 0));
         double dot_prod = bj.dot(e);
         double dot_over_norm = dot_prod / enorm;
-        double part1 = dot_over_norm / tan_cos;
-
-        part1 = dot_over_norm * cot_over_cos;
+        double part1 = dot_over_norm * cot_over_cos;
 
         Eigen::Matrix<double, 1, 9> hderiv;
         Eigen::Matrix<double, 9, 9> hhess;
@@ -207,7 +205,7 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
             triangleAltitude(mesh, curPos, face, i, (derivative || hessian) ? &hderiv : nullptr, hessian ? &hhess : nullptr);
 
         double sij = vector_relationship == VectorRelationship::kPositiveOrientation ? 1.0 : -1.0;
-        double part2 = -sij * std::tan(zeta) * altitude;
+        double part2 = sij * std::tan(zeta) * altitude;
 
         if (derivative || hessian) {
             // derivatives and hessian from first part
@@ -259,7 +257,7 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
                     hv[k] = (i + k) % 3;
                 }
 
-                // - tan(ζ) s_ij * h_i;
+                // tan(ζ) s_ij * h_i;
                 double tan_zeta_altitude = std::tan(zeta) * altitude;
                 Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs> tan_zeta_altitude_deriv;
                 tan_zeta_altitude_deriv.setZero();
@@ -275,7 +273,7 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
                 tan_zeta_altitude_deriv(0, 18 + i * numExtraDOFs) += altitude / (std::cos(zeta) * std::cos(zeta));
 
                 if(derivative) {
-                    (*derivative) += -sij * tan_zeta_altitude_deriv;
+                    (*derivative) += sij * tan_zeta_altitude_deriv;
                 }
                 
                 if(hessian) {
@@ -314,7 +312,7 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
 
                     tan_altitude_hess(18 + i * numExtraDOFs, 18 + i * numExtraDOFs) += 2 * altitude * std::tan(zeta) / (std::cos(zeta) * std::cos(zeta));
 
-                    (*hessian) += -sij * tan_altitude_hess;
+                    (*hessian) += sij * tan_altitude_hess;
                 }
             }
         }
@@ -330,7 +328,7 @@ Eigen::Matrix2d MidedgeAngleGeneralTanFormulation::secondFundamentalForm(
     int face,
     Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs>* derivative,
     std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>>* hessian) {
-    
+
     if(m_edge_face_basis_sign.size() != 2 * mesh.nEdges()) {
         initializeEdgeFaceBasisSign(mesh, curPos);
     }
@@ -360,28 +358,28 @@ Eigen::Matrix2d MidedgeAngleGeneralTanFormulation::secondFundamentalForm(
     };
 
     Eigen::Matrix2d II;
-    // first entry: II(0, 0) = 2(n1^T b0 - n0^T b0)
-    II(0, 0) = 2 * (nibj[get_idx(1, 0)] - nibj[get_idx(0, 0)]);
+    // first entry: II(0, 0) = -2(n1^T b0 - n0^T b0)
+    II(0, 0) = -2 * (nibj[get_idx(1, 0)] - nibj[get_idx(0, 0)]);
     if(derivative) {
-        derivative->block<1, 18 + 3 * numExtraDOFs>(0, 0) = 2 * (nibj_deriv[get_idx(1, 0)] - nibj_deriv[get_idx(0, 0)]);
+        derivative->block<1, 18 + 3 * numExtraDOFs>(0, 0) = -2 * (nibj_deriv[get_idx(1, 0)] - nibj_deriv[get_idx(0, 0)]);
     }
     if(hessian) {
-        (*hessian)[0] = 2 * (nibj_hessian[get_idx(1, 0)] - nibj_hessian[get_idx(0, 0)]);
+        (*hessian)[0] = -2 * (nibj_hessian[get_idx(1, 0)] - nibj_hessian[get_idx(0, 0)]);
     }
 
 
-    // second entry: II(0, 1) = (n1^T b1 - n0^T b1) + (n2^T b0 - n0^T b0)
-    II(0, 1) = nibj[get_idx(1, 1)] - nibj[get_idx(0, 1)] + nibj[get_idx(2, 0)] - nibj[get_idx(0, 0)];
+    // second entry: II(0, 1) = -(n1^T b1 - n0^T b1) - (n2^T b0 - n0^T b0)
+    II(0, 1) = -(nibj[get_idx(1, 1)] - nibj[get_idx(0, 1)]) - (nibj[get_idx(2, 0)] - nibj[get_idx(0, 0)]);
     if(derivative) {
-        derivative->block<1, 18 + 3 * numExtraDOFs>(1, 0) = nibj_deriv[get_idx(1, 1)] - nibj_deriv[get_idx(0, 1)];
-        derivative->block<1, 18 + 3 * numExtraDOFs>(1, 0) += nibj_deriv[get_idx(2, 0)] - nibj_deriv[get_idx(0, 0)];
+        derivative->block<1, 18 + 3 * numExtraDOFs>(1, 0) = -nibj_deriv[get_idx(1, 1)] + nibj_deriv[get_idx(0, 1)];
+        derivative->block<1, 18 + 3 * numExtraDOFs>(1, 0) += -nibj_deriv[get_idx(2, 0)] + nibj_deriv[get_idx(0, 0)];
     }
     if(hessian) {
-        (*hessian)[1] = nibj_hessian[get_idx(1, 1)] - nibj_hessian[get_idx(0, 1)];
-        (*hessian)[1] += nibj_hessian[get_idx(2, 0)] - nibj_hessian[get_idx(0, 0)];
+        (*hessian)[1] = -nibj_hessian[get_idx(1, 1)] + nibj_hessian[get_idx(0, 1)];
+        (*hessian)[1] += -nibj_hessian[get_idx(2, 0)] + nibj_hessian[get_idx(0, 0)];
     }
 
-    // third entry: II(1, 0) = (n1^T b1 - n0^T b1) + (n2^T b0 - n0^T b0) = II(0, 1)
+    // third entry: II(1, 0) = -(n1^T b1 - n0^T b1) - (n2^T b0 - n0^T b0) = II(0, 1)
     II(1, 0) = II(0, 1);
     if(derivative) {
         derivative->block<1, 18 + 3 * numExtraDOFs>(2, 0) = derivative->block<1, 18 + 3 * numExtraDOFs>(1, 0);
@@ -390,13 +388,13 @@ Eigen::Matrix2d MidedgeAngleGeneralTanFormulation::secondFundamentalForm(
         (*hessian)[2] = (*hessian)[1];
     }
 
-    // fourth entry: II(1, 1) = 2(n2^T b1 - n0^T b1)
-    II(1, 1) = 2 * (nibj[get_idx(2, 1)] - nibj[get_idx(0, 1)]);
+    // fourth entry: II(1, 1) = -2(n2^T b1 - n0^T b1)
+    II(1, 1) = -2 * (nibj[get_idx(2, 1)] - nibj[get_idx(0, 1)]);
     if(derivative) {
-        derivative->block<1, 18 + 3 * numExtraDOFs>(3, 0) = 2 * (nibj_deriv[get_idx(2, 1)] - nibj_deriv[get_idx(0, 1)]);
+        derivative->block<1, 18 + 3 * numExtraDOFs>(3, 0) = -2 * (nibj_deriv[get_idx(2, 1)] - nibj_deriv[get_idx(0, 1)]);
     }
     if(hessian) {
-        (*hessian)[3] = 2 * (nibj_hessian[get_idx(2, 1)] - nibj_hessian[get_idx(0, 1)]);
+        (*hessian)[3] = -2 * (nibj_hessian[get_idx(2, 1)] - nibj_hessian[get_idx(0, 1)]);
     }
 
     return II;
@@ -416,6 +414,42 @@ void MidedgeAngleGeneralTanFormulation::initializeExtraDOFs(Eigen::VectorXd& ext
 
     initializeEdgeFaceBasisSign(mesh, curPos);
 }
+
+std::vector<Eigen::Vector3d> MidedgeAngleGeneralTanFormulation::get_face_edge_normals(const MeshConnectivity& mesh,
+                                                                                      const Eigen::MatrixXd& curPos,
+                                                                                      const Eigen::VectorXd& edgeDOFs, int face){
+    // di = cos(σ) ê + sin(σ) cos(ζ) nf + sin(σ) sin(ζ) (ê x nf)
+    // mi = 1 / (sin(σ) cos(ζ))
+    Eigen::Vector3d b0 = curPos.row(mesh.faceVertex(face, 1)) - curPos.row(mesh.faceVertex(face, 0));
+    Eigen::Vector3d b1 = curPos.row(mesh.faceVertex(face, 2)) - curPos.row(mesh.faceVertex(face, 0));
+    Eigen::Vector3d nf = b0.cross(b1);
+    nf.normalize();
+
+    std::vector<Eigen::Vector3d> face_edge_normals = {};
+
+    for(int i = 0; i < 3; i++) {
+        int eid = mesh.faceEdge(face, i);
+
+        Eigen::Vector3d e = curPos.row(mesh.edgeVertex(eid, 1)) - curPos.row(mesh.edgeVertex(eid, 0));
+        e.normalize();
+
+        Eigen::Vector3d eperp = e.cross(nf);
+
+        double theta =
+            edgeTheta(mesh, curPos, eid, nullptr, nullptr);
+
+        double orient = mesh.faceEdgeOrientation(face, i) == 0 ? 1.0 : -1.0;
+        double zeta = orient * 0.5 * theta + edgeDOFs[numExtraDOFs * eid];
+        double sigma = edgeDOFs(eid * numExtraDOFs + 1);
+
+        double mi = 1.0 / (std::sin(sigma) * std::cos(zeta));
+        Eigen::Vector3d di = std::cos(sigma) * e + std::sin(sigma) * std::cos(zeta) * nf + std::sin(sigma) * std::sin(zeta) * eperp;
+        face_edge_normals.push_back(mi * di);
+    }
+
+    return face_edge_normals;
+}
+
 
 void MidedgeAngleGeneralTanFormulation::initializeEdgeFaceBasisSign(const MeshConnectivity& mesh,
                                                                  const Eigen::MatrixXd& curPos) {
@@ -463,6 +497,25 @@ void MidedgeAngleGeneralTanFormulation::initializeEdgeFaceBasisSign(const MeshCo
     }
 }
 
+void MidedgeAngleGeneralTanFormulation::get_per_edge_face_sigma_zeta(const MeshConnectivity& mesh,
+                                                                  const Eigen::MatrixXd& curPos,
+                                                                  const Eigen::VectorXd& edgeDOFs,
+                                                                  int edge,
+                                                                  int face,
+                                                                  double& sigma,
+                                                                  double& zeta) {
+    sigma = edgeDOFs(edge * numExtraDOFs + 1);
+    zeta = 0;
+    int face_id = mesh.edgeFace(edge, face);
+    if(face_id == -1) {
+        return;
+    }
+    double theta =
+           edgeTheta(mesh, curPos, edge, nullptr, nullptr);
+
+    double orient = face == 0 ? 1.0 : -1.0;
+    zeta = orient * 0.5 * theta + edgeDOFs[numExtraDOFs * edge];
+}
 
 
 void MidedgeAngleGeneralTanFormulation::test_compute_nibj(const MeshConnectivity& mesh,
