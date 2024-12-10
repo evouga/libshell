@@ -12,8 +12,8 @@
 #include <random>
 
 static void TestFuncGradHessian(
-    std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *, Eigen::SparseMatrix<double> *, bool)> obj_Func,
-    const Eigen::VectorXd &x0) {
+    std::function<double(const Eigen::VectorXd&, Eigen::VectorXd*, Eigen::SparseMatrix<double>*, bool)> obj_Func,
+    const Eigen::VectorXd& x0) {
     Eigen::VectorXd dir = x0;
     dir.setRandom();
 
@@ -21,7 +21,8 @@ static void TestFuncGradHessian(
     Eigen::SparseMatrix<double> H;
 
     double f = obj_Func(x0, &grad, &H, false);
-    std::cout << "energy: " << f << ", gradient L2-norm: " << grad.norm() << ", hessian L2-norm: " << H.norm() << std::endl;
+    std::cout << "energy: " << f << ", gradient L2-norm: " << grad.norm() << ", hessian L2-norm: " << H.norm()
+              << std::endl;
 
     for (int i = 3; i < 10; i++) {
         double eps = std::pow(0.1, i);
@@ -35,7 +36,6 @@ static void TestFuncGradHessian(
     }
 }
 
-
 namespace LibShell {
 
 // Define the static member variable
@@ -46,14 +46,15 @@ constexpr int MidedgeAngleGeneralFormulation::numExtraDOFs;
 // ni^T bj = mi cos(sigma) bj^T ei / |ei| + mi sin(sigma) sin(zeta) sij * |bj x ei| / |ei|
 //         = mi cos(sigma) bj^T ei / |ei| + mi sin(sigma) sin(zeta) sij * hi, if bj is not parallel to ei
 //         = mi cos(sigma) |ei| * sign(bj^T ei), if bj is parallel to ei
-double MidedgeAngleGeneralFormulation::compute_nibj(const MeshConnectivity& mesh,
-                                                    const Eigen::MatrixXd& curPos,
-                                                    const Eigen::VectorXd& edgeDOFs,
-                                                    int face,
-                                                    int i,
-                                                    int j,
-                                                    Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
-                                                    Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian) {
+double MidedgeAngleGeneralFormulation::compute_nibj(
+    const MeshConnectivity& mesh,
+    const Eigen::MatrixXd& curPos,
+    const Eigen::VectorXd& edgeDOFs,
+    int face,
+    int i,
+    int j,
+    Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
+    Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian) {
     assert(i >= 0 && i < 3 && j >= 0 && j < 2);
     int efid = mesh.faceEdgeOrientation(face, i);
     assert(efid == 0 || efid == 1);
@@ -126,7 +127,7 @@ double MidedgeAngleGeneralFormulation::compute_nibj(const MeshConnectivity& mesh
             hessian->block<3, 3>(3 * ev[1], 3 * ev[1]) = mi * std::cos(sigma) * sign * norm_hess;
             hessian->block<3, 3>(3 * ev[1], 3 * ev[0]) = -mi * std::cos(sigma) * sign * norm_hess;
         }
-        
+
         return res;
     } else {
         // ni^T bj = mi cos(sigma) bj^T ei / |ei| + mi sin(sigma) sin(zeta) sij * hi, if bj is not parallel to ei
@@ -137,20 +138,18 @@ double MidedgeAngleGeneralFormulation::compute_nibj(const MeshConnectivity& mesh
 
         Eigen::Matrix<double, 1, 12> thetaderiv;
         Eigen::Matrix<double, 12, 12> thetahess;
-        double theta =
-            edgeTheta(mesh, curPos, eid, (derivative || hessian) ? &thetaderiv : nullptr, hessian ? &thetahess : nullptr);
+        double theta = edgeTheta(mesh, curPos, eid, (derivative || hessian) ? &thetaderiv : nullptr,
+                                 hessian ? &thetahess : nullptr);
 
         Eigen::Matrix<double, 1, 9> hderiv;
         Eigen::Matrix<double, 9, 9> hhess;
-        double altitude =
-            triangleAltitude(mesh, curPos, face, i, (derivative || hessian) ? &hderiv : nullptr, hessian ? &hhess : nullptr);
-        
+        double altitude = triangleAltitude(mesh, curPos, face, i, (derivative || hessian) ? &hderiv : nullptr,
+                                           hessian ? &hhess : nullptr);
 
         double orient = mesh.faceEdgeOrientation(face, i) == 0 ? 1.0 : -1.0;
         double zeta = orient * 0.5 * theta + edgeDOFs[numExtraDOFs * eid];
         double sij = vector_relationship == VectorRelationship::kPositiveOrientation ? 1.0 : -1.0;
         double part2 = sij * mi * std::sin(sigma) * std::sin(zeta) * altitude;
-
 
         if (derivative || hessian) {
             // derivatives and hessian from first part
@@ -199,8 +198,7 @@ double MidedgeAngleGeneralFormulation::compute_nibj(const MeshConnectivity& mesh
                         (dot_deriv.transpose() * norm_deriv_full + norm_deriv_full.transpose() * dot_deriv) /
                             (enorm * enorm) -
                         dot_prod * norm_hess_full / (enorm * enorm) +
-                        2 * dot_prod * norm_deriv_full.transpose() * norm_deriv_full /
-                            (enorm * enorm * enorm);
+                        2 * dot_prod * norm_deriv_full.transpose() * norm_deriv_full / (enorm * enorm * enorm);
 
                     // hessian->block<9, 9>(0, 0) += norm_hess_full;
 
@@ -246,7 +244,7 @@ double MidedgeAngleGeneralFormulation::compute_nibj(const MeshConnectivity& mesh
                 double sin_zeta_altitude = std::sin(zeta) * altitude;
                 Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs> sin_zeta_altitude_deriv;
                 sin_zeta_altitude_deriv.setZero();
-                
+
                 for (int k = 0; k < 3; k++) {
                     sin_zeta_altitude_deriv.block<1, 3>(0, 3 * hv[k]) += sin(zeta) * hderiv.block<1, 3>(0, 3 * k);
                 }
@@ -257,65 +255,156 @@ double MidedgeAngleGeneralFormulation::compute_nibj(const MeshConnectivity& mesh
                 }
                 sin_zeta_altitude_deriv(0, 18 + i * numExtraDOFs) += altitude * cos(zeta);
 
-                if(derivative) {
+                if (derivative) {
                     (*derivative) += sij * mi * std::sin(sigma) * sin_zeta_altitude_deriv;
                     (*derivative)(0, 18 + i * numExtraDOFs + 1) += sij * mi * std::cos(sigma) * sin_zeta_altitude;
                     (*derivative)(0, 18 + i * numExtraDOFs + mi_id_inc) += sij * std::sin(sigma) * sin_zeta_altitude;
                 }
-                
-                if(hessian) {
+
+                if (hessian) {
                     Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> sin_altitude_hess;
                     sin_altitude_hess.setZero();
 
-                    for (int m = 0; m < 3; m++)
-                    {
-                        for (int k = 0; k < 3; k++)
-                        {
-                            sin_altitude_hess.block<3, 3>(3 * hv[m], 3 * hv[k]) += sin(zeta) * hhess.block<3, 3>(3 * m, 3 * k);
+                    for (int m = 0; m < 3; m++) {
+                        for (int k = 0; k < 3; k++) {
+                            sin_altitude_hess.block<3, 3>(3 * hv[m], 3 * hv[k]) +=
+                                sin(zeta) * hhess.block<3, 3>(3 * m, 3 * k);
                         }
                     }
 
-                    for (int k = 0; k < 3; k++)
-                    {
-                        for (int m = 0; m < 4; m++)
-                        {
-                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * hv[k]) += orient * 0.5 * cos(zeta) * thetaderiv.block(0, 3 * m, 1, 3).transpose() * hderiv.block(0, 3 * k, 1, 3);
-                            sin_altitude_hess.block<3, 3>(3 * hv[k], 3 * av[m]) += orient * 0.5 * cos(zeta) * hderiv.block(0, 3 * k, 1, 3).transpose() * thetaderiv.block(0, 3 * m, 1, 3);
+                    for (int k = 0; k < 3; k++) {
+                        for (int m = 0; m < 4; m++) {
+                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * hv[k]) +=
+                                orient * 0.5 * cos(zeta) * thetaderiv.block(0, 3 * m, 1, 3).transpose() *
+                                hderiv.block(0, 3 * k, 1, 3);
+                            sin_altitude_hess.block<3, 3>(3 * hv[k], 3 * av[m]) +=
+                                orient * 0.5 * cos(zeta) * hderiv.block(0, 3 * k, 1, 3).transpose() *
+                                thetaderiv.block(0, 3 * m, 1, 3);
                         }
-                        sin_altitude_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * hv[k]) += cos(zeta) * hderiv.block<1, 3>(0, 3 * k);
-                        sin_altitude_hess.block<3, 1>(3 * hv[k], 18 + i * numExtraDOFs) += cos(zeta) * hderiv.block<1, 3>(0, 3 * k).transpose();
+                        sin_altitude_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * hv[k]) +=
+                            cos(zeta) * hderiv.block<1, 3>(0, 3 * k);
+                        sin_altitude_hess.block<3, 1>(3 * hv[k], 18 + i * numExtraDOFs) +=
+                            cos(zeta) * hderiv.block<1, 3>(0, 3 * k).transpose();
                     }
 
-                    for (int k = 0; k < 4; k++)
-                    {
-                        for (int m = 0; m < 4; m++)
-                        {
-                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * av[k]) += orient * 0.5 * altitude * cos(zeta) * thetahess.block<3, 3>(3 * m, 3 * k);
-                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * av[k]) += -0.25 * altitude * sin(zeta) * thetaderiv.block<1, 3>(0, 3 * m).transpose() * thetaderiv.block<1, 3>(0, 3 * k);
+                    for (int k = 0; k < 4; k++) {
+                        for (int m = 0; m < 4; m++) {
+                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * av[k]) +=
+                                orient * 0.5 * altitude * cos(zeta) * thetahess.block<3, 3>(3 * m, 3 * k);
+                            sin_altitude_hess.block<3, 3>(3 * av[m], 3 * av[k]) +=
+                                -0.25 * altitude * sin(zeta) * thetaderiv.block<1, 3>(0, 3 * m).transpose() *
+                                thetaderiv.block<1, 3>(0, 3 * k);
                         }
-                        sin_altitude_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * av[k]) += -0.5 * altitude * sin(zeta) * orient * thetaderiv.block<1, 3>(0, 3 * k);
-                        sin_altitude_hess.block<3, 1>(3 * av[k], 18 + i * numExtraDOFs) += -0.5 * altitude * sin(zeta) * orient * thetaderiv.block<1, 3>(0, 3 * k).transpose();
+                        sin_altitude_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * av[k]) +=
+                            -0.5 * altitude * sin(zeta) * orient * thetaderiv.block<1, 3>(0, 3 * k);
+                        sin_altitude_hess.block<3, 1>(3 * av[k], 18 + i * numExtraDOFs) +=
+                            -0.5 * altitude * sin(zeta) * orient * thetaderiv.block<1, 3>(0, 3 * k).transpose();
                     }
 
                     sin_altitude_hess(18 + i * numExtraDOFs, 18 + i * numExtraDOFs) += -altitude * sin(zeta);
 
-                    (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + 1) += -sij * mi * std::sin(sigma) * sin_zeta_altitude;
-                    (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + mi_id_inc) += sij * std::cos(sigma) * sin_zeta_altitude;
-                    hessian->block<1, 18 + 3 * numExtraDOFs>(18 + i * numExtraDOFs + 1, 0) += sij * mi * std::cos(sigma) * sin_zeta_altitude_deriv;
+                    (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + 1) +=
+                        -sij * mi * std::sin(sigma) * sin_zeta_altitude;
+                    (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + mi_id_inc) +=
+                        sij * std::cos(sigma) * sin_zeta_altitude;
+                    hessian->block<1, 18 + 3 * numExtraDOFs>(18 + i * numExtraDOFs + 1, 0) +=
+                        sij * mi * std::cos(sigma) * sin_zeta_altitude_deriv;
 
-                    (*hessian)(18 + i * numExtraDOFs + mi_id_inc, 18 + i * numExtraDOFs + 1) += sij * std::cos(sigma) * sin_zeta_altitude;
-                    hessian->block<1, 18 + 3 * numExtraDOFs>(18 + i * numExtraDOFs + mi_id_inc, 0) += sij * std::sin(sigma) * sin_zeta_altitude_deriv;
+                    (*hessian)(18 + i * numExtraDOFs + mi_id_inc, 18 + i * numExtraDOFs + 1) +=
+                        sij * std::cos(sigma) * sin_zeta_altitude;
+                    hessian->block<1, 18 + 3 * numExtraDOFs>(18 + i * numExtraDOFs + mi_id_inc, 0) +=
+                        sij * std::sin(sigma) * sin_zeta_altitude_deriv;
 
                     (*hessian) += sij * mi * std::sin(sigma) * sin_altitude_hess;
-                    hessian->block<18 + 3 * numExtraDOFs, 1>(0, 18 + i * numExtraDOFs + 1) += sij * mi * std::cos(sigma) * sin_zeta_altitude_deriv.transpose();
-                    hessian->block<18 + 3 * numExtraDOFs, 1>(0, 18 + i * numExtraDOFs + mi_id_inc) += sij * std::sin(sigma) * sin_zeta_altitude_deriv.transpose();
-
+                    hessian->block<18 + 3 * numExtraDOFs, 1>(0, 18 + i * numExtraDOFs + 1) +=
+                        sij * mi * std::cos(sigma) * sin_zeta_altitude_deriv.transpose();
+                    hessian->block<18 + 3 * numExtraDOFs, 1>(0, 18 + i * numExtraDOFs + mi_id_inc) +=
+                        sij * std::sin(sigma) * sin_zeta_altitude_deriv.transpose();
                 }
             }
         }
 
         return part1 + part2;
     }
+}
+
+double MidedgeAngleGeneralFormulation::compute_niei(
+    const MeshConnectivity& mesh,
+    const Eigen::MatrixXd& curPos,
+    const Eigen::VectorXd& edgeDOFs,
+    int face,
+    int i,
+    Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
+    Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian) {
+    assert(i >= 0 && i < 3);
+    int efid = mesh.faceEdgeOrientation(face, i);
+    assert(efid == 0 || efid == 1);
+    int eid = mesh.faceEdge(face, i);
+
+    if (derivative) {
+        derivative->setZero();
+    }
+
+    if (hessian) {
+        hessian->setZero();
+    }
+
+    int mi_id_inc = efid == 0 ? 2 : 3;
+    double mi = edgeDOFs(eid * numExtraDOFs + mi_id_inc);
+    double sigma = edgeDOFs(eid * numExtraDOFs + 1);
+
+    int ev[2];
+    for (int k = 0; k < 3; k++) {
+        if (mesh.faceVertex(face, k) == mesh.edgeVertex(eid, 0)) {
+            ev[0] = k;
+        }
+        if (mesh.faceVertex(face, k) == mesh.edgeVertex(eid, 1)) {
+            ev[1] = k;
+        }
+    }
+
+    Eigen::Vector3d e = curPos.row(mesh.edgeVertex(eid, 1)) - curPos.row(mesh.edgeVertex(eid, 0));
+    Eigen::Vector3d norm_deriv;
+    Eigen::Matrix3d norm_hess;
+    double enorm = vec_norm(e, (derivative || hessian) ? &norm_deriv : nullptr, hessian ? &norm_hess : nullptr);
+
+    // ni^T bj = mi cos(sigma) |ei|
+    double sign = 1.0;
+    double res = mi * std::cos(sigma) * enorm * sign;
+
+    if (derivative) {
+        (*derivative)(18 + i * numExtraDOFs + 1) = sign * mi * -std::sin(sigma) * enorm;
+        (*derivative)(18 + i * numExtraDOFs + mi_id_inc) = sign * std::cos(sigma) * enorm;
+        derivative->block<1, 3>(0, 3 * ev[0]) = -sign * mi * std::cos(sigma) * norm_deriv;
+        derivative->block<1, 3>(0, 3 * ev[1]) = sign * mi * std::cos(sigma) * norm_deriv;
+    }
+
+    if (hessian) {
+        (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + 1) = mi * -std::cos(sigma) * enorm * sign;
+        (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + mi_id_inc) = -std::sin(sigma) * enorm * sign;
+        hessian->block<1, 3>(18 + i * numExtraDOFs + 1, 3 * ev[0]) =
+            mi * std::sin(sigma) * sign * norm_deriv.transpose();
+        hessian->block<1, 3>(18 + i * numExtraDOFs + 1, 3 * ev[1]) =
+            -mi * std::sin(sigma) * sign * norm_deriv.transpose();
+
+        (*hessian)(18 + i * numExtraDOFs + mi_id_inc, 18 + i * numExtraDOFs + 1) = -std::sin(sigma) * enorm * sign;
+        hessian->block<1, 3>(18 + i * numExtraDOFs + mi_id_inc, 3 * ev[0]) =
+            -std::cos(sigma) * sign * norm_deriv.transpose();
+        hessian->block<1, 3>(18 + i * numExtraDOFs + mi_id_inc, 3 * ev[1]) =
+            std::cos(sigma) * sign * norm_deriv.transpose();
+
+        hessian->block<3, 1>(3 * ev[0], 18 + i * numExtraDOFs + 1) = mi * std::sin(sigma) * sign * norm_deriv;
+        hessian->block<3, 1>(3 * ev[0], 18 + i * numExtraDOFs + mi_id_inc) = -sign * std::cos(sigma) * norm_deriv;
+        hessian->block<3, 3>(3 * ev[0], 3 * ev[0]) = mi * std::cos(sigma) * sign * norm_hess;
+        hessian->block<3, 3>(3 * ev[0], 3 * ev[1]) = -mi * std::cos(sigma) * sign * norm_hess;
+
+        hessian->block<3, 1>(3 * ev[1], 18 + i * numExtraDOFs + 1) = -mi * std::sin(sigma) * sign * norm_deriv;
+        hessian->block<3, 1>(3 * ev[1], 18 + i * numExtraDOFs + mi_id_inc) = sign * std::cos(sigma) * norm_deriv;
+        hessian->block<3, 3>(3 * ev[1], 3 * ev[1]) = mi * std::cos(sigma) * sign * norm_hess;
+        hessian->block<3, 3>(3 * ev[1], 3 * ev[0]) = -mi * std::cos(sigma) * sign * norm_hess;
+    }
+
+    return res;
 }
 
 Eigen::Matrix2d MidedgeAngleGeneralFormulation::secondFundamentalForm(
@@ -325,7 +414,6 @@ Eigen::Matrix2d MidedgeAngleGeneralFormulation::secondFundamentalForm(
     int face,
     Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs>* derivative,
     std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>>* hessian) {
-
     if (m_edge_face_basis_sign.size() != 2 * mesh.nEdges()) {
         initializeExtraDOFs(const_cast<Eigen::VectorXd&>(extraDOFs), mesh, curPos);
     }
@@ -343,53 +431,53 @@ Eigen::Matrix2d MidedgeAngleGeneralFormulation::secondFundamentalForm(
     std::vector<Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>> nibj_deriv(6);
     std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>> nibj_hessian(6);
 
-    for(int i = 0; i < 6; i++) {
+    for (int i = 0; i < 6; i++) {
         int edge = i / 2;
         int bid = i % 2;
-        nibj[i] = compute_nibj(mesh, curPos, extraDOFs, face, edge, bid, derivative ? &nibj_deriv[i] : nullptr, hessian ? &nibj_hessian[i] : nullptr);
+        nibj[i] = compute_nibj(mesh, curPos, extraDOFs, face, edge, bid, derivative ? &nibj_deriv[i] : nullptr,
+                               hessian ? &nibj_hessian[i] : nullptr);
     }
 
-    auto get_idx = [&](int i, int j) -> int {
-        return i * 2 + j;
-    };
+    auto get_idx = [&](int i, int j) -> int { return i * 2 + j; };
 
     Eigen::Matrix2d II;
     // first entry: II(0, 0) = -2(n1^T b0 - n0^T b0)
     II(0, 0) = -2 * (nibj[get_idx(1, 0)] - nibj[get_idx(0, 0)]);
-    if(derivative) {
-        derivative->block<1, 18 + 3 * numExtraDOFs>(0, 0) = -2 * (nibj_deriv[get_idx(1, 0)] - nibj_deriv[get_idx(0, 0)]);
+    if (derivative) {
+        derivative->block<1, 18 + 3 * numExtraDOFs>(0, 0) =
+            -2 * (nibj_deriv[get_idx(1, 0)] - nibj_deriv[get_idx(0, 0)]);
     }
-    if(hessian) {
+    if (hessian) {
         (*hessian)[0] = -2 * (nibj_hessian[get_idx(1, 0)] - nibj_hessian[get_idx(0, 0)]);
     }
 
-
     // second entry: II(0, 1) = -(n1^T b1 - n0^T b1) - (n2^T b0 - n0^T b0)
     II(0, 1) = -(nibj[get_idx(1, 1)] - nibj[get_idx(0, 1)]) - (nibj[get_idx(2, 0)] - nibj[get_idx(0, 0)]);
-    if(derivative) {
+    if (derivative) {
         derivative->block<1, 18 + 3 * numExtraDOFs>(1, 0) = -nibj_deriv[get_idx(1, 1)] + nibj_deriv[get_idx(0, 1)];
         derivative->block<1, 18 + 3 * numExtraDOFs>(1, 0) += -nibj_deriv[get_idx(2, 0)] + nibj_deriv[get_idx(0, 0)];
     }
-    if(hessian) {
+    if (hessian) {
         (*hessian)[1] = -nibj_hessian[get_idx(1, 1)] + nibj_hessian[get_idx(0, 1)];
         (*hessian)[1] += -nibj_hessian[get_idx(2, 0)] + nibj_hessian[get_idx(0, 0)];
     }
 
     // third entry: II(1, 0) = -(n1^T b1 - n0^T b1) - (n2^T b0 - n0^T b0) = II(0, 1)
     II(1, 0) = II(0, 1);
-    if(derivative) {
+    if (derivative) {
         derivative->block<1, 18 + 3 * numExtraDOFs>(2, 0) = derivative->block<1, 18 + 3 * numExtraDOFs>(1, 0);
     }
-    if(hessian) {
+    if (hessian) {
         (*hessian)[2] = (*hessian)[1];
     }
 
     // fourth entry: II(1, 1) = -2(n2^T b1 - n0^T b1)
     II(1, 1) = -2 * (nibj[get_idx(2, 1)] - nibj[get_idx(0, 1)]);
-    if(derivative) {
-        derivative->block<1, 18 + 3 * numExtraDOFs>(3, 0) = -2 * (nibj_deriv[get_idx(2, 1)] - nibj_deriv[get_idx(0, 1)]);
+    if (derivative) {
+        derivative->block<1, 18 + 3 * numExtraDOFs>(3, 0) =
+            -2 * (nibj_deriv[get_idx(2, 1)] - nibj_deriv[get_idx(0, 1)]);
     }
-    if(hessian) {
+    if (hessian) {
         (*hessian)[3] = -2 * (nibj_hessian[get_idx(2, 1)] - nibj_hessian[get_idx(0, 1)]);
     }
 
@@ -409,7 +497,7 @@ void MidedgeAngleGeneralFormulation::initializeExtraDOFs(Eigen::VectorXd& extraD
         for (int j = 2; j < numExtraDOFs; j++) {
             extraDOFs[numExtraDOFs * i + j] = 1;
         }
-        extraDOFs[numExtraDOFs * i + 1] = M_PI_2;   // pi / 2, namely perpendicular to the edge
+        extraDOFs[numExtraDOFs * i + 1] = M_PI_2;  // pi / 2, namely perpendicular to the edge
     }
 
     initializeEdgeFaceBasisSign(mesh, curPos);
@@ -462,8 +550,9 @@ void MidedgeAngleGeneralFormulation::initializeEdgeFaceBasisSign(const MeshConne
 }
 
 std::vector<Eigen::Vector3d> MidedgeAngleGeneralFormulation::get_face_edge_normals(const MeshConnectivity& mesh,
-                                                                                      const Eigen::MatrixXd& curPos,
-                                                                                      const Eigen::VectorXd& edgeDOFs, int face){
+                                                                                   const Eigen::MatrixXd& curPos,
+                                                                                   const Eigen::VectorXd& edgeDOFs,
+                                                                                   int face) {
     // di = cos(σ) ê + sin(σ) cos(ζ) nf + sin(σ) sin(ζ) (ê x nf)
     Eigen::Vector3d b0 = curPos.row(mesh.faceVertex(face, 1)) - curPos.row(mesh.faceVertex(face, 0));
     Eigen::Vector3d b1 = curPos.row(mesh.faceVertex(face, 2)) - curPos.row(mesh.faceVertex(face, 0));
@@ -472,7 +561,7 @@ std::vector<Eigen::Vector3d> MidedgeAngleGeneralFormulation::get_face_edge_norma
 
     std::vector<Eigen::Vector3d> face_edge_normals = {};
 
-    for(int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; i++) {
         int eid = mesh.faceEdge(face, i);
 
         int efid = mesh.faceEdgeOrientation(face, i);
@@ -483,8 +572,7 @@ std::vector<Eigen::Vector3d> MidedgeAngleGeneralFormulation::get_face_edge_norma
 
         Eigen::Vector3d eperp = e.cross(nf);
 
-        double theta =
-            edgeTheta(mesh, curPos, eid, nullptr, nullptr);
+        double theta = edgeTheta(mesh, curPos, eid, nullptr, nullptr);
 
         double orient = mesh.faceEdgeOrientation(face, i) == 0 ? 1.0 : -1.0;
         double zeta = orient * 0.5 * theta + edgeDOFs[numExtraDOFs * eid];
@@ -492,7 +580,8 @@ std::vector<Eigen::Vector3d> MidedgeAngleGeneralFormulation::get_face_edge_norma
 
         int mi_id_inc = efid == 0 ? 2 : 3;
         double mi = edgeDOFs(eid * numExtraDOFs + mi_id_inc);
-        Eigen::Vector3d di = std::cos(sigma) * e + std::sin(sigma) * std::cos(zeta) * nf + std::sin(sigma) * std::sin(zeta) * eperp;
+        Eigen::Vector3d di =
+            std::cos(sigma) * e + std::sin(sigma) * std::cos(zeta) * nf + std::sin(sigma) * std::sin(zeta) * eperp;
         face_edge_normals.push_back(mi * di);
     }
 
@@ -508,12 +597,12 @@ void MidedgeAngleGeneralFormulation::test_compute_nibj(const MeshConnectivity& m
     auto to_variables = [&]() {
         Eigen::VectorXd vars(18 + 3 * numExtraDOFs);
         vars.setZero();
-        for(int k = 0; k < 3; k++) {
+        for (int k = 0; k < 3; k++) {
             int vid = mesh.faceVertex(face, k);
             vars.segment<3>(3 * k) = curPos.row(vid);
 
             int opp_vid = mesh.vertexOppositeFaceEdge(face, k);
-            if(opp_vid != -1) {
+            if (opp_vid != -1) {
                 vars.segment<3>(9 + 3 * k) = curPos.row(opp_vid);
             }
         }
@@ -525,7 +614,7 @@ void MidedgeAngleGeneralFormulation::test_compute_nibj(const MeshConnectivity& m
 
     auto from_variable = [&](const Eigen::VectorXd& vars, Eigen::MatrixXd& pos, Eigen::VectorXd& edge_dofs) {
         assert(vars.size() == 18 + 3 * numExtraDOFs);
-        for(int k = 0; k < 3; k++) {
+        for (int k = 0; k < 3; k++) {
             int vid = mesh.faceVertex(face, k);
             pos.row(vid) = vars.segment<3>(3 * k);
 
@@ -542,19 +631,21 @@ void MidedgeAngleGeneralFormulation::test_compute_nibj(const MeshConnectivity& m
     Eigen::MatrixXd pos = curPos;
     Eigen::VectorXd edge_dofs = edgeDOFs;
 
-    auto func = [&](const Eigen::VectorXd& x, Eigen::VectorXd* deriv, Eigen::SparseMatrix<double>* hessian, bool is_proj) {
+    auto func = [&](const Eigen::VectorXd& x, Eigen::VectorXd* deriv, Eigen::SparseMatrix<double>* hessian,
+                    bool is_proj) {
         from_variable(x, pos, edge_dofs);
         Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs> dense_deriv;
         Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> dense_hess;
-        double val = compute_nibj(mesh, pos, edge_dofs, face, i, j, deriv ? &dense_deriv : nullptr, hessian ? &dense_hess : nullptr);
-        if(deriv) {
+        double val = compute_nibj(mesh, pos, edge_dofs, face, i, j, deriv ? &dense_deriv : nullptr,
+                                  hessian ? &dense_hess : nullptr);
+        if (deriv) {
             *deriv = dense_deriv.transpose();
         }
-        if(hessian) {
+        if (hessian) {
             std::vector<Eigen::Triplet<double>> T;
-            for(int k = 0; k < dense_hess.rows(); k++) {
-                for(int l = 0; l < dense_hess.cols(); l++) {
-                    if(dense_hess(k, l) != 0) {
+            for (int k = 0; k < dense_hess.rows(); k++) {
+                for (int l = 0; l < dense_hess.cols(); l++) {
+                    if (dense_hess(k, l) != 0) {
                         T.push_back(Eigen::Triplet<double>(k, l, dense_hess(k, l)));
                     }
                 }
@@ -568,18 +659,18 @@ void MidedgeAngleGeneralFormulation::test_compute_nibj(const MeshConnectivity& m
 }
 
 void MidedgeAngleGeneralFormulation::test_second_fund_form(const MeshConnectivity& mesh,
-                                                       const Eigen::MatrixXd& curPos,
-                                                       const Eigen::VectorXd& edgeDOFs,
-                                                       int face) {
+                                                           const Eigen::MatrixXd& curPos,
+                                                           const Eigen::VectorXd& edgeDOFs,
+                                                           int face) {
     auto to_variables = [&]() {
         Eigen::VectorXd vars(18 + 3 * numExtraDOFs);
         vars.setZero();
-        for(int k = 0; k < 3; k++) {
+        for (int k = 0; k < 3; k++) {
             int vid = mesh.faceVertex(face, k);
             vars.segment<3>(3 * k) = curPos.row(vid);
 
             int opp_vid = mesh.vertexOppositeFaceEdge(face, k);
-            if(opp_vid != -1) {
+            if (opp_vid != -1) {
                 vars.segment<3>(9 + 3 * k) = curPos.row(opp_vid);
             }
 
@@ -591,7 +682,7 @@ void MidedgeAngleGeneralFormulation::test_second_fund_form(const MeshConnectivit
 
     auto from_variable = [&](const Eigen::VectorXd& vars, Eigen::MatrixXd& pos, Eigen::VectorXd& edge_dofs) {
         assert(vars.size() == 18 + 3 * numExtraDOFs);
-        for(int k = 0; k < 3; k++) {
+        for (int k = 0; k < 3; k++) {
             int vid = mesh.faceVertex(face, k);
             pos.row(vid) = vars.segment<3>(3 * k);
 
@@ -611,19 +702,21 @@ void MidedgeAngleGeneralFormulation::test_second_fund_form(const MeshConnectivit
 
     int selected_entry = 0;
 
-    auto func = [&](const Eigen::VectorXd& x, Eigen::VectorXd* deriv, Eigen::SparseMatrix<double>* hessian, bool is_proj) {
+    auto func = [&](const Eigen::VectorXd& x, Eigen::VectorXd* deriv, Eigen::SparseMatrix<double>* hessian,
+                    bool is_proj) {
         from_variable(x, pos, edge_dofs);
         Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs> dense_deriv;
         std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>> dense_hess;
-        Eigen::Matrix2d II = secondFundamentalForm(mesh, pos, edge_dofs, face, deriv ? &dense_deriv : nullptr, hessian ? &dense_hess : nullptr);
-        if(deriv) {
+        Eigen::Matrix2d II = secondFundamentalForm(mesh, pos, edge_dofs, face, deriv ? &dense_deriv : nullptr,
+                                                   hessian ? &dense_hess : nullptr);
+        if (deriv) {
             *deriv = dense_deriv.row(selected_entry).transpose();
         }
-        if(hessian) {
+        if (hessian) {
             std::vector<Eigen::Triplet<double>> T;
-            for(int k = 0; k < dense_hess[selected_entry].rows(); k++) {
-                for(int l = 0; l < dense_hess[selected_entry].cols(); l++) {
-                    if(dense_hess[selected_entry](k, l) != 0) {
+            for (int k = 0; k < dense_hess[selected_entry].rows(); k++) {
+                for (int l = 0; l < dense_hess[selected_entry].cols(); l++) {
+                    if (dense_hess[selected_entry](k, l) != 0) {
                         T.push_back(Eigen::Triplet<double>(k, l, dense_hess[selected_entry](k, l)));
                     }
                 }
@@ -635,9 +728,10 @@ void MidedgeAngleGeneralFormulation::test_second_fund_form(const MeshConnectivit
         int col = selected_entry % 2;
         return II(row, col);
     };
-    for(int i = 0; i < 2; i++) {
-        for(int j = 0; j < 2; j++) {
-            std::cout << "======================= test (" << i << ", " << j << ") entry =======================" << std::endl;
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+            std::cout << "======================= test (" << i << ", " << j
+                      << ") entry =======================" << std::endl;
             selected_entry = i * 2 + j;
             TestFuncGradHessian(func, vars);
         }
@@ -654,16 +748,13 @@ void MidedgeAngleGeneralFormulation::get_per_edge_face_sigma_zeta(const MeshConn
     sigma = edgeDOFs(edge * numExtraDOFs + 1);
     zeta = 0;
     int face_id = mesh.edgeFace(edge, face);
-    if(face_id == -1) {
+    if (face_id == -1) {
         return;
     }
-    double theta =
-           edgeTheta(mesh, curPos, edge, nullptr, nullptr);
+    double theta = edgeTheta(mesh, curPos, edge, nullptr, nullptr);
 
     double orient = face == 0 ? 1.0 : -1.0;
     zeta = orient * 0.5 * theta + edgeDOFs[numExtraDOFs * edge];
 }
-
-
 
 };  // namespace LibShell

@@ -315,4 +315,5 @@ template class ElasticShell<MidedgeAngleGeneralTanFormulation>;
 template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 9, 9>>& symA, const HessianProjectType& projType);
 template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 18, 18>>& symA, const HessianProjectType& projType);
 template void projSymMatrix(Eigen::MatrixBase<Eigen::Matrix<double, 21, 21>>& symA, const HessianProjectType& projType);
+template void projSymMatrix(Eigen::MatrixBase<Eigen::MatrixXd>& symA, const HessianProjectType& projType);
 };  // namespace LibShell

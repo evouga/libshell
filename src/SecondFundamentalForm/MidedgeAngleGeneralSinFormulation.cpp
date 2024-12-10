@@ -287,6 +287,74 @@ double MidedgeAngleGeneralSinFormulation::compute_nibj(const MeshConnectivity& m
     }
 }
 
+double MidedgeAngleGeneralSinFormulation::compute_niei(
+    const MeshConnectivity& mesh,
+    const Eigen::MatrixXd& curPos,
+    const Eigen::VectorXd& edgeDOFs,
+    int face,
+    int i,
+    Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
+    Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian) {
+    assert(i >= 0 && i < 3);
+    int efid = mesh.faceEdgeOrientation(face, i);
+    assert(efid == 0 || efid == 1);
+    int eid = mesh.faceEdge(face, i);
+
+    if (derivative) {
+        derivative->setZero();
+    }
+
+    if (hessian) {
+        hessian->setZero();
+    }
+
+    double sigma = edgeDOFs(eid * numExtraDOFs + 1);
+
+    int ev[2];
+    for (int k = 0; k < 3; k++) {
+        if (mesh.faceVertex(face, k) == mesh.edgeVertex(eid, 0)) {
+            ev[0] = k;
+        }
+        if (mesh.faceVertex(face, k) == mesh.edgeVertex(eid, 1)) {
+            ev[1] = k;
+        }
+    }
+
+    Eigen::Vector3d e = curPos.row(mesh.edgeVertex(eid, 1)) - curPos.row(mesh.edgeVertex(eid, 0));
+    Eigen::Vector3d norm_deriv;
+    Eigen::Matrix3d norm_hess;
+    double enorm = vec_norm(e, (derivative || hessian) ? &norm_deriv : nullptr, hessian ? &norm_hess : nullptr);
+
+    // ni^T bj = cos(sigma) |ei|
+    double sign = 1.0;
+    double res = std::cos(sigma) * enorm * sign;
+
+    if (derivative) {
+        (*derivative)(18 + i * numExtraDOFs + 1) = sign * -std::sin(sigma) * enorm;
+        derivative->block<1, 3>(0, 3 * ev[0]) = -sign * std::cos(sigma) * norm_deriv;
+        derivative->block<1, 3>(0, 3 * ev[1]) = sign * std::cos(sigma) * norm_deriv;
+    }
+
+    if (hessian) {
+        (*hessian)(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + 1) = -std::cos(sigma) * enorm * sign;
+        hessian->block<1, 3>(18 + i * numExtraDOFs + 1, 3 * ev[0]) =
+            std::sin(sigma) * sign * norm_deriv.transpose();
+        hessian->block<1, 3>(18 + i * numExtraDOFs + 1, 3 * ev[1]) =
+            -std::sin(sigma) * sign * norm_deriv.transpose();
+
+        hessian->block<3, 1>(3 * ev[0], 18 + i * numExtraDOFs + 1) = std::sin(sigma) * sign * norm_deriv;
+        hessian->block<3, 3>(3 * ev[0], 3 * ev[0]) = std::cos(sigma) * sign * norm_hess;
+        hessian->block<3, 3>(3 * ev[0], 3 * ev[1]) = -std::cos(sigma) * sign * norm_hess;
+
+        hessian->block<3, 1>(3 * ev[1], 18 + i * numExtraDOFs + 1) = -std::sin(sigma) * sign * norm_deriv;
+        hessian->block<3, 3>(3 * ev[1], 3 * ev[1]) = std::cos(sigma) * sign * norm_hess;
+        hessian->block<3, 3>(3 * ev[1], 3 * ev[0]) = -std::cos(sigma) * sign * norm_hess;
+    }
+
+    return res;
+}
+
+
 Eigen::Matrix2d MidedgeAngleGeneralSinFormulation::secondFundamentalForm(
     const MeshConnectivity& mesh,
     const Eigen::MatrixXd& curPos,

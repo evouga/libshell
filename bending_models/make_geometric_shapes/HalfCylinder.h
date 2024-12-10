@@ -9,7 +9,4 @@ void makeHalfCylinder(bool regular, double radius, double height, double triangl
     Eigen::MatrixXd& V,
     Eigen::MatrixXi& F);
 
-
-void getBoundaries(const Eigen::MatrixXi& F, std::vector<int>& bdryVertices);
-
 #endif

@@ -156,12 +156,3 @@ void makeHalfCylinder(bool regular, double radius, double height, double triangl
         F = F2;
     }
 }
-
-void getBoundaries(const Eigen::MatrixXi& F, std::vector<int>& bdryVertices)
-{
-    std::vector<std::vector<int> > boundaries;
-    igl::boundary_loop(F, boundaries);
-    assert(boundaries.size() == 1);
-
-    bdryVertices = boundaries[0];
-}

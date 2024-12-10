@@ -321,6 +321,150 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
     }
 }
 
+double MidedgeAngleGeneralTanFormulation::compute_niei(
+    const MeshConnectivity& mesh,
+    const Eigen::MatrixXd& curPos,
+    const Eigen::VectorXd& edgeDOFs,
+    int face,
+    int i,
+    Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
+    Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian){
+    assert(i >= 0 && i < 3);
+    int efid = mesh.faceEdgeOrientation(face, i);
+    assert(efid == 0 || efid == 1);
+    int eid = mesh.faceEdge(face, i);
+
+    if (derivative) {
+        derivative->setZero();
+    }
+
+    if (hessian) {
+        hessian->setZero();
+    }
+
+    double sigma = edgeDOFs(eid * numExtraDOFs + 1);
+
+    int ev[2];
+    for (int k = 0; k < 3; k++) {
+        if (mesh.faceVertex(face, k) == mesh.edgeVertex(eid, 0)) {
+            ev[0] = k;
+        }
+        if (mesh.faceVertex(face, k) == mesh.edgeVertex(eid, 1)) {
+            ev[1] = k;
+        }
+    }
+
+    Eigen::Vector3d e = curPos.row(mesh.edgeVertex(eid, 1)) - curPos.row(mesh.edgeVertex(eid, 0));
+    Eigen::Vector3d norm_deriv;
+    Eigen::Matrix3d norm_hess;
+    double enorm = vec_norm(e, (derivative || hessian) ? &norm_deriv : nullptr, hessian ? &norm_hess : nullptr);
+
+    Eigen::Matrix<double, 1, 12> thetaderiv;
+    Eigen::Matrix<double, 12, 12> thetahess;
+    double theta =
+        edgeTheta(mesh, curPos, eid, (derivative || hessian) ? &thetaderiv : nullptr, hessian ? &thetahess : nullptr);
+
+    int av[4];
+    if (mesh.faceEdgeOrientation(face, i) == 0) {
+        av[0] = (i + 1) % 3;
+        av[1] = (i + 2) % 3;
+        av[2] = i;
+        av[3] = 3 + i;
+    } else {
+        av[0] = (i + 2) % 3;
+        av[1] = (i + 1) % 3;
+        av[2] = 3 + i;
+        av[3] = i;
+    }
+
+    double orient = mesh.faceEdgeOrientation(face, i) == 0 ? 1.0 : -1.0;
+    double zeta = orient * 0.5 * theta + edgeDOFs[numExtraDOFs * eid];
+
+    double tan_cos = std::tan(sigma) * std::cos(zeta);
+
+    double cot_over_cos = std::cos(sigma) / std::sin(sigma) / std::cos(zeta);
+
+    Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs> cot_over_cos_deriv;
+    Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> cot_over_cos_hess;
+
+    Eigen::Matrix<double, 1, 9> norm_deriv_full;
+
+    Eigen::Matrix<double, 9, 9> norm_hess_full;
+
+    double cot_sigma = std::cos(sigma) / std::sin(sigma);
+    double dcot_sigma = -1.0 / (std::sin(sigma) * std::sin(sigma));
+    double hcot_sigma = 2.0 / (std::sin(sigma) * std::sin(sigma) * std::sin(sigma)) * std::cos(sigma);
+
+    double cos_zeta_inv = 1.0 / std::cos(zeta);
+    double dcos_zeta_inv = std::sin(zeta) / std::cos(zeta) / std::cos(zeta);
+    double hcos_zeta_inv = (1 + std::sin(zeta) * std::sin(zeta)) / (std::cos(zeta) * std::cos(zeta) * std::cos(zeta));
+
+    if(derivative || hessian) {
+        cot_over_cos_deriv.setZero();
+        for (int k = 0; k < 4; k++) {
+            cot_over_cos_deriv.block<1, 3>(0, 3 * av[k]) += 0.5 * orient * cot_sigma * dcos_zeta_inv * thetaderiv.block<1, 3>(0, 3 * k);
+        }
+        cot_over_cos_deriv(18 + i * numExtraDOFs) = cot_sigma * dcos_zeta_inv;
+        cot_over_cos_deriv(18 + i * numExtraDOFs + 1) = dcot_sigma * cos_zeta_inv;
+
+        norm_deriv_full.setZero();
+        norm_deriv_full.block<1, 3>(0, 3 * ev[0]) = -norm_deriv;
+        norm_deriv_full.block<1, 3>(0, 3 * ev[1]) = norm_deriv;
+
+        if(hessian) {
+            cot_over_cos_hess.setZero();
+            cot_over_cos_hess(18 + i * numExtraDOFs, 18 + i * numExtraDOFs) += cot_sigma * hcos_zeta_inv;
+            cot_over_cos_hess(18 + i * numExtraDOFs, 18 + i * numExtraDOFs + 1) += dcot_sigma * dcos_zeta_inv;
+            for(int k = 0; k < 4; k++) {
+                cot_over_cos_hess.block<1, 3>(18 + i * numExtraDOFs, 3 * av[k]) += 0.5 * orient * cot_sigma * hcos_zeta_inv * thetaderiv.block<1, 3>(0, 3 * k);
+            }
+
+            cot_over_cos_hess(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs) += dcot_sigma * dcos_zeta_inv;
+            cot_over_cos_hess(18 + i * numExtraDOFs + 1, 18 + i * numExtraDOFs + 1) += hcot_sigma * cos_zeta_inv;
+            for(int k = 0; k < 4; k++) {
+                cot_over_cos_hess.block<1, 3>(18 + i * numExtraDOFs + 1, 3 * av[k]) += orient * 0.5 * dcot_sigma * dcos_zeta_inv * thetaderiv.block<1, 3>(0, 3 * k);
+            }
+
+            for(int k = 0; k < 4; k++) {
+                for(int m = 0; m < 4; m++) {
+                    cot_over_cos_hess.block<3, 3>(3 * av[k], 3 * av[m]) += orient * 0.5 * cot_sigma * dcos_zeta_inv * thetahess.block<3, 3>(3 * k, 3 * m);
+                    cot_over_cos_hess.block<3, 3>(3 * av[k], 3 * av[m]) += 0.25 * cot_sigma * hcos_zeta_inv * thetaderiv.block<1, 3>(0, 3 * k).transpose() * thetaderiv.block<1, 3>(0, 3 * m);
+                }
+                cot_over_cos_hess.block<3, 1>(3 * av[k], 18 + i * numExtraDOFs) += 0.5 * orient * cot_sigma * hcos_zeta_inv * thetaderiv.block<1, 3>(0, 3 * k).transpose();
+
+                cot_over_cos_hess.block<3, 1>(3 * av[k], 18 + i * numExtraDOFs + 1) += orient * 0.5 * dcot_sigma * dcos_zeta_inv * thetaderiv.block<1, 3>(0, 3 * k).transpose();
+            }
+
+            norm_hess_full.setZero();
+            norm_hess_full.block<3, 3>(3 * ev[0], 3 * ev[0]) = norm_hess;
+            norm_hess_full.block<3, 3>(3 * ev[0], 3 * ev[1]) = -norm_hess;
+            norm_hess_full.block<3, 3>(3 * ev[1], 3 * ev[0]) = -norm_hess;
+            norm_hess_full.block<3, 3>(3 * ev[1], 3 * ev[1]) = norm_hess;
+        }
+    }
+
+
+    // ni^T bj = cot(σ) / cos(ζ) |ei|
+    double sign = 1;
+    double res = enorm / tan_cos * sign;
+
+    res = enorm * cot_over_cos * sign;
+
+    if (derivative) {
+        (*derivative) = sign * enorm * cot_over_cos_deriv;
+        derivative->block<1, 9>(0, 0) += sign * norm_deriv_full * cot_over_cos;
+    }
+
+    if (hessian) {
+        (*hessian) += sign * enorm * cot_over_cos_hess;
+        hessian->block<9, 18 + 3 * numExtraDOFs>(0, 0) += sign * norm_deriv_full.transpose() * cot_over_cos_deriv;
+        hessian->block<18 + 3 * numExtraDOFs, 9>(0, 0) += sign * cot_over_cos_deriv.transpose() * norm_deriv_full;
+        hessian->block<9, 9>(0, 0) += sign * norm_hess_full * cot_over_cos;
+    }
+    return res;
+}
+
+
 Eigen::Matrix2d MidedgeAngleGeneralTanFormulation::secondFundamentalForm(
     const MeshConnectivity& mesh,
     const Eigen::MatrixXd& curPos,

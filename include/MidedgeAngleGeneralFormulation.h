@@ -115,8 +115,7 @@ public:
      * @param[in] mesh:             the mesh connectivity
      * @param[in] curPos:           the current vertex positions
      */
-    static void initializeEdgeFaceBasisSign(const MeshConnectivity& mesh,
-                                           const Eigen::MatrixXd& curPos);
+    static void initializeEdgeFaceBasisSign(const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos);
 
     /*
      * Compute the second fundamental form for the specific face
@@ -179,7 +178,8 @@ public:
      * @param[in] face:             the face id in {0, 1}
      *
      * @param[out] sigma:           the angle between the edge direction d and the edge e
-     * @param[out] zeta:            the rotation angle from face normal nf to edge direction d with e as the rotation axis
+     * @param[out] zeta:            the rotation angle from face normal nf to edge direction d with e as the rotation
+     * axis
      */
     static void get_per_edge_face_sigma_zeta(const MeshConnectivity& mesh,
                                              const Eigen::MatrixXd& curPos,
@@ -233,6 +233,32 @@ public:
                                int face,
                                int i,
                                int j,
+                               Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
+                               Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian);
+
+    /*
+     * Compute ni^T ei
+     *
+     *
+     * @param[in] mesh:             the mesh connectivity
+     * @param[in] curPos:           the current vertex position
+     * @param[in] extraDOFs:        the current edge dofs
+     * @param[in] face:             the face id, where we want to compute the second fundamental form
+     * @param[in] i:                the index for edge normal, in {0, 1, 2}
+     *
+     * @param[out] derivative:      the derivative of ni^T ei
+     * @param[out] hessian:         the hessian of ni^T ei
+     *
+     * @return:                     ni^T ei
+     *
+     * @note:
+     * ni^T ei = mi cos(sigma_i) |ei|
+     */
+    static double compute_niei(const MeshConnectivity& mesh,
+                               const Eigen::MatrixXd& curPos,
+                               const Eigen::VectorXd& edgeDOFs,
+                               int face,
+                               int i,
                                Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
                                Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian);
     /*
