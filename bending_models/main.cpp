@@ -18,6 +18,7 @@
 #include "make_geometric_shapes/HalfCylinder.h"
 #include "make_geometric_shapes/Cylinder.h"
 #include "make_geometric_shapes/Sphere.h"
+#include "spdlog/fmt/bundled/chrono.h"
 
 #include <polyscope/surface_vector_quantity.h>
 #include <polyscope/polyscope.h>
@@ -683,7 +684,7 @@ Energies measureCylinderEnergy(const LibShell::MeshConnectivity& mesh,
     StVKS1DirectorTanShellEnergy stvk_s1_dir_tan_energy_model(mesh, s1_dir_rest_state);
     StVKS2DirectorSinShellEnergy stvk_s2_dir_sin_energy_model(mesh, s2_dir_rest_state);
     StVKS2DirectorTanShellEnergy stvk_s2_dir_tan_energy_model(mesh, s2_dir_rest_state);
-    StVKGeneralDirectorSinShellEnergy stvk_general_dir_energy_model(mesh, general_dir_rest_state);
+    StVKGeneralDirectorShellEnergy stvk_general_dir_energy_model(mesh, general_dir_rest_state);
 
     Eigen::VectorXd edge_area = Eigen::VectorXd::Zero(mesh.nEdges());
 
@@ -780,28 +781,28 @@ Energies measureCylinderEnergy(const LibShell::MeshConnectivity& mesh,
 
     result.exact = svnorm * coeff * area;
 
-    // std::vector<Eigen::Vector3d> tan_face_edge_normals = get_face_edge_normal_vectors(cur_pos, mesh, s2_dir_tan_edge_dofs, s2_tan_general_type);
-    // std::vector<Eigen::Vector3d> sin_face_edge_normals = get_face_edge_normal_vectors(cur_pos, mesh, s2_dir_sin_edge_dofs, s2_sin_general_type);
-    // std::vector<Eigen::Vector3d> general_face_edge_normals = get_face_edge_normal_vectors(cur_pos, mesh, general_dir_edge_dofs, general_type);
-    // std::vector<Eigen::Vector3d> mid_surface_face_edge_normals = get_midsurf_face_edge_normal_vectors(cur_pos, mesh);
-    // pt_mesh->addVectorQuantity("Tan Edge Normals", tan_face_edge_normals);
-    // pt_mesh->addVectorQuantity("Sin Edge Normals", sin_face_edge_normals);
-    // pt_mesh->addVectorQuantity("General Edge Normals", general_face_edge_normals);
-    // pt_mesh->addVectorQuantity("Mid Surface Edge Normals", mid_surface_face_edge_normals);
-    //
-    // std::vector<double> mag_comp_scalars, perp_scalars, mag_sq_change_scalars;
-    // for(int i = 0; i < mesh.nFaces(); i++) {
-    //     mag_comp_scalars.push_back(extra_energy_terms.compute_magnitude_compression_energy_perface(
-    //         general_dir_edge_dofs, mesh, i, nullptr, nullptr, false));
-    //     perp_scalars.push_back(extra_energy_terms.compute_vector_perp_tangent_energy_perface(cur_pos, general_dir_edge_dofs, mesh, s2_dir_rest_state.abars, i, nullptr, nullptr, false));
-    //     mag_sq_change_scalars.push_back(extra_energy_terms.compute_magnitude_sq_change_energy_perface(general_dir_edge_dofs, mesh, s2_dir_rest_state.abars, i, nullptr, nullptr, false));
-    // }
-    //
-    // surface_mesh->addFaceScalarQuantity("mag compression", mag_comp_scalars);
-    // auto perp_plot = surface_mesh->addFaceScalarQuantity("perp", perp_scalars);
-    // auto [min_val, max_val] = std::minmax_element(perp_scalars.begin(), perp_scalars.end());
-    // perp_plot->setMapRange({*min_val, *max_val});
-    // surface_mesh->addFaceScalarQuantity("mag sq change", mag_sq_change_scalars);
+    std::vector<Eigen::Vector3d> tan_face_edge_normals = get_face_edge_normal_vectors(cur_pos, mesh, s2_dir_tan_edge_dofs, s2_tan_general_type);
+    std::vector<Eigen::Vector3d> sin_face_edge_normals = get_face_edge_normal_vectors(cur_pos, mesh, s2_dir_sin_edge_dofs, s2_sin_general_type);
+    std::vector<Eigen::Vector3d> general_face_edge_normals = get_face_edge_normal_vectors(cur_pos, mesh, general_dir_edge_dofs, general_type);
+    std::vector<Eigen::Vector3d> mid_surface_face_edge_normals = get_midsurf_face_edge_normal_vectors(cur_pos, mesh);
+    pt_mesh->addVectorQuantity("Tan Edge Normals", tan_face_edge_normals);
+    pt_mesh->addVectorQuantity("Sin Edge Normals", sin_face_edge_normals);
+    pt_mesh->addVectorQuantity("General Edge Normals", general_face_edge_normals);
+    pt_mesh->addVectorQuantity("Mid Surface Edge Normals", mid_surface_face_edge_normals);
+
+    std::vector<double> mag_comp_scalars, perp_scalars, mag_sq_change_scalars;
+    for(int i = 0; i < mesh.nFaces(); i++) {
+        mag_comp_scalars.push_back(extra_energy_terms.compute_magnitude_compression_energy_perface(
+            general_dir_edge_dofs, mesh, i, nullptr, nullptr, false));
+        perp_scalars.push_back(extra_energy_terms.compute_vector_perp_tangent_energy_perface(cur_pos, general_dir_edge_dofs, mesh, s2_dir_rest_state.abars, i, nullptr, nullptr, false));
+        mag_sq_change_scalars.push_back(extra_energy_terms.compute_magnitude_sq_change_energy_perface(general_dir_edge_dofs, mesh, s2_dir_rest_state.abars, i, nullptr, nullptr, false));
+    }
+
+    surface_mesh->addFaceScalarQuantity("mag compression", mag_comp_scalars);
+    auto perp_plot = surface_mesh->addFaceScalarQuantity("perp", perp_scalars);
+    auto [min_val, max_val] = std::minmax_element(perp_scalars.begin(), perp_scalars.end());
+    perp_plot->setMapRange({*min_val, *max_val});
+    surface_mesh->addFaceScalarQuantity("mag sq change", mag_sq_change_scalars);
 
     return result;
 }
@@ -891,7 +892,7 @@ Energies measureSphereEnergy(const LibShell::MeshConnectivity& mesh,
     StVKS1DirectorTanShellEnergy stvk_s1_dir_tan_energy_model(mesh, s1_dir_rest_state);
     StVKS2DirectorSinShellEnergy stvk_s2_dir_sin_energy_model(mesh, s2_dir_rest_state);
     StVKS2DirectorTanShellEnergy stvk_s2_dir_tan_energy_model(mesh, s2_dir_rest_state);
-    StVKGeneralDirectorSinShellEnergy stvk_general_dir_energy_model(mesh, general_dir_rest_state);
+    StVKGeneralDirectorShellEnergy stvk_general_dir_energy_model(mesh, general_dir_rest_state);
 
     Eigen::VectorXd edge_area = Eigen::VectorXd::Zero(mesh.nEdges());
 
@@ -1077,7 +1078,7 @@ Energies measureFoldEnergy(const LibShell::MeshConnectivity& mesh,
     StVKS1DirectorTanShellEnergy stvk_s1_dir_tan_energy_model(mesh, s1_dir_rest_state);
     StVKS2DirectorSinShellEnergy stvk_s2_dir_sin_energy_model(mesh, s2_dir_rest_state);
     StVKS2DirectorTanShellEnergy stvk_s2_dir_tan_energy_model(mesh, s2_dir_rest_state);
-    StVKGeneralDirectorSinShellEnergy stvk_general_dir_energy_model(mesh, general_dir_rest_state);
+    StVKGeneralDirectorShellEnergy stvk_general_dir_energy_model(mesh, general_dir_rest_state);
 
     Eigen::VectorXd edge_area = Eigen::VectorXd::Zero(mesh.nEdges());
 
@@ -1226,11 +1227,11 @@ int main(int argc, char* argv[]) {
     cokeHeight = 1;
     sphereRadius = 0.05;
 
-    // triangleArea = 0.0000001;
-    triangleArea = 0.00001;
+    triangleArea = 0.005;
+    // triangleArea = 0.00001;
 
-    // curMeshType = MeshType::MT_CYLINDER_REGULAR;
-    curMeshType = MeshType::MT_CYLINDER_IRREGULAR;
+    curMeshType = MeshType::MT_CYLINDER_REGULAR;
+    // curMeshType = MeshType::MT_CYLINDER_IRREGULAR;
     // curMeshType = MeshType::MT_SPHERE;
     // curMeshType = MeshType::MT_FOLD_MESH;
 
@@ -1247,7 +1248,7 @@ int main(int argc, char* argv[]) {
     shear = youngs / (2.0 * (1.0 + poisson));
 
     // quad order
-    quad_order = 2;
+    quad_order = 3;
 
     Eigen::MatrixXd origV;
     Eigen::MatrixXd rolledV;
@@ -1321,63 +1322,134 @@ int main(int argc, char* argv[]) {
                  rolledV, F, 6.0 / 4 * M_PI);
         LibShell::MeshConnectivity mesh(F);
 
-        // polyscope::init();
-        //
-        // surface_mesh = polyscope::registerSurfaceMesh("Current mesh", rolledV, F);
-        // std::vector<Eigen::Vector3d> face_edge_midpts = {};
-        // for (int i = 0; i < mesh.nFaces(); i++) {
-        //     for (int j = 0; j < 3; j++) {
-        //         int eid = mesh.faceEdge(i, j);
-        //         Eigen::Vector3d midpt =
-        //             (rolledV.row(mesh.edgeVertex(eid, 0)) + rolledV.row(mesh.edgeVertex(eid, 1))) / 2.0;
-        //         face_edge_midpts.push_back(midpt);
-        //     }
-        // }
-        // pt_mesh = polyscope::registerPointCloud("Face edge midpoints", face_edge_midpts);
-        //
-        // polyscope::state::userCallback = [&]() {
-        //     if (ImGui::Button("Measure Fold Energy", ImVec2(-1, 0))) {
-        //         curenergies = measureCylinderEnergy(mesh, origV, rolledV, thickness, lame_alpha, lame_beta, cur_radius,
-        //                                         cur_height, nhForces, qbForces);
-        //
-        //         log << std::setw(15) << origV.rows() << "| " << std::setw(15) << curenergies.exact << "| " << std::setw(25)
-        //             << curenergies.quadratic_bending << "| " << std::setw(20) << curenergies.stvk << "| " << std::setw(20)
-        //             << curenergies.stvk_s1_dir_sin << "| " << std::setw(20) << curenergies.stvk_s1_dir_tan << "| "
-        //             << std::setw(20) << curenergies.stvk_s2_dir_sin << "| " << std::setw(20) << curenergies.stvk_s2_dir_tan
-        //             << "| " << std::setw(20) << curenergies.stvk_general_dir << std::endl;
-        //     }
-        // };
-        //
-        // polyscope::show();
-
-        for (int step = 0; step < steps; step++) {
-            curenergies = measureCylinderEnergy(mesh, origV, rolledV, thickness, lame_alpha, lame_beta, cur_radius,
-                                                cur_height, nhForces, qbForces);
-
-            log << std::setw(15) << origV.rows() << "| " << std::setw(15) << curenergies.exact << "| " << std::setw(25)
-                << curenergies.quadratic_bending << "| " << std::setw(20) << curenergies.stvk << "| " << std::setw(20)
-                << curenergies.stvk_s1_dir_sin << "| " << std::setw(20) << curenergies.stvk_s1_dir_tan << "| "
-                << std::setw(20) << curenergies.stvk_s2_dir_sin << "| " << std::setw(20) << curenergies.stvk_s2_dir_tan
-                << "| " << std::setw(20) << curenergies.stvk_general_dir << std::endl;
-            triangleArea *= multiplier;
-            makeHalfCylinder(curMeshType == MeshType::MT_CYLINDER_REGULAR, cokeRadius, cokeHeight, triangleArea, origV,
-                             rolledV, F);
-            mesh = LibShell::MeshConnectivity(F);
-        }
-    } else {
-        Eigen::MatrixXd fold_V;
-        gererated_foleded_mesh(1, 1, M_PI * 0.9, origV, F, fold_V);
-        LibShell::MeshConnectivity mesh(F);
         Eigen::VectorXd test_edge_dofs;
         LibShell::MidedgeAngleGeneralFormulation::initializeExtraDOFs(test_edge_dofs, mesh, origV);
         LibShell::ExtraEnergyTerms extra_terms;
         std::vector<Eigen::Matrix2d> abars;
         LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::firstFundamentalForms(mesh, origV,
                                                                                        abars);
-        extra_terms.initialization(origV, mesh, 1, 2, 1, 2);
+        extra_terms.initialization(origV, mesh, youngs, shear, thickness, quad_order);
+
+        double compression_energy = extra_terms.compute_magnitude_compression_energy(test_edge_dofs, mesh, nullptr, nullptr, false);
+        double change_sq_energy = extra_terms.compute_magnitude_sq_change_energy(test_edge_dofs, mesh, abars, nullptr, nullptr, false);
+
+        std::cout << "Compression energy: " << compression_energy << std::endl;
+        std::cout << "change sq energy: " << change_sq_energy << std::endl;
+
+
+        test_edge_dofs.setRandom();
+        test_edge_dofs *= 10;
+
+        int test_face = std::rand() % mesh.nFaces();
+        extra_terms.test_compute_vector_perp_tangent_energy(mesh, abars, origV, test_edge_dofs);
         extra_terms.test_compute_magnitude_compression_energy(mesh, test_edge_dofs);
-        extra_terms.test_compute_vector_perp_tangent_energy(mesh, abars, fold_V, test_edge_dofs);
         extra_terms.test_compute_magnitude_sq_change_energy(mesh, abars, test_edge_dofs);
+
+
+        {
+            std::cout << "======= Test energy terms under the change of basis =======" << std::endl;
+
+            // initialize the rest geometry of the shell
+            LibShell::MonolayerRestState rest_state;
+
+            // set uniform thicknesses
+            rest_state.thicknesses.resize(mesh.nFaces(), thickness);
+            rest_state.lameAlpha.resize(mesh.nFaces(), lame_alpha);
+            rest_state.lameBeta.resize(mesh.nFaces(), lame_beta);
+
+            // initialize first and second fundamental forms to those of input mesh
+            LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::firstFundamentalForms(mesh, origV,
+                                                                                               rest_state.abars);
+            LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::secondFundamentalForms(
+                mesh, origV, test_edge_dofs, rest_state.bbars);
+            for(int i = 0; i < rest_state.bbars.size(); i++) {
+                rest_state.bbars[i].setZero();
+            }
+            LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralFormulation> mat;
+
+            double test_bending = mat.bendingEnergy(mesh, origV, test_edge_dofs, rest_state, test_face, nullptr, nullptr);
+            std::cout << "bending energy: " << test_bending << std::endl;
+
+            Eigen::MatrixXi swapped_F = F;
+            swapped_F.col(0) = F.col(2);
+            swapped_F.col(1) = F.col(0);
+            swapped_F.col(2) = F.col(1);
+            LibShell::MeshConnectivity swapped_mesh(swapped_F);
+
+            auto rest_state_swapped = rest_state;
+            LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::firstFundamentalForms(swapped_mesh, origV,
+                                                                                               rest_state_swapped.abars);
+            double test_bending_swapped = mat.bendingEnergy(swapped_mesh, origV, test_edge_dofs, rest_state_swapped, test_face, nullptr, nullptr);
+            std::cout << "swapped bending energy: " << test_bending_swapped << std::endl;
+
+            std::cout << "Bending energy, before: " << test_bending << ", swapped: " << test_bending_swapped << ", difference: " << test_bending - test_bending_swapped << std::endl;
+
+            LibShell::ExtraEnergyTerms extra_energy_terms_swapped;
+            extra_energy_terms_swapped.initialization(origV, swapped_mesh, youngs, shear, thickness, quad_order);
+
+            double test_perp = extra_terms.compute_vector_perp_tangent_energy_perface(origV, test_edge_dofs, mesh, rest_state.abars, test_face, nullptr, nullptr, false);
+            double test_mag_compression = extra_terms.compute_magnitude_compression_energy_perface(test_edge_dofs, mesh, test_face, nullptr, nullptr, false);
+            double test_mag_sq_change = extra_terms.compute_magnitude_sq_change_energy_perface(test_edge_dofs, mesh, rest_state.abars, test_face, nullptr, nullptr, false);
+
+
+            double test_perp_swapped = extra_energy_terms_swapped.compute_vector_perp_tangent_energy_perface(origV, test_edge_dofs, swapped_mesh, rest_state_swapped.abars, test_face, nullptr, nullptr, false);
+            double test_mag_compression_swapped = extra_energy_terms_swapped.compute_magnitude_compression_energy_perface(test_edge_dofs, swapped_mesh, test_face, nullptr, nullptr, false);
+            double test_mag_sq_change_swapped = extra_energy_terms_swapped.compute_magnitude_sq_change_energy_perface(test_edge_dofs, swapped_mesh, rest_state_swapped.abars, test_face, nullptr, nullptr, false);
+
+            std::cout << "Extra energy terms" << std::endl;
+            std::cout << "||dr^n||^2,    before: " << test_perp << ", swapped: " << test_perp_swapped << ", difference: " << test_perp - test_perp_swapped << std::endl;
+            std::cout << "||m^2 - 1||^2, before: " << test_mag_compression << ", swapped: " << test_mag_compression_swapped << ", difference: " << test_mag_compression - test_mag_compression_swapped << std::endl;
+            std::cout << "||dm^2||^2,    before: " << test_mag_sq_change << ", swapped: " << test_mag_sq_change_swapped << ", difference: " << test_mag_sq_change - test_mag_sq_change_swapped << std::endl;
+        }
+
+        polyscope::init();
+
+        surface_mesh = polyscope::registerSurfaceMesh("Current mesh", rolledV, F);
+        std::vector<Eigen::Vector3d> face_edge_midpts = {};
+        for (int i = 0; i < mesh.nFaces(); i++) {
+            for (int j = 0; j < 3; j++) {
+                int eid = mesh.faceEdge(i, j);
+                Eigen::Vector3d midpt =
+                    (rolledV.row(mesh.edgeVertex(eid, 0)) + rolledV.row(mesh.edgeVertex(eid, 1))) / 2.0;
+                face_edge_midpts.push_back(midpt);
+            }
+        }
+        pt_mesh = polyscope::registerPointCloud("Face edge midpoints", face_edge_midpts);
+
+        polyscope::state::userCallback = [&]() {
+            if (ImGui::Button("Measure Fold Energy", ImVec2(-1, 0))) {
+                curenergies = measureCylinderEnergy(mesh, origV, rolledV, thickness, lame_alpha, lame_beta, cur_radius,
+                                                cur_height, nhForces, qbForces);
+
+                log << std::setw(15) << origV.rows() << "| " << std::setw(15) << curenergies.exact << "| " << std::setw(25)
+                    << curenergies.quadratic_bending << "| " << std::setw(20) << curenergies.stvk << "| " << std::setw(20)
+                    << curenergies.stvk_s1_dir_sin << "| " << std::setw(20) << curenergies.stvk_s1_dir_tan << "| "
+                    << std::setw(20) << curenergies.stvk_s2_dir_sin << "| " << std::setw(20) << curenergies.stvk_s2_dir_tan
+                    << "| " << std::setw(20) << curenergies.stvk_general_dir << std::endl;
+            }
+        };
+
+        polyscope::show();
+
+        // for (int step = 0; step < steps; step++) {
+        //     curenergies = measureCylinderEnergy(mesh, origV, rolledV, thickness, lame_alpha, lame_beta, cur_radius,
+        //                                         cur_height, nhForces, qbForces);
+        //
+        //     log << std::setw(15) << origV.rows() << "| " << std::setw(15) << curenergies.exact << "| " << std::setw(25)
+        //         << curenergies.quadratic_bending << "| " << std::setw(20) << curenergies.stvk << "| " << std::setw(20)
+        //         << curenergies.stvk_s1_dir_sin << "| " << std::setw(20) << curenergies.stvk_s1_dir_tan << "| "
+        //         << std::setw(20) << curenergies.stvk_s2_dir_sin << "| " << std::setw(20) << curenergies.stvk_s2_dir_tan
+        //         << "| " << std::setw(20) << curenergies.stvk_general_dir << std::endl;
+        //     triangleArea *= multiplier;
+        //     makeHalfCylinder(curMeshType == MeshType::MT_CYLINDER_REGULAR, cokeRadius, cokeHeight, triangleArea, origV,
+        //                      rolledV, F);
+        //     mesh = LibShell::MeshConnectivity(F);
+        // }
+    } else {
+        Eigen::MatrixXd fold_V;
+        gererated_foleded_mesh(1, 1, M_PI * 0.9, origV, F, fold_V);
+        LibShell::MeshConnectivity mesh(F);
+
 
         polyscope::init();
 

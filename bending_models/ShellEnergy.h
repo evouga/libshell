@@ -344,9 +344,9 @@ public:
     LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralTanFormulation> mat_;
 };
 
-class StVKGeneralDirectorSinShellEnergy : public ShellEnergy {
+class StVKGeneralDirectorShellEnergy : public ShellEnergy {
 public:
-    StVKGeneralDirectorSinShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
+    StVKGeneralDirectorShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
         : mesh_(mesh),
           restState_(restState),
           mat_() {}

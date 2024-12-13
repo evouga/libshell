@@ -114,6 +114,9 @@ double ElasticShell<SFF>::elasticEnergy(const MeshConnectivity& mesh,
             stretch_energies[i] =
                 mat.stretchingEnergy(mesh, curPos, restState, i, derivative ? &stretch_derivs[i] : nullptr,
                                      hessian ? &stretch_hessians[i] : nullptr);
+            if(hessian) {
+                projSymMatrix(stretch_hessians[i], projType);
+            }
         });
 
         for (int i = 0; i < nfaces; i++) {
@@ -125,7 +128,7 @@ double ElasticShell<SFF>::elasticEnergy(const MeshConnectivity& mesh,
             }
             if (hessian) {
                 Eigen::Matrix<double, 9, 9>& hess = stretch_hessians[i];
-                projSymMatrix(hess, projType);
+                // projSymMatrix(hess, projType);
                 for (int j = 0; j < 3; j++) {
                     for (int k = 0; k < 3; k++) {
                         for (int l = 0; l < 3; l++) {
@@ -157,19 +160,15 @@ double ElasticShell<SFF>::elasticEnergy(const MeshConnectivity& mesh,
             bend_hessians.resize(nfaces);
         }
 
-        // In S2 version of SFF, we update the static variable of edge_face_basis_sign
-        // We should actually rewrite the code to avoid this!
-        for(int i = 0; i < nfaces; i++) {
+
+        tbb::parallel_for(0, nfaces, [&](int i) {
             bend_energies[i] =
                 mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &bend_derivs[i] : nullptr,
                                   hessian ? &bend_hessians[i] : nullptr);
-        }
-
-        // tbb::parallel_for(0, nfaces, [&](int i) {
-        //     bend_energies[i] =
-        //         mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &bend_derivs[i] : nullptr,
-        //                           hessian ? &bend_hessians[i] : nullptr);
-        // });
+            if(hessian) {
+                projSymMatrix(bend_hessians[i], projType);
+            }
+        });
 
         for (int i = 0; i < nfaces; i++) {
             result += bend_energies[i];
@@ -189,7 +188,7 @@ double ElasticShell<SFF>::elasticEnergy(const MeshConnectivity& mesh,
             }
             if (hessian) {
                 Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs>& hess = bend_hessians[i];
-                projSymMatrix(hess, projType);
+                // projSymMatrix(hess, projType);
                 for (int j = 0; j < 3; j++) {
                     for (int k = 0; k < 3; k++) {
                         for (int l = 0; l < 3; l++) {

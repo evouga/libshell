@@ -96,7 +96,8 @@ public:
                                                          const Eigen::VectorXd& edge_dofs,
                                                          int face);
 
-private:
+// TODO: Change this to private
+public:
     std::vector<QuadraturePoint> m_quad_points;
     std::vector<double> m_face_area;
     double m_youngs;

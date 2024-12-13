@@ -23,40 +23,33 @@
 std::default_random_engine rng;
 
 const int nummats = 4;
-const int numsff = 5;    
+const int numsff = 5;
 
+template <class SFF>
+static void testStretchingFiniteDifferences(const LibShell::MeshConnectivity &mesh,
+                                            const Eigen::MatrixXd &curPos,
+                                            const LibShell::MaterialModel<SFF> &mat,
+                                            const LibShell::RestState &restState,
+                                            bool verbose,
+                                            FiniteDifferenceLog &log);
 
-template<class SFF>
-static void testStretchingFiniteDifferences(
-    const LibShell::MeshConnectivity &mesh,
-    const Eigen::MatrixXd &curPos,
-    const LibShell::MaterialModel<SFF> &mat,
-    const LibShell::RestState &restState,
-    bool verbose,
-    FiniteDifferenceLog &log);
+template <class SFF>
+static void testBendingFiniteDifferences(const LibShell::MeshConnectivity &mesh,
+                                         const Eigen::MatrixXd &curPos,
+                                         const Eigen::VectorXd &edgeDOFs,
+                                         const LibShell::MaterialModel<SFF> &mat,
+                                         const LibShell::RestState &restState,
+                                         bool verbose,
+                                         FiniteDifferenceLog &globalLog,
+                                         FiniteDifferenceLog &localLog);
 
-template<class SFF>
-static void testBendingFiniteDifferences(
-    const LibShell::MeshConnectivity &mesh,
-    const Eigen::MatrixXd &curPos,
-    const Eigen::VectorXd &edgeDOFs,
-    const LibShell::MaterialModel<SFF> &mat,
-    const LibShell::RestState &restState,
-    bool verbose,
-    FiniteDifferenceLog &globalLog,
-    FiniteDifferenceLog &localLog);
-
-
-void makeSquareMesh(int dim, Eigen::MatrixXd &V, Eigen::MatrixXi &F)
-{
-    V.resize(dim*dim, 3);
+void makeSquareMesh(int dim, Eigen::MatrixXd &V, Eigen::MatrixXi &F) {
+    V.resize(dim * dim, 3);
     F.resize(2 * (dim - 1) * (dim - 1), 3);
     int vrow = 0;
     int frow = 0;
-    for (int i = 0; i < dim; i++)
-    {
-        for (int j = 0; j < dim; j++)
-        {
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
             double y = -(i * 1.0 + (dim - i - 1) * -1.0) / double(dim - 1);
             double x = (j * 1.0 + (dim - j - 1) * -1.0) / double(dim - 1);
 
@@ -65,8 +58,7 @@ void makeSquareMesh(int dim, Eigen::MatrixXd &V, Eigen::MatrixXi &F)
             V(vrow, 2) = 0;
             vrow++;
 
-            if (i != 0 && j != 0)
-            {
+            if (i != 0 && j != 0) {
                 int iprev = i - 1;
                 int jprev = j - 1;
                 F(frow, 0) = iprev * dim + jprev;
@@ -82,20 +74,14 @@ void makeSquareMesh(int dim, Eigen::MatrixXd &V, Eigen::MatrixXi &F)
     }
 }
 
-void printDiffLog(const std::map<int, double> &difflog)
-{
-    for (auto it : difflog)
-    {
+void printDiffLog(const std::map<int, double> &difflog) {
+    for (auto it : difflog) {
         std::cout << it.first << "\t" << it.second << std::endl;
     }
 }
 
 template <class SFF>
-void differenceTest(const LibShell::MeshConnectivity &mesh,
-    const Eigen::MatrixXd &restPos,
-    int matid,
-    bool verbose)
-{
+void differenceTest(const LibShell::MeshConnectivity &mesh, const Eigen::MatrixXd &restPos, int matid, bool verbose) {
     Eigen::MatrixXd curPos = restPos;
     curPos.setRandom();
     const double PI = 3.14159263535898;
@@ -104,8 +90,7 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
     SFF::initializeExtraDOFs(edgeDOFs, mesh, curPos);
     int nedgeDOFs = (int)edgeDOFs.size();
     std::uniform_real_distribution<double> angdist(-PI / 2, PI / 2);
-    for (int i = 0; i < nedgeDOFs; i++)
-    {
+    for (int i = 0; i < nedgeDOFs; i++) {
         edgeDOFs[i] = angdist(rng);
     }
     std::vector<Eigen::Matrix2d> abar1;
@@ -122,22 +107,19 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
     // set abar2, bbar2 slightly different than abar1, bbar1 for testing bilayers
     std::vector<Eigen::Matrix2d> abar2;
     std::vector<Eigen::Matrix2d> bbar2;
-    for (int i = 0; i < nfaces; i++)
-    {
+    for (int i = 0; i < nfaces; i++) {
         abar2.push_back(0.9 * abar1[i]);
         bbar2.push_back(0.9 * bbar1[i]);
     }
 
-    for (int i = 0; i < nfaces; i++)
-    {
+    for (int i = 0; i < nfaces; i++) {
         thicknesses1[i] = std::pow(10.0, logThicknessDist(rng));
         thicknesses2[i] = std::pow(10.0, logThicknessDist(rng));
     }
 
     std::uniform_real_distribution<double> loglamedist(-1, 1);
 
-    for (int lameiter1 = 0; lameiter1 < 2; lameiter1++)
-    {
+    for (int lameiter1 = 0; lameiter1 < 2; lameiter1++) {
         double lameAlpha1 = 0;
         double lameBeta1 = 0;
         (lameiter1 == 1 ? lameAlpha1 : lameBeta1) = std::pow(10.0, loglamedist(rng));
@@ -146,8 +128,7 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
         std::vector<double> lameBeta1v;
         lameBeta1v.resize(nfaces, lameBeta1);
 
-        for (int lameiter2 = 0; lameiter2 < 2; lameiter2++)
-        {
+        for (int lameiter2 = 0; lameiter2 < 2; lameiter2++) {
             double lameAlpha2 = 0;
             double lameBeta2 = 0;
             (lameiter2 == 1 ? lameAlpha2 : lameBeta2) = std::pow(10.0, loglamedist(rng));
@@ -158,99 +139,86 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
 
             bool skip = false;
 
-            LibShell::MaterialModel<SFF>* mat;
-            LibShell::RestState* restState;
+            LibShell::MaterialModel<SFF> *mat;
+            LibShell::RestState *restState;
 
-            switch (matid)
-            {
-            case 0:
-            {
-                if (lameiter1 != lameiter2)
-                {
-                    skip = true;
+            switch (matid) {
+                case 0: {
+                    if (lameiter1 != lameiter2) {
+                        skip = true;
+                    } else {
+                        std::cout << "NeoHookeanMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1
+                                  << std::endl;
+                        mat = new LibShell::NeoHookeanMaterial<SFF>();
+                        LibShell::MonolayerRestState *rs = new LibShell::MonolayerRestState;
+                        rs->thicknesses = thicknesses1;
+                        rs->abars = abar1;
+                        rs->bbars = bbar1;
+                        rs->lameAlpha = lameAlpha1v;
+                        rs->lameBeta = lameBeta1v;
+                        restState = rs;
+                    }
+                    break;
                 }
-                else
-                {
-                    std::cout << "NeoHookeanMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1 << std::endl;
-                    mat = new LibShell::NeoHookeanMaterial<SFF>();
-                    LibShell::MonolayerRestState* rs = new LibShell::MonolayerRestState;
-                    rs->thicknesses = thicknesses1;
-                    rs->abars = abar1;
-                    rs->bbars = bbar1;
-                    rs->lameAlpha = lameAlpha1v;
-                    rs->lameBeta = lameBeta1v;
+                case 1: {
+                    if (lameiter1 != lameiter2) {
+                        skip = true;
+                    } else {
+                        std::cout << "StVKMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1 << std::endl;
+                        mat = new LibShell::StVKMaterial<SFF>();
+                        LibShell::MonolayerRestState *rs = new LibShell::MonolayerRestState;
+                        rs->thicknesses = thicknesses1;
+                        rs->abars = abar1;
+                        rs->bbars = bbar1;
+                        rs->lameAlpha = lameAlpha1v;
+                        rs->lameBeta = lameBeta1v;
+                        restState = rs;
+                    }
+                    break;
+                }
+                case 2: {
+                    if (lameiter1 != lameiter2) {
+                        skip = true;
+                    } else {
+                        std::cout << "TensionFieldStVKMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1
+                                  << std::endl;
+                        mat = new LibShell::TensionFieldStVKMaterial<SFF>();
+                        LibShell::MonolayerRestState *rs = new LibShell::MonolayerRestState;
+                        rs->thicknesses = thicknesses1;
+                        rs->abars = abar1;
+                        rs->bbars = bbar1;
+                        rs->lameAlpha = lameAlpha1v;
+                        rs->lameBeta = lameBeta1v;
+                        restState = rs;
+                    }
+                    break;
+                }
+                case 3: {
+                    std::cout << "BilayerStVKMaterial, alpha1 = " << lameAlpha1 << ", beta1 = " << lameBeta1
+                              << ", alpha2 = " << lameAlpha2 << ", beta2 = " << lameBeta2 << std::endl;
+                    mat = new LibShell::BilayerStVKMaterial<SFF>();
+                    LibShell::BilayerRestState *rs = new LibShell::BilayerRestState;
+                    rs->layers[0].thicknesses = thicknesses1;
+                    rs->layers[1].thicknesses = thicknesses2;
+                    rs->layers[0].abars = abar1;
+                    rs->layers[1].abars = abar2;
+                    rs->layers[0].bbars = bbar1;
+                    rs->layers[1].bbars = bbar2;
+                    rs->layers[0].lameAlpha = lameAlpha1v;
+                    rs->layers[0].lameBeta = lameBeta1v;
+                    rs->layers[1].lameAlpha = lameAlpha2v;
+                    rs->layers[1].lameBeta = lameBeta2v;
                     restState = rs;
+                    break;
                 }
-                break;
-            }
-            case 1:
-            {
-                if (lameiter1 != lameiter2)
-                {
-                    skip = true;
-                }
-                else
-                {
-                    std::cout << "StVKMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1 << std::endl;
-                    mat = new LibShell::StVKMaterial<SFF>();
-                    LibShell::MonolayerRestState* rs = new LibShell::MonolayerRestState;
-                    rs->thicknesses = thicknesses1;
-                    rs->abars = abar1;
-                    rs->bbars = bbar1;
-                    rs->lameAlpha = lameAlpha1v;
-                    rs->lameBeta = lameBeta1v;
-                    restState = rs;
-                }
-                break;
-            }
-            case 2:
-            {
-                if (lameiter1 != lameiter2)
-                {
-                    skip = true;
-                }
-                else
-                {
-                    std::cout << "TensionFieldStVKMaterial, alpha = " << lameAlpha1 << ", beta = " << lameBeta1 << std::endl;
-                    mat = new LibShell::TensionFieldStVKMaterial<SFF>();
-                    LibShell::MonolayerRestState* rs = new LibShell::MonolayerRestState;
-                    rs->thicknesses = thicknesses1;
-                    rs->abars = abar1;
-                    rs->bbars = bbar1;
-                    rs->lameAlpha = lameAlpha1v;
-                    rs->lameBeta = lameBeta1v;
-                    restState = rs;
-                }
-                break;
-            }
-            case 3:
-            {
-                std::cout << "BilayerStVKMaterial, alpha1 = " << lameAlpha1 << ", beta1 = " << lameBeta1 << ", alpha2 = " << lameAlpha2 << ", beta2 = " << lameBeta2 << std::endl;
-                mat = new LibShell::BilayerStVKMaterial<SFF>();
-                LibShell::BilayerRestState* rs = new LibShell::BilayerRestState;
-                rs->layers[0].thicknesses = thicknesses1;
-                rs->layers[1].thicknesses = thicknesses2;
-                rs->layers[0].abars = abar1;
-                rs->layers[1].abars = abar2;
-                rs->layers[0].bbars = bbar1;
-                rs->layers[1].bbars = bbar2;
-                rs->layers[0].lameAlpha = lameAlpha1v;
-                rs->layers[0].lameBeta = lameBeta1v;
-                rs->layers[1].lameAlpha = lameAlpha2v;
-                rs->layers[1].lameBeta = lameBeta2v;
-                restState = rs;
-                break;
-            }
-            default:
-                assert(false);
+                default:
+                    assert(false);
             }
 
-            if (skip)
-                continue;
+            if (skip) continue;
 
             curPos.setRandom();
-            for (int i = 0; i < nedgeDOFs; i++)
-            {
+            for (int i = 0; i < nedgeDOFs; i++) {
                 edgeDOFs[i] = angdist(rng);
             }
 
@@ -261,7 +229,8 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
 
             FiniteDifferenceLog globalBendingLog;
             FiniteDifferenceLog localBendingLog;
-            testBendingFiniteDifferences(mesh, curPos, edgeDOFs, *mat, *restState, verbose, globalBendingLog, localBendingLog);
+            testBendingFiniteDifferences(mesh, curPos, edgeDOFs, *mat, *restState, verbose, globalBendingLog,
+                                         localBendingLog);
             std::cout << "Bending (global):" << std::endl;
             globalBendingLog.printStats();
             std::cout << "Bending (stencil):" << std::endl;
@@ -274,25 +243,23 @@ void differenceTest(const LibShell::MeshConnectivity &mesh,
     }
 }
 
-template<class SFF> 
-double bilayerTest(const LibShell::MeshConnectivity& mesh,
-    const Eigen::MatrixXd& restPos,
-    const Eigen::VectorXd& thicknesses,    
-    double lameAlpha, double lameBeta)
-{    
+template <class SFF>
+double bilayerTest(const LibShell::MeshConnectivity &mesh,
+                   const Eigen::MatrixXd &restPos,
+                   const Eigen::VectorXd &thicknesses,
+                   double lameAlpha,
+                   double lameBeta) {
     Eigen::MatrixXd curPos = restPos;
     curPos.setRandom();
     Eigen::VectorXd edgeDOFs;
     SFF::initializeExtraDOFs(edgeDOFs, mesh, curPos);
     int nedgeDOFs = (int)edgeDOFs.size();
 
-
     LibShell::MonolayerRestState monoRestState;
     monoRestState.thicknesses.resize(mesh.nFaces());
     monoRestState.lameAlpha.resize(mesh.nFaces());
     monoRestState.lameBeta.resize(mesh.nFaces());
-    for (int i = 0; i < mesh.nFaces(); i++)
-    {
+    for (int i = 0; i < mesh.nFaces(); i++) {
         monoRestState.thicknesses[i] = thicknesses[i];
         monoRestState.lameAlpha[i] = lameAlpha;
         monoRestState.lameBeta[i] = lameBeta;
@@ -305,8 +272,7 @@ double bilayerTest(const LibShell::MeshConnectivity& mesh,
     biRestState.layers[0].lameBeta.resize(mesh.nFaces());
     biRestState.layers[1].lameAlpha.resize(mesh.nFaces());
     biRestState.layers[1].lameBeta.resize(mesh.nFaces());
-    for (int i = 0; i < mesh.nFaces(); i++)
-    {
+    for (int i = 0; i < mesh.nFaces(); i++) {
         biRestState.layers[0].thicknesses[i] = thicknesses[i];
         biRestState.layers[1].thicknesses[i] = thicknesses[i];
         biRestState.layers[0].lameAlpha[i] = lameAlpha;
@@ -322,36 +288,33 @@ double bilayerTest(const LibShell::MeshConnectivity& mesh,
     LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, restPos, biRestState.layers[1].abars);
     LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, restPos, edgeDOFs, biRestState.layers[0].bbars);
     LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, restPos, edgeDOFs, biRestState.layers[1].bbars);
-    
+
     LibShell::StVKMaterial<SFF> monomat;
     LibShell::BilayerStVKMaterial<SFF> bimat;
 
-    double energy1 = LibShell::ElasticShell<SFF>::elasticEnergy(
-        mesh, curPos, edgeDOFs, monomat, monoRestState, NULL, NULL,
-        LibShell::HessianProjectType::kNone);
-    double energy2 = LibShell::ElasticShell<SFF>::elasticEnergy(
-        mesh, curPos, edgeDOFs, bimat, biRestState, NULL, NULL,
-        LibShell::HessianProjectType::kNone);
-    
+    double energy1 = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, monomat, monoRestState, NULL,
+                                                                NULL, LibShell::HessianProjectType::kNone);
+    double energy2 = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, bimat, biRestState, NULL, NULL,
+                                                                LibShell::HessianProjectType::kNone);
+
     return std::fabs(energy1 - energy2);
 }
 
-template<class SFF> 
-void getHessian(const LibShell::MeshConnectivity &mesh, 
-    const Eigen::MatrixXd &curPos, 
-    const Eigen::VectorXd &thicknesses, 
-    int matid,
-    double lameAlpha, double lameBeta,
-    Eigen::SparseMatrix<double> &H)
-{
+template <class SFF>
+void getHessian(const LibShell::MeshConnectivity &mesh,
+                const Eigen::MatrixXd &curPos,
+                const Eigen::VectorXd &thicknesses,
+                int matid,
+                double lameAlpha,
+                double lameBeta,
+                Eigen::SparseMatrix<double> &H) {
     Eigen::VectorXd edgeDOFs;
     SFF::initializeExtraDOFs(edgeDOFs, mesh, curPos);
     int nedgeDOFs = (int)edgeDOFs.size();
 
     LibShell::MonolayerRestState restState;
     restState.thicknesses.resize(mesh.nFaces());
-    for (int i = 0; i < mesh.nFaces(); i++)
-        restState.thicknesses[i] = thicknesses[i];
+    for (int i = 0; i < mesh.nFaces(); i++) restState.thicknesses[i] = thicknesses[i];
 
     restState.lameAlpha.resize(mesh.nFaces(), lameAlpha);
     restState.lameBeta.resize(mesh.nFaces(), lameBeta);
@@ -359,30 +322,28 @@ void getHessian(const LibShell::MeshConnectivity &mesh,
     LibShell::ElasticShell<SFF>::firstFundamentalForms(mesh, curPos, restState.abars);
     LibShell::ElasticShell<SFF>::secondFundamentalForms(mesh, curPos, edgeDOFs, restState.bbars);
 
-    std::vector<Eigen::Triplet<double> > hessian;
+    std::vector<Eigen::Triplet<double>> hessian;
 
     LibShell::MaterialModel<SFF> *mat;
-    switch (matid)
-    {
-    case 0:
-        mat = new LibShell::NeoHookeanMaterial<SFF>();
-        break;
-    case 1:
-        mat = new LibShell::StVKMaterial<SFF>();
-        break;
-    case 2:
-        mat = new LibShell::TensionFieldStVKMaterial<SFF>();
-        break;
-    case 3:
-        H.resize(0, 0);
-        return;
-    default:
-        assert(false);
+    switch (matid) {
+        case 0:
+            mat = new LibShell::NeoHookeanMaterial<SFF>();
+            break;
+        case 1:
+            mat = new LibShell::StVKMaterial<SFF>();
+            break;
+        case 2:
+            mat = new LibShell::TensionFieldStVKMaterial<SFF>();
+            break;
+        case 3:
+            H.resize(0, 0);
+            return;
+        default:
+            assert(false);
     }
 
-    LibShell::ElasticShell<SFF>::elasticEnergy(
-        mesh, curPos, edgeDOFs, *mat, restState, NULL, &hessian,
-        LibShell::HessianProjectType::kNone);
+    LibShell::ElasticShell<SFF>::elasticEnergy(mesh, curPos, edgeDOFs, *mat, restState, NULL, &hessian,
+                                               LibShell::HessianProjectType::kNone);
 
     int nverts = curPos.rows();
     int nedges = mesh.nEdges();
@@ -393,119 +354,107 @@ void getHessian(const LibShell::MeshConnectivity &mesh,
     delete mat;
 }
 
-
-void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::MatrixXd &restPos)
-{
+void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::MatrixXd &restPos) {
     std::uniform_real_distribution<double> logThicknessDist(-6, 0);
     int nfaces = mesh.nFaces();
     Eigen::VectorXd thicknesses(nfaces);
-    for (int i = 0; i < nfaces; i++)
-    {
+    for (int i = 0; i < nfaces; i++) {
         thicknesses[i] = std::pow(10.0, logThicknessDist(rng));
     }
 
     std::uniform_real_distribution<double> loglamedist(-1, 1);
 
-    for (int lameiter = 0; lameiter < 2; lameiter++)
-    {
+    for (int lameiter = 0; lameiter < 2; lameiter++) {
         double lameAlpha = 0;
         double lameBeta = 0;
         (lameiter == 1 ? lameAlpha : lameBeta) = std::pow(10.0, loglamedist(rng));
         std::cout << "Testing with alpha = " << lameAlpha << ", beta = " << lameBeta << std::endl;
-        
+
         int numoptions = nummats * numsff;
-        std::vector<Eigen::SparseMatrix<double> > hessians(numoptions);
-        for (int i = 0; i < nummats; i++)
-        {
-            for (int j = 0; j < numsff; j++)
-            {
-                switch (j)
-                {
-                case 0:
-                    getHessian<LibShell::MidedgeAngleTanFormulation>(mesh, restPos, thicknesses, i, lameAlpha, lameBeta, hessians[i*numsff + j]);
-                    break;
-                case 1:
-                    getHessian<LibShell::MidedgeAngleSinFormulation>(mesh, restPos, thicknesses, i, lameAlpha, lameBeta, hessians[i*numsff + j]);
-                    break;
-                case 2:
-                    getHessian<LibShell::MidedgeAverageFormulation>(mesh, restPos, thicknesses, i, lameAlpha, lameBeta, hessians[i*numsff + j]);
-                    break;
-                case 3:
-                    getHessian<LibShell::MidedgeAngleThetaFormulation>(mesh, restPos, thicknesses, i, lameAlpha, lameBeta,
-                                                                     hessians[i * numsff + j]);
-                    break;
-                case 4:
-                    getHessian<LibShell::MidedgeAngleCompressiveFormulation>(mesh, restPos, thicknesses, i, lameAlpha,
-                                                                             lameBeta, hessians[i * numsff + j]);
-                    break;
-                default:
-                    assert(false);
-                }                
+        std::vector<Eigen::SparseMatrix<double>> hessians(numoptions);
+        for (int i = 0; i < nummats; i++) {
+            for (int j = 0; j < numsff; j++) {
+                switch (j) {
+                    case 0:
+                        getHessian<LibShell::MidedgeAngleTanFormulation>(mesh, restPos, thicknesses, i, lameAlpha,
+                                                                         lameBeta, hessians[i * numsff + j]);
+                        break;
+                    case 1:
+                        getHessian<LibShell::MidedgeAngleSinFormulation>(mesh, restPos, thicknesses, i, lameAlpha,
+                                                                         lameBeta, hessians[i * numsff + j]);
+                        break;
+                    case 2:
+                        getHessian<LibShell::MidedgeAverageFormulation>(mesh, restPos, thicknesses, i, lameAlpha,
+                                                                        lameBeta, hessians[i * numsff + j]);
+                        break;
+                    case 3:
+                        getHessian<LibShell::MidedgeAngleThetaFormulation>(mesh, restPos, thicknesses, i, lameAlpha,
+                                                                           lameBeta, hessians[i * numsff + j]);
+                        break;
+                    case 4:
+                        getHessian<LibShell::MidedgeAngleCompressiveFormulation>(
+                            mesh, restPos, thicknesses, i, lameAlpha, lameBeta, hessians[i * numsff + j]);
+                        break;
+                    default:
+                        assert(false);
+                }
             }
         }
-        for (int i = 0; i < nummats; i++)
-        {
-            for (int j = 0; j < numsff; j++)
-            {
-                for (int k = 0; k < nummats; k++)
-                {
-                    for (int l = 4; l < numsff; l++)
-                    {
+        for (int i = 0; i < nummats; i++) {
+            for (int j = 0; j < numsff; j++) {
+                for (int k = 0; k < nummats; k++) {
+                    for (int l = 4; l < numsff; l++) {
                         // ignore TensionField material
-                        if (i == 2 || k == 2)
-                            continue;
+                        if (i == 2 || k == 2) continue;
                         // ignore BilayerStVK material
-                        if (i == 3 || k == 3)
-                            continue;
+                        if (i == 3 || k == 3) continue;
                         int idx1 = i * numsff + j;
                         int idx2 = k * numsff + l;
-                        if (idx2 <= idx1)
-                            continue;
-                        std::string matnames[] = { "Neohk", "StVK" };
+                        if (idx2 <= idx1) continue;
+                        std::string matnames[] = {"Neohk", "StVK"};
                         std::string sffnames[] = {"Tan", "Sin", "Avg", "Theta", "Compressive-tan"};
-                        std::cout << "(" << matnames[i] << ", " << sffnames[j] << ") vs (" << matnames[k] << ", " << sffnames[l] << "): ";
+                        std::cout << "(" << matnames[i] << ", " << sffnames[j] << ") vs (" << matnames[k] << ", "
+                                  << sffnames[l] << "): ";
                         double diff = 0;
                         int nverts = restPos.rows();
-                        for (int m = 0; m < 3 * nverts; m++)
-                        {
-                            for (int n = m; n < 3 * nverts; n++)
-                            {
+                        for (int m = 0; m < 3 * nverts; m++) {
+                            for (int n = m; n < 3 * nverts; n++) {
                                 diff += std::fabs(hessians[idx1].coeff(m, n) - hessians[idx2].coeff(m, n));
                             }
                         }
                         std::cout << diff << std::endl;
-                    }                    
+                    }
                 }
             }
         }
 
-
         // bilayer consistency tests
         std::cout << "Bilayer consistency tests: " << std::endl;
-        for (int j = 0; j < numsff; j++)
-        {
+        for (int j = 0; j < numsff; j++) {
             double diff = 0;
-            switch (j)
-            {
-            case 0:
-                diff = bilayerTest<LibShell::MidedgeAngleTanFormulation>(mesh, restPos, thicknesses, lameAlpha, lameBeta);
-                break;
-            case 1:
-                diff = bilayerTest<LibShell::MidedgeAngleSinFormulation>(mesh, restPos, thicknesses, lameAlpha, lameBeta);
-                break;
-            case 2:
-                diff = bilayerTest<LibShell::MidedgeAverageFormulation>(mesh, restPos, thicknesses, lameAlpha, lameBeta);
-                break;
-            case 3:
-                diff =
-                    bilayerTest<LibShell::MidedgeAngleThetaFormulation>(mesh, restPos, thicknesses, lameAlpha, lameBeta);
-                break;
-            case 4: 
-                diff = bilayerTest<LibShell::MidedgeAngleCompressiveFormulation>(mesh, restPos, thicknesses, lameAlpha,
-                                                                                 lameBeta);
-                break;
-            default:
-                assert(false);
+            switch (j) {
+                case 0:
+                    diff = bilayerTest<LibShell::MidedgeAngleTanFormulation>(mesh, restPos, thicknesses, lameAlpha,
+                                                                             lameBeta);
+                    break;
+                case 1:
+                    diff = bilayerTest<LibShell::MidedgeAngleSinFormulation>(mesh, restPos, thicknesses, lameAlpha,
+                                                                             lameBeta);
+                    break;
+                case 2:
+                    diff = bilayerTest<LibShell::MidedgeAverageFormulation>(mesh, restPos, thicknesses, lameAlpha,
+                                                                            lameBeta);
+                    break;
+                case 3:
+                    diff = bilayerTest<LibShell::MidedgeAngleThetaFormulation>(mesh, restPos, thicknesses, lameAlpha,
+                                                                               lameBeta);
+                    break;
+                case 4:
+                    diff = bilayerTest<LibShell::MidedgeAngleCompressiveFormulation>(mesh, restPos, thicknesses,
+                                                                                     lameAlpha, lameBeta);
+                    break;
+                default:
+                    assert(false);
             }
             std::string sffnames[] = {"Tan", "Sin", "Avg", "Theta", "Compressive-tan"};
             std::cout << "  - " << sffnames[j] << ": " << diff << std::endl;
@@ -513,7 +462,11 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
     }
 }
 
-template <class SFF> bool general_II_derivative_test(const Eigen::MatrixXd& V, const LibShell::MeshConnectivity& mesh, const Eigen::VectorXd& edgeDOFs, int face) {
+template <class SFF>
+bool general_II_derivative_test(const Eigen::MatrixXd &V,
+                                const LibShell::MeshConnectivity &mesh,
+                                const Eigen::VectorXd &edgeDOFs,
+                                int face) {
     std::cout << "======================== Different Test for Elastic Energy ===========================\n";
     differenceTest<SFF>(mesh, V, 1, false);
 
@@ -525,14 +478,15 @@ template <class SFF> bool general_II_derivative_test(const Eigen::MatrixXd& V, c
     bool nibj_consistent = true;
 
     std::cout << "======================== Edge Normal dot Basis Test ===========================\n";
-    for(int i = 0; i < 3; i++) {
-        for(int j = 0; j < 2; j++) {
-            std::cout << "======================== edge: " << i << ", basis:  " << j << " ==========================="<< std::endl;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 2; j++) {
+            std::cout << "======================== edge: " << i << ", basis:  " << j
+                      << " ===========================" << std::endl;
 
             double nibj = SFF::compute_nibj(mesh, V, edgeDOFs, face, i, j, nullptr, nullptr);
             double nibj_rewrite = edge_normals[i].dot(bs[j]);
 
-            if(std::abs(nibj - nibj_rewrite) > 1e-10) {
+            if (std::abs(nibj - nibj_rewrite) > 1e-10) {
                 std::cout << "Mismatched nibj for edge: " << i << ", basis: " << j << std::endl;
                 std::cout << "nibj: " << nibj << ", nibj_rewrite: " << nibj_rewrite << std::endl;
                 nibj_consistent = false;
@@ -548,11 +502,13 @@ template <class SFF> bool general_II_derivative_test(const Eigen::MatrixXd& V, c
     std::cout << "======================== Second Fundamental Form Rewrite Test ===========================\n";
     Eigen::Matrix2d II = SFF::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
     Eigen::Matrix2d II_rewrite;
-    II_rewrite << 2 * (edge_normals[1] - edge_normals[0]).dot(bs[0]), (edge_normals[2] - edge_normals[0]).dot(bs[0]) + (edge_normals[1] - edge_normals[0]).dot(bs[1]),
-                  (edge_normals[1] - edge_normals[0]).dot(bs[1]) + (edge_normals[2] - edge_normals[0]).dot(bs[0]), 2 * (edge_normals[2] - edge_normals[0]).dot(bs[1]);
+    II_rewrite << 2 * (edge_normals[1] - edge_normals[0]).dot(bs[0]),
+        (edge_normals[2] - edge_normals[0]).dot(bs[0]) + (edge_normals[1] - edge_normals[0]).dot(bs[1]),
+        (edge_normals[1] - edge_normals[0]).dot(bs[1]) + (edge_normals[2] - edge_normals[0]).dot(bs[0]),
+        2 * (edge_normals[2] - edge_normals[0]).dot(bs[1]);
     II_rewrite *= -1;
 
-    if((II-II_rewrite).norm() > 1e-10) {
+    if ((II - II_rewrite).norm() > 1e-10) {
         std::cout << "Rewrite II mismatched for face: " << face << std::endl;
         std::cout << "II: \n" << II << std::endl;
         std::cout << "II_rewrite: \n" << II_rewrite << std::endl;
@@ -561,118 +517,140 @@ template <class SFF> bool general_II_derivative_test(const Eigen::MatrixXd& V, c
     return nibj_consistent;
 }
 
-void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshConnectivity& mesh) {
+void test_general_II_formulation(const Eigen::MatrixXd &V, const LibShell::MeshConnectivity &mesh) {
     int rand_face = std::rand() % mesh.nFaces();
 
-    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
-    std::cout << "---------------------------------- Testing General II Formulation Derivatives, Face id " << rand_face << " ---------------------------------\n";
-    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
+    std::cout << "-----------------------------------------------------------------------------------------------------"
+                 "-------------------\n";
+    std::cout << "---------------------------------- Testing General II Formulation Derivatives, Face id " << rand_face
+              << " ---------------------------------\n";
+    std::cout << "-----------------------------------------------------------------------------------------------------"
+                 "-------------------\n";
 
-    std::cout << "\n======================== Most General II Formulation ==========================="<< std::endl;
+    std::cout << "\n======================== Most General II Formulation ===========================" << std::endl;
     Eigen::VectorXd edgeDOFs;
     LibShell::MidedgeAngleGeneralFormulation::initializeExtraDOFs(edgeDOFs, mesh, V);
     edgeDOFs.setRandom();
-    bool nibj_formula_consistent = general_II_derivative_test<LibShell::MidedgeAngleGeneralFormulation>(V, mesh, edgeDOFs, rand_face);
+    bool nibj_formula_consistent =
+        general_II_derivative_test<LibShell::MidedgeAngleGeneralFormulation>(V, mesh, edgeDOFs, rand_face);
     std::cout << "ni^bj formula rewrite consistent: " << nibj_formula_consistent << std::endl;
 
-
-    std::cout << "\n======================== General II Formulation (Sin-based) ==========================="<< std::endl;
+    std::cout << "\n======================== General II Formulation (Sin-based) ==========================="
+              << std::endl;
     Eigen::VectorXd general_sin_edgeDOFs;
     LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(general_sin_edgeDOFs, mesh, V);
     general_sin_edgeDOFs.setRandom();
-    nibj_formula_consistent = general_II_derivative_test<LibShell::MidedgeAngleGeneralSinFormulation>(V, mesh, general_sin_edgeDOFs, rand_face);
+    nibj_formula_consistent = general_II_derivative_test<LibShell::MidedgeAngleGeneralSinFormulation>(
+        V, mesh, general_sin_edgeDOFs, rand_face);
     std::cout << "ni^bj formula rewrite consistent: " << nibj_formula_consistent << std::endl;
 
-
-    std::cout << "\n======================== General II Formulation (Tan-based) ==========================="<< std::endl;
+    std::cout << "\n======================== General II Formulation (Tan-based) ==========================="
+              << std::endl;
     Eigen::VectorXd general_tan_edgeDOFs;
     LibShell::MidedgeAngleGeneralTanFormulation::initializeExtraDOFs(general_tan_edgeDOFs, mesh, V);
     general_tan_edgeDOFs.setRandom();
-    nibj_formula_consistent = general_II_derivative_test<LibShell::MidedgeAngleGeneralTanFormulation>(V, mesh, general_tan_edgeDOFs, rand_face);
+    nibj_formula_consistent = general_II_derivative_test<LibShell::MidedgeAngleGeneralTanFormulation>(
+        V, mesh, general_tan_edgeDOFs, rand_face);
     std::cout << "ni^bj formula rewrite consistent: " << nibj_formula_consistent << std::endl;
 
-    std::cout << "\n------------------------------------------------------------------------------------------------------------------------\n";
-    std::cout << "---------------------------------- Testing General II Formulation Consistency ------------------------------------------\n";
-    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
+    std::cout << "\n---------------------------------------------------------------------------------------------------"
+                 "---------------------\n";
+    std::cout << "---------------------------------- Testing General II Formulation Consistency "
+                 "------------------------------------------\n";
+    std::cout << "-----------------------------------------------------------------------------------------------------"
+                 "-------------------\n";
 
     // direction consistency on the common edge
-    for(int i = 0; i < mesh.nEdges(); i++) {
+    for (int i = 0; i < mesh.nEdges(); i++) {
         int face0 = mesh.edgeFace(i, 0);
         int face1 = mesh.edgeFace(i, 1);
 
-        if(face0 != -1 && face1 != -1) {
+        if (face0 != -1 && face1 != -1) {
             int eid0 = -1;
-            for(int j = 0; j < 3; j++) {
-                if(mesh.faceEdge(face0, j) == i) {
+            for (int j = 0; j < 3; j++) {
+                if (mesh.faceEdge(face0, j) == i) {
                     eid0 = j;
                     break;
                 }
             }
 
             int eid1 = -1;
-            for(int j = 0; j < 3; j++) {
-                if(mesh.faceEdge(face1, j) == i) {
+            for (int j = 0; j < 3; j++) {
+                if (mesh.faceEdge(face1, j) == i) {
                     eid1 = j;
                     break;
                 }
             }
 
-            std::vector<Eigen::Vector3d> face_edge_normals_0 = LibShell::MidedgeAngleGeneralFormulation::get_face_edge_normals(mesh, V, edgeDOFs, face0);
-            std::vector<Eigen::Vector3d> face_edge_normals_1 = LibShell::MidedgeAngleGeneralFormulation::get_face_edge_normals(mesh, V, edgeDOFs, face1);
+            std::vector<Eigen::Vector3d> face_edge_normals_0 =
+                LibShell::MidedgeAngleGeneralFormulation::get_face_edge_normals(mesh, V, edgeDOFs, face0);
+            std::vector<Eigen::Vector3d> face_edge_normals_1 =
+                LibShell::MidedgeAngleGeneralFormulation::get_face_edge_normals(mesh, V, edgeDOFs, face1);
 
             double m0 = edgeDOFs[4 * i + 2];
             double m1 = edgeDOFs[4 * i + 3];
 
-            auto& edge_normal_0 = face_edge_normals_0[eid0] / m0;
-            auto& edge_normal_1 = face_edge_normals_1[eid1] / m1;
+            auto &edge_normal_0 = face_edge_normals_0[eid0] / m0;
+            auto &edge_normal_1 = face_edge_normals_1[eid1] / m1;
 
-            if((edge_normal_0 - edge_normal_1).norm() > 1e-10) {
+            if ((edge_normal_0 - edge_normal_1).norm() > 1e-10) {
                 std::cout << "direction doesn't match (General-formula) for edge: " << i << std::endl;
             }
-            if(std::abs(edge_normal_0.norm() - 1) > 1e-10 || std::abs(edge_normal_1.norm() - 1) > 1e-10) {
+            if (std::abs(edge_normal_0.norm() - 1) > 1e-10 || std::abs(edge_normal_1.norm() - 1) > 1e-10) {
                 std::cout << "norm doesn't match (General-formula) for edge: " << i << std::endl;
             }
 
-            std::vector<Eigen::Vector3d> face_edge_normals_sin_0 = LibShell::MidedgeAngleGeneralSinFormulation::get_face_edge_normals(mesh, V, general_sin_edgeDOFs, face0);
-            std::vector<Eigen::Vector3d> face_edge_normals_sin_1 = LibShell::MidedgeAngleGeneralSinFormulation::get_face_edge_normals(mesh, V, general_sin_edgeDOFs, face1);
-            auto& edge_normal_sin_0 = face_edge_normals_sin_0[eid0];
-            auto& edge_normal_sin_1 = face_edge_normals_sin_1[eid1];
+            std::vector<Eigen::Vector3d> face_edge_normals_sin_0 =
+                LibShell::MidedgeAngleGeneralSinFormulation::get_face_edge_normals(mesh, V, general_sin_edgeDOFs,
+                                                                                   face0);
+            std::vector<Eigen::Vector3d> face_edge_normals_sin_1 =
+                LibShell::MidedgeAngleGeneralSinFormulation::get_face_edge_normals(mesh, V, general_sin_edgeDOFs,
+                                                                                   face1);
+            auto &edge_normal_sin_0 = face_edge_normals_sin_0[eid0];
+            auto &edge_normal_sin_1 = face_edge_normals_sin_1[eid1];
 
-            if((edge_normal_sin_0 - edge_normal_sin_1).norm() > 1e-10) {
+            if ((edge_normal_sin_0 - edge_normal_sin_1).norm() > 1e-10) {
                 std::cout << "direction doesn't match (Sin-formula) for edge: " << i << std::endl;
             }
-            if(std::abs(edge_normal_sin_0.norm() - 1) > 1e-10 || std::abs(edge_normal_sin_1.norm() - 1) > 1e-10) {
+            if (std::abs(edge_normal_sin_0.norm() - 1) > 1e-10 || std::abs(edge_normal_sin_1.norm() - 1) > 1e-10) {
                 std::cout << "norm doesn't match (Sin-formula) for edge: " << i << std::endl;
             }
 
-            std::vector<Eigen::Vector3d> face_edge_normals_tan_0 = LibShell::MidedgeAngleGeneralTanFormulation::get_face_edge_normals(mesh, V, general_tan_edgeDOFs, face0);
-            std::vector<Eigen::Vector3d> face_edge_normals_tan_1 = LibShell::MidedgeAngleGeneralTanFormulation::get_face_edge_normals(mesh, V, general_tan_edgeDOFs, face1);
+            std::vector<Eigen::Vector3d> face_edge_normals_tan_0 =
+                LibShell::MidedgeAngleGeneralTanFormulation::get_face_edge_normals(mesh, V, general_tan_edgeDOFs,
+                                                                                   face0);
+            std::vector<Eigen::Vector3d> face_edge_normals_tan_1 =
+                LibShell::MidedgeAngleGeneralTanFormulation::get_face_edge_normals(mesh, V, general_tan_edgeDOFs,
+                                                                                   face1);
             double sigma0, zeta0, sigma1, zeta1;
-            LibShell::MidedgeAngleGeneralTanFormulation::get_per_edge_face_sigma_zeta(mesh, V, general_tan_edgeDOFs, i, 0, sigma0, zeta0);
-            LibShell::MidedgeAngleGeneralTanFormulation::get_per_edge_face_sigma_zeta(mesh, V, general_tan_edgeDOFs, i, 1, sigma1, zeta1);
+            LibShell::MidedgeAngleGeneralTanFormulation::get_per_edge_face_sigma_zeta(mesh, V, general_tan_edgeDOFs, i,
+                                                                                      0, sigma0, zeta0);
+            LibShell::MidedgeAngleGeneralTanFormulation::get_per_edge_face_sigma_zeta(mesh, V, general_tan_edgeDOFs, i,
+                                                                                      1, sigma1, zeta1);
 
             m0 = 1 / (std::sin(sigma0) * std::cos(zeta0));
             m1 = 1 / (std::sin(sigma1) * std::cos(zeta1));
 
-            auto& edge_normal_tan_0 = face_edge_normals_tan_0[eid0] / m0;
-            auto& edge_normal_tan_1 = face_edge_normals_tan_1[eid1] / m1;
+            auto &edge_normal_tan_0 = face_edge_normals_tan_0[eid0] / m0;
+            auto &edge_normal_tan_1 = face_edge_normals_tan_1[eid1] / m1;
 
-            if((edge_normal_tan_0 - edge_normal_tan_1).norm() > 1e-10) {
+            if ((edge_normal_tan_0 - edge_normal_tan_1).norm() > 1e-10) {
                 std::cout << "direction doesn't match (Tan-formula) for edge: " << i << std::endl;
             }
-            if(std::abs(edge_normal_tan_0.norm() - 1) > 1e-10 || std::abs(edge_normal_tan_1.norm() - 1) > 1e-10) {
+            if (std::abs(edge_normal_tan_0.norm() - 1) > 1e-10 || std::abs(edge_normal_tan_1.norm() - 1) > 1e-10) {
                 std::cout << "norm doesn't match (Tan-formula) for edge: " << i << std::endl;
             }
         }
     }
 
-    // general sin formulation and general tan formulation should be consistent with sin formulation with specific choice of edge dofs
+    // general sin formulation and general tan formulation should be consistent with sin formulation with specific
+    // choice of edge dofs
     bool sin_consistent = true;
     Eigen::VectorXd sin_edgeDOFs;
     LibShell::MidedgeAngleSinFormulation::initializeExtraDOFs(sin_edgeDOFs, mesh, V);
     sin_edgeDOFs.setRandom();
 
-    for(int i = 0; i < mesh.nEdges(); i++) {
+    for (int i = 0; i < mesh.nEdges(); i++) {
         edgeDOFs[4 * i + 0] = sin_edgeDOFs[i];
         edgeDOFs[4 * i + 1] = M_PI_2;
         edgeDOFs[4 * i + 2] = 1;
@@ -682,13 +660,16 @@ void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshC
         general_sin_edgeDOFs[2 * i + 1] = M_PI_2;
     }
 
-    for(int face = 0; face < mesh.nFaces(); face++) {
+    for (int face = 0; face < mesh.nFaces(); face++) {
         Eigen::Matrix2d sin_II, general_II, general_sin_II;
-        sin_II = LibShell::MidedgeAngleSinFormulation::secondFundamentalForm(mesh, V, sin_edgeDOFs, face, nullptr, nullptr);
-        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
-        general_sin_II = LibShell::MidedgeAngleGeneralSinFormulation::secondFundamentalForm(mesh, V, general_sin_edgeDOFs, face, nullptr, nullptr);
+        sin_II =
+            LibShell::MidedgeAngleSinFormulation::secondFundamentalForm(mesh, V, sin_edgeDOFs, face, nullptr, nullptr);
+        general_II =
+            LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
+        general_sin_II = LibShell::MidedgeAngleGeneralSinFormulation::secondFundamentalForm(
+            mesh, V, general_sin_edgeDOFs, face, nullptr, nullptr);
 
-        if((sin_II - general_II).norm() > 1e-10 || (sin_II - general_sin_II).norm() > 1e-10) {
+        if ((sin_II - general_II).norm() > 1e-10 || (sin_II - general_sin_II).norm() > 1e-10) {
             std::cout << "Miss matched II for face: " << face << std::endl;
             std::cout << "Sin II: \n" << sin_II << std::endl;
             std::cout << "General II: \n" << general_II << std::endl;
@@ -704,26 +685,30 @@ void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshC
     LibShell::MidedgeAngleTanFormulation::initializeExtraDOFs(tan_edgeDOFs, mesh, V);
     tan_edgeDOFs.setRandom();
 
-    for(int i = 0; i < mesh.nEdges(); i++) {
+    for (int i = 0; i < mesh.nEdges(); i++) {
         general_tan_edgeDOFs[2 * i + 0] = tan_edgeDOFs[i];
         general_tan_edgeDOFs[2 * i + 1] = M_PI_2;
 
         edgeDOFs[4 * i + 0] = tan_edgeDOFs[i];
         edgeDOFs[4 * i + 1] = M_PI_2;
-        for(int j = 0; j < 2; j++) {
+        for (int j = 0; j < 2; j++) {
             double sigma, zeta;
-            LibShell::MidedgeAngleGeneralFormulation::get_per_edge_face_sigma_zeta(mesh, V, edgeDOFs, i, j, sigma, zeta);
+            LibShell::MidedgeAngleGeneralFormulation::get_per_edge_face_sigma_zeta(mesh, V, edgeDOFs, i, j, sigma,
+                                                                                   zeta);
             edgeDOFs[4 * i + 2 + j] = 1 / (std::sin(sigma) * std::cos(zeta));
         }
     }
 
-    for(int face = 0; face < mesh.nFaces(); face++) {
+    for (int face = 0; face < mesh.nFaces(); face++) {
         Eigen::Matrix2d tan_II, general_II, general_tan_II;
-        tan_II = LibShell::MidedgeAngleTanFormulation::secondFundamentalForm(mesh, V, tan_edgeDOFs, face, nullptr, nullptr);
-        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
-        general_tan_II = LibShell::MidedgeAngleGeneralTanFormulation::secondFundamentalForm(mesh, V, general_tan_edgeDOFs, face, nullptr, nullptr);
+        tan_II =
+            LibShell::MidedgeAngleTanFormulation::secondFundamentalForm(mesh, V, tan_edgeDOFs, face, nullptr, nullptr);
+        general_II =
+            LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
+        general_tan_II = LibShell::MidedgeAngleGeneralTanFormulation::secondFundamentalForm(
+            mesh, V, general_tan_edgeDOFs, face, nullptr, nullptr);
 
-        if((tan_II - general_II).norm() > 1e-10 || (tan_II - general_tan_II).norm() > 1e-10) {
+        if ((tan_II - general_II).norm() > 1e-10 || (tan_II - general_tan_II).norm() > 1e-10) {
             std::cout << "Miss matched II for face: " << face << std::endl;
             std::cout << "Tan II: \n" << tan_II << std::endl;
             std::cout << "General II: \n" << general_II << std::endl;
@@ -737,7 +722,7 @@ void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshC
     bool general_consistent = true;
     Eigen::VectorXd edgeDOFs1 = edgeDOFs;
 
-    for(int i = 0; i < mesh.nEdges(); i++) {
+    for (int i = 0; i < mesh.nEdges(); i++) {
         general_sin_edgeDOFs[2 * i + 0] = edgeDOFs[4 * i + 0];
         general_sin_edgeDOFs[2 * i + 1] = edgeDOFs[4 * i + 1];
         edgeDOFs[4 * i + 2] = 1;
@@ -745,115 +730,188 @@ void test_general_II_formulation(const Eigen::MatrixXd& V, const LibShell::MeshC
 
         general_tan_edgeDOFs[2 * i + 0] = edgeDOFs1[4 * i + 0];
         general_tan_edgeDOFs[2 * i + 1] = edgeDOFs1[4 * i + 1];
-        for(int j = 0; j < 2; j++) {
+        for (int j = 0; j < 2; j++) {
             double sigma, zeta;
-            LibShell::MidedgeAngleGeneralFormulation::get_per_edge_face_sigma_zeta(mesh, V, edgeDOFs1, i, j, sigma, zeta);
+            LibShell::MidedgeAngleGeneralFormulation::get_per_edge_face_sigma_zeta(mesh, V, edgeDOFs1, i, j, sigma,
+                                                                                   zeta);
             edgeDOFs1[4 * i + 2 + j] = 1 / (std::sin(sigma) * std::cos(zeta));
         }
     }
 
-    for(int face = 0; face < mesh.nFaces(); face++) {
+    for (int face = 0; face < mesh.nFaces(); face++) {
         Eigen::Matrix2d general_sin_II, general_II;
-        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
-        general_sin_II = LibShell::MidedgeAngleGeneralSinFormulation::secondFundamentalForm(mesh, V, general_sin_edgeDOFs, face, nullptr, nullptr);
+        general_II =
+            LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs, face, nullptr, nullptr);
+        general_sin_II = LibShell::MidedgeAngleGeneralSinFormulation::secondFundamentalForm(
+            mesh, V, general_sin_edgeDOFs, face, nullptr, nullptr);
 
-        if((general_sin_II - general_II).norm() > 1e-10) {
+        if ((general_sin_II - general_II).norm() > 1e-10) {
             std::cout << "Miss matched II (General sin) for face: " << face << std::endl;
             std::cout << "General II: \n" << general_II << std::endl;
             std::cout << "General Sin II: \n" << general_sin_II << std::endl;
             general_consistent = false;
         }
 
-        general_II = LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs1, face, nullptr, nullptr);
-        Eigen::Matrix2d general_tan_II = LibShell::MidedgeAngleGeneralTanFormulation::secondFundamentalForm(mesh, V, general_tan_edgeDOFs, face, nullptr, nullptr);
+        general_II =
+            LibShell::MidedgeAngleGeneralFormulation::secondFundamentalForm(mesh, V, edgeDOFs1, face, nullptr, nullptr);
+        Eigen::Matrix2d general_tan_II = LibShell::MidedgeAngleGeneralTanFormulation::secondFundamentalForm(
+            mesh, V, general_tan_edgeDOFs, face, nullptr, nullptr);
 
-        if((general_tan_II - general_II).norm() > 1e-10) {
+        if ((general_tan_II - general_II).norm() > 1e-10) {
             std::cout << "Miss matched II (General tan) for face: " << face << std::endl;
             std::cout << "General II: \n" << general_II << std::endl;
             std::cout << "General Tan II: \n" << general_tan_II << std::endl;
             general_consistent = false;
         }
-
     }
     std::cout << "General Consistent: " << general_consistent << std::endl;
 }
 
+void test_general_bending_energy(const Eigen::MatrixXd &V, const Eigen::MatrixXi &F) {
 
-int main()
-{
+    std::cout << "\n------------------------------------------------------------------------------------------------------------------------\n";
+    std::cout << "--------------------- Testing General Bending Consistency w.r.t. changing coordinate system ----------------------------\n";
+    std::cout << "------------------------------------------------------------------------------------------------------------------------\n";
+
+    LibShell::MeshConnectivity mesh(F);
+    Eigen::MatrixXd origV = V;
+
+    Eigen::MatrixXi swapped_F = F;
+    swapped_F.col(0) = F.col(1);
+    swapped_F.col(1) = F.col(2);
+    swapped_F.col(2) = F.col(0);
+    LibShell::MeshConnectivity swapped_mesh(swapped_F);
+
+    int test_face = std::rand() % mesh.nFaces();
+    // test bending energy is invarient to the coordinate system of the parameterization
+    // notice that edge vector is the same for swapped mesh and mesh
+    Eigen::VectorXd s2_edge_dofs, general_edge_dofs;
+
+    LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(s2_edge_dofs, mesh, origV);
+    s2_edge_dofs.setRandom();
+
+    LibShell::MidedgeAngleGeneralFormulation::initializeExtraDOFs(general_edge_dofs, mesh, origV);
+    general_edge_dofs.setRandom();
+
+    for (int i = 0; i < mesh.nEdges(); i++) {
+        general_edge_dofs[i * LibShell::MidedgeAngleGeneralFormulation::numExtraDOFs + 0] =
+            s2_edge_dofs[i * LibShell::MidedgeAngleGeneralSinFormulation::numExtraDOFs + 0];
+        general_edge_dofs[i * LibShell::MidedgeAngleGeneralFormulation::numExtraDOFs + 1] =
+            s2_edge_dofs[i * LibShell::MidedgeAngleGeneralSinFormulation::numExtraDOFs + 1];
+        general_edge_dofs[i * LibShell::MidedgeAngleGeneralFormulation::numExtraDOFs + 2] = 1;
+        general_edge_dofs[i * LibShell::MidedgeAngleGeneralFormulation::numExtraDOFs + 3] = 1;
+    }
+
+    // initialize the rest geometry of the shell
+    LibShell::MonolayerRestState rest_state, rest_state_swapped;
+
+    // set uniform thicknesses
+    rest_state.thicknesses.resize(mesh.nFaces(), 1);
+    rest_state.lameAlpha.resize(mesh.nFaces(), 30);
+    rest_state.lameBeta.resize(mesh.nFaces(), 50);
+
+    // initialize first and second fundamental forms to those of input mesh
+    LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::firstFundamentalForms(mesh, origV, rest_state.abars);
+    rest_state.bbars.resize(mesh.nFaces());
+    for (int i = 0; i < rest_state.bbars.size(); i++) {
+        rest_state.bbars[i].setZero();
+    }
+
+    rest_state_swapped = rest_state;
+    LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::firstFundamentalForms(swapped_mesh, origV,
+                                                                                        rest_state_swapped.abars);
+
+    LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralTanFormulation> s2_tan_mat;
+    LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralSinFormulation> s2_sin_mat;
+    LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralFormulation> general_mat;
+
+    double test_bending = s2_sin_mat.bendingEnergy(mesh, origV, s2_edge_dofs, rest_state, test_face, nullptr, nullptr);
+    double test_bending_swap =
+        s2_sin_mat.bendingEnergy(swapped_mesh, origV, s2_edge_dofs, rest_state_swapped, test_face, nullptr, nullptr);
+
+    bool is_consistent = std::abs(test_bending - test_bending_swap) < 1e-10;
+    std::cout << "bending energy consistency (S2 sin): " << is_consistent << ", energy unswapped: " << test_bending << ", swapped: " << test_bending_swap << std::endl;
+
+    test_bending = s2_tan_mat.bendingEnergy(mesh, origV, s2_edge_dofs, rest_state, test_face, nullptr, nullptr);
+    test_bending_swap =
+        s2_tan_mat.bendingEnergy(swapped_mesh, origV, s2_edge_dofs, rest_state_swapped, test_face, nullptr, nullptr);
+    is_consistent = std::abs(test_bending - test_bending_swap) < 1e-10;
+    std::cout << "bending energy consistency (S2 tan): " << is_consistent << ", energy unswapped: " << test_bending << ", swapped: " << test_bending_swap << std::endl;
+
+    test_bending = general_mat.bendingEnergy(mesh, origV, general_edge_dofs, rest_state, test_face, nullptr, nullptr);
+    test_bending_swap = general_mat.bendingEnergy(swapped_mesh, origV, general_edge_dofs, rest_state_swapped, test_face,
+                                                  nullptr, nullptr);
+    is_consistent = std::abs(test_bending - test_bending_swap) < 1e-10;
+    std::cout << "bending energy consistency (General): " << is_consistent << ", energy unswapped: " << test_bending << ", swapped: " << test_bending_swap << std::endl;
+}
+
+int main() {
     int dim = 3;
     bool verbose = false;
     bool testderivatives = true;
     bool testconsistency = true;
-    
-    
+
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
     makeSquareMesh(dim, V, F);
 
     V.col(2).setRandom();
 
-
     LibShell::MeshConnectivity mesh(F);
 
     test_general_II_formulation(V, mesh);
+    test_general_bending_energy(V, F);
     return EXIT_SUCCESS;
 
-    if (testderivatives)
-    {
-        std::cout << "Running finite difference tests" << std::endl;;
-        for (int i = 0; i < nummats; i++)
-        {
-            for (int j = 0; j < numsff; j++)
-            {
+    if (testderivatives) {
+        std::cout << "Running finite difference tests" << std::endl;
+        ;
+        for (int i = 0; i < nummats; i++) {
+            for (int j = 0; j < numsff; j++) {
                 std::cout << "================== Starting trial: ";
-                switch (j)
-                {
-                case 0:
-                    std::cout << "MidedgeAngleTanFormulation ==================\n";
-                    differenceTest<LibShell::MidedgeAngleTanFormulation>(mesh, V, i, verbose);
-                    break;
-                case 1:
-                    std::cout << "MidedgeAngleSinFormulation ==================\n";
-                    differenceTest<LibShell::MidedgeAngleSinFormulation>(mesh, V, i, verbose);
-                    break;
-                case 2:
-                    std::cout << "MidedgeAverageFormulation ==================\n";
-                    differenceTest<LibShell::MidedgeAverageFormulation>(mesh, V, i, verbose);
-                    break;
-                case 3:
-                    std::cout << "MidedgeAngleThetaFormulation ==================\n";
-                    differenceTest<LibShell::MidedgeAngleThetaFormulation>(mesh, V, i, verbose);
-                    break;
-                case 4:
-                    std::cout << "MidedgeAngleCompressiveFormulation ==================\n";
-                    differenceTest<LibShell::MidedgeAngleCompressiveFormulation>(mesh, V, i, verbose);
-                    break;
-                default:
-                    assert(false);
+                switch (j) {
+                    case 0:
+                        std::cout << "MidedgeAngleTanFormulation ==================\n";
+                        differenceTest<LibShell::MidedgeAngleTanFormulation>(mesh, V, i, verbose);
+                        break;
+                    case 1:
+                        std::cout << "MidedgeAngleSinFormulation ==================\n";
+                        differenceTest<LibShell::MidedgeAngleSinFormulation>(mesh, V, i, verbose);
+                        break;
+                    case 2:
+                        std::cout << "MidedgeAverageFormulation ==================\n";
+                        differenceTest<LibShell::MidedgeAverageFormulation>(mesh, V, i, verbose);
+                        break;
+                    case 3:
+                        std::cout << "MidedgeAngleThetaFormulation ==================\n";
+                        differenceTest<LibShell::MidedgeAngleThetaFormulation>(mesh, V, i, verbose);
+                        break;
+                    case 4:
+                        std::cout << "MidedgeAngleCompressiveFormulation ==================\n";
+                        differenceTest<LibShell::MidedgeAngleCompressiveFormulation>(mesh, V, i, verbose);
+                        break;
+                    default:
+                        assert(false);
                 }
             }
         }
         std::cout << "Finite difference tests done" << std::endl;
     }
-    if (testconsistency)
-    {
-        std::cout << "Running consistency tests" << std::endl;;
+    if (testconsistency) {
+        std::cout << "Running consistency tests" << std::endl;
+        ;
         consistencyTests(mesh, V);
         std::cout << "Consistency tests done" << std::endl;
     }
 }
 
-
 template <class SFF>
-void testStretchingFiniteDifferences(
-    const LibShell::MeshConnectivity &mesh,
-    const Eigen::MatrixXd &curPos,
-    const LibShell::MaterialModel<SFF> &mat,
-    const LibShell::RestState &restState,
-    bool verbose,
-    FiniteDifferenceLog &log)
-{
+void testStretchingFiniteDifferences(const LibShell::MeshConnectivity &mesh,
+                                     const Eigen::MatrixXd &curPos,
+                                     const LibShell::MaterialModel<SFF> &mat,
+                                     const LibShell::RestState &restState,
+                                     bool verbose,
+                                     FiniteDifferenceLog &log) {
     log.clear();
     int nfaces = mesh.nFaces();
     int nedges = mesh.nEdges();
@@ -863,22 +921,17 @@ void testStretchingFiniteDifferences(
     testpos.setRandom();
 
     std::vector<int> epsilons = {-2, -3, -4, -5, -6};
-    
-    for (auto epsilon : epsilons)
-    {
+
+    for (auto epsilon : epsilons) {
         double pert = std::pow(10.0, epsilon);
 
-        for (int face = 0; face < nfaces; face++)
-        {
-
+        for (int face = 0; face < nfaces; face++) {
             Eigen::Matrix<double, 1, 9> deriv;
             Eigen::Matrix<double, 9, 9> hess;
             double result = mat.stretchingEnergy(mesh, testpos, restState, face, &deriv, &hess);
 
-            for (int j = 0; j < 3; j++)
-            {
-                for (int k = 0; k < 3; k++)
-                {
+            for (int j = 0; j < 3; j++) {
+                for (int k = 0; k < 3; k++) {
                     Eigen::MatrixXd fwdpertpos = testpos;
                     Eigen::MatrixXd backpertpos = testpos;
                     fwdpertpos(mesh.faceVertex(face, j), k) += pert;
@@ -887,38 +940,37 @@ void testStretchingFiniteDifferences(
                     Eigen::Matrix<double, 1, 9> fwdpertderiv;
                     Eigen::Matrix<double, 1, 9> backpertderiv;
                     double fwdnewresult = mat.stretchingEnergy(mesh, fwdpertpos, restState, face, &fwdpertderiv, NULL);
-                    double backnewresult = mat.stretchingEnergy(mesh, backpertpos, restState, face, &backpertderiv, NULL);
+                    double backnewresult =
+                        mat.stretchingEnergy(mesh, backpertpos, restState, face, &backpertderiv, NULL);
                     double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
-                    if(verbose) std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k) << std::endl;
+                    if (verbose)
+                        std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k)
+                                  << std::endl;
                     log.addEntry(pert, deriv(0, 3 * j + k), findiff);
                     Eigen::Matrix<double, 1, 9> derivdiff = (fwdpertderiv - backpertderiv) / 2.0 / pert;
-                    if (verbose)
-                    {
+                    if (verbose) {
                         std::cout << derivdiff << std::endl;
                         std::cout << "//" << std::endl;
                         std::cout << hess.row(3 * j + k) << std::endl << std::endl;
                     }
-                    for (int l = 0; l < 9; l++)
-                    {
+                    for (int l = 0; l < 9; l++) {
                         log.addEntry(pert, hess(3 * j + k, l), derivdiff(0, l));
-                    }                    
+                    }
                 }
             }
-        }        
+        }
     }
 }
 
 template <class SFF>
-void testBendingFiniteDifferences(
-    const LibShell::MeshConnectivity &mesh,
-    const Eigen::MatrixXd &curPos,
-    const Eigen::VectorXd &edgeDOFs,
-    const LibShell::MaterialModel<SFF> &mat,
-    const LibShell::RestState &restState,
-    bool verbose,
-    FiniteDifferenceLog &globalLog,
-    FiniteDifferenceLog &localLog)
-{
+void testBendingFiniteDifferences(const LibShell::MeshConnectivity &mesh,
+                                  const Eigen::MatrixXd &curPos,
+                                  const Eigen::VectorXd &edgeDOFs,
+                                  const LibShell::MaterialModel<SFF> &mat,
+                                  const LibShell::RestState &restState,
+                                  bool verbose,
+                                  FiniteDifferenceLog &globalLog,
+                                  FiniteDifferenceLog &localLog) {
     globalLog.clear();
     localLog.clear();
 
@@ -931,7 +983,6 @@ void testBendingFiniteDifferences(
     Eigen::VectorXd testedge = edgeDOFs;
     testedge.setRandom();
 
-
     // for global testing
     Eigen::MatrixXd posPert(testpos.rows(), testpos.cols());
     posPert.setRandom();
@@ -942,9 +993,7 @@ void testBendingFiniteDifferences(
     constexpr int nedgedofs = SFF::numExtraDOFs;
 
     std::vector<int> epsilons = {-2, -3, -4, -5, -6};
-    for (auto epsilon : epsilons)
-    {
-
+    for (auto epsilon : epsilons) {
         double pert = std::pow(10.0, epsilon);
 
         // global testing
@@ -976,10 +1025,12 @@ void testBendingFiniteDifferences(
         //     Eigen::VectorXd fwdderiv;
         //     Eigen::VectorXd backderiv;
         //
-        //     double fwdnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, fwdpertpos, fwdpertedge, mat, restState,
+        //     double fwdnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, fwdpertpos, fwdpertedge, mat,
+        //     restState,
         //         LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &fwdderiv,
         //         NULL, LibShell::HessianProjectType::kNone);
-        //     double backnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, backpertpos, backpertedge, mat, restState,
+        //     double backnewresult = LibShell::ElasticShell<SFF>::elasticEnergy(mesh, backpertpos, backpertedge, mat,
+        //     restState,
         //         LibShell::ElasticShell<SFF>::EnergyTerm::ET_BENDING, &backderiv,
         //         NULL, LibShell::HessianProjectType::kNone);
         //
@@ -1006,97 +1057,94 @@ void testBendingFiniteDifferences(
 
         int rand_face = rand() % nfaces;
 
-        for (int face = 0; face < nfaces; face++)
-        {
-            if(face != rand_face) {
+        for (int face = 0; face < nfaces; face++) {
+            if (face != rand_face) {
                 continue;
             }
             Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> deriv;
             Eigen::Matrix<double, 18 + 3 * nedgedofs, 18 + 3 * nedgedofs> hess;
             double result = mat.bendingEnergy(mesh, testpos, testedge, restState, face, &deriv, &hess);
 
-            for (int j = 0; j < 3; j++)
-            {
-                for (int k = 0; k < 3; k++)
-                {
+            for (int j = 0; j < 3; j++) {
+                for (int k = 0; k < 3; k++) {
                     Eigen::MatrixXd fwdpertpos = testpos;
                     Eigen::MatrixXd backpertpos = testpos;
                     fwdpertpos(mesh.faceVertex(face, j), k) += pert;
                     backpertpos(mesh.faceVertex(face, j), k) -= pert;
                     Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> fwdpertderiv;
                     Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> backpertderiv;
-                    double fwdnewresult = mat.bendingEnergy(mesh, fwdpertpos, testedge, restState, face, &fwdpertderiv, NULL);
-                    double backnewresult = mat.bendingEnergy(mesh, backpertpos, testedge, restState, face, &backpertderiv, NULL);
+                    double fwdnewresult =
+                        mat.bendingEnergy(mesh, fwdpertpos, testedge, restState, face, &fwdpertderiv, NULL);
+                    double backnewresult =
+                        mat.bendingEnergy(mesh, backpertpos, testedge, restState, face, &backpertderiv, NULL);
                     double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
-                    if(verbose) std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k) << std::endl;
+                    if (verbose)
+                        std::cout << '(' << j << ", " << k << ") " << findiff << " " << deriv(0, 3 * j + k)
+                                  << std::endl;
                     localLog.addEntry(pert, deriv(0, 3 * j + k), findiff);
 
                     Eigen::MatrixXd derivdiff = (fwdpertderiv - backpertderiv) / 2.0 / pert;
-                    if (verbose)
-                    {
+                    if (verbose) {
                         std::cout << derivdiff << std::endl;
                         std::cout << "//" << std::endl;
                         std::cout << hess.row(3 * j + k) << std::endl << std::endl;
                     }
-                    for (int l = 0; l < 18 + 3 * nedgedofs; l++)
-                    {
+                    for (int l = 0; l < 18 + 3 * nedgedofs; l++) {
                         localLog.addEntry(pert, hess(3 * j + k, l), derivdiff(0, l));
                     }
                 }
-    
+
                 int oppidx = mesh.vertexOppositeFaceEdge(face, j);
-                if (oppidx != -1)
-                {
-                    for (int k = 0; k < 3; k++)
-                    {
+                if (oppidx != -1) {
+                    for (int k = 0; k < 3; k++) {
                         Eigen::MatrixXd fwdpertpos = testpos;
                         Eigen::MatrixXd backpertpos = testpos;
                         fwdpertpos(oppidx, k) += pert;
                         backpertpos(oppidx, k) -= pert;
                         Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> fwdpertderiv;
                         Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> backpertderiv;
-                        double fwdnewresult = mat.bendingEnergy(mesh, fwdpertpos, testedge, restState, face, &fwdpertderiv, NULL);
-                        double backnewresult = mat.bendingEnergy(mesh, backpertpos, testedge, restState, face, &backpertderiv, NULL);
+                        double fwdnewresult =
+                            mat.bendingEnergy(mesh, fwdpertpos, testedge, restState, face, &fwdpertderiv, NULL);
+                        double backnewresult =
+                            mat.bendingEnergy(mesh, backpertpos, testedge, restState, face, &backpertderiv, NULL);
                         double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
                         Eigen::MatrixXd derivdiff = (fwdpertderiv - backpertderiv) / 2.0 / pert;
-                        if (verbose)
-                        {
-                            std::cout << "opp (" << j << ", " << k << ") " << findiff << " " << deriv(0, 9 + 3 * j + k) << std::endl;
+                        if (verbose) {
+                            std::cout << "opp (" << j << ", " << k << ") " << findiff << " " << deriv(0, 9 + 3 * j + k)
+                                      << std::endl;
                             std::cout << derivdiff << std::endl;
                             std::cout << "//" << std::endl;
                             std::cout << hess.row(9 + 3 * j + k) << std::endl << std::endl;
                         }
                         localLog.addEntry(pert, deriv(0, 9 + 3 * j + k), findiff);
-                        for (int l = 0; l < 18 + 3 * nedgedofs; l++)
-                        {
+                        for (int l = 0; l < 18 + 3 * nedgedofs; l++) {
                             localLog.addEntry(pert, hess(9 + 3 * j + k, l), derivdiff(0, l));
-                        }                        
+                        }
                     }
                 }
-                
-                for (int k = 0; k < nedgedofs; k++)
-                {
+
+                for (int k = 0; k < nedgedofs; k++) {
                     Eigen::VectorXd fwdpertedge = testedge;
                     Eigen::VectorXd backpertedge = testedge;
                     fwdpertedge[nedgedofs * mesh.faceEdge(face, j) + k] += pert;
                     backpertedge[nedgedofs * mesh.faceEdge(face, j) + k] -= pert;
                     Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> fwdpertderiv;
                     Eigen::Matrix<double, 1, 18 + 3 * nedgedofs> backpertderiv;
-                    double fwdnewresult = mat.bendingEnergy(mesh, testpos, fwdpertedge, restState, face, &fwdpertderiv, NULL);
-                    double backnewresult = mat.bendingEnergy(mesh, testpos, backpertedge, restState, face, &backpertderiv, NULL);
+                    double fwdnewresult =
+                        mat.bendingEnergy(mesh, testpos, fwdpertedge, restState, face, &fwdpertderiv, NULL);
+                    double backnewresult =
+                        mat.bendingEnergy(mesh, testpos, backpertedge, restState, face, &backpertderiv, NULL);
                     double findiff = (fwdnewresult - backnewresult) / 2.0 / pert;
-                    if(verbose) std::cout << findiff << " " << deriv(0, 18 + nedgedofs * j + k) << std::endl;
+                    if (verbose) std::cout << findiff << " " << deriv(0, 18 + nedgedofs * j + k) << std::endl;
                     localLog.addEntry(pert, deriv(0, 18 + nedgedofs * j + k), findiff);
-                    
+
                     Eigen::MatrixXd derivdiff = (fwdpertderiv - backpertderiv) / 2.0 / pert;
-                    if (verbose)
-                    {
+                    if (verbose) {
                         std::cout << derivdiff << std::endl;
                         std::cout << "//" << std::endl;
                         std::cout << hess.row(18 + nedgedofs * j + k) << std::endl << std::endl;
                     }
-                    for (int l = 0; l < 18 + 3 * nedgedofs; l++)
-                    {
+                    for (int l = 0; l < 18 + 3 * nedgedofs; l++) {
                         localLog.addEntry(pert, hess(18 + nedgedofs * j + k, l), derivdiff(0, l));
                     }
                 }

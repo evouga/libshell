@@ -5,6 +5,7 @@
 #include "../include/types.h"
 
 #include <iostream>
+#include <tbb/parallel_for.h>
 
 static void TestFuncGradHessian(
     std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *, Eigen::SparseMatrix<double> *, bool)> obj_Func,
@@ -71,7 +72,6 @@ void ExtraEnergyTerms::initialization(const Eigen::MatrixXd& rest_pos,
     m_shear = shear;
     m_thickness = thickness;
     m_quad_points = build_quadrature_points(quad_oder);
-    m_sff.initializeEdgeFaceBasisSign(mesh, rest_pos);
 
     m_face_area.resize(mesh.nFaces());
     for (int f = 0; f < mesh.nFaces(); f++) {
@@ -104,6 +104,69 @@ double ExtraEnergyTerms::compute_magnitude_compression_energy_perface(const Eige
     if (hessian) {
         hessian->setZero();
     }
+
+    // m = (2u + 2v - 1) m0 + (1 - 2u) m1 + (1 - 2v) m2
+    // int_u (m^2 - 1)^2 = 1/30 (15 + 3 m0^4 + 3 m1^4 - 10 m2^2 + 3 m2^4 - 8 m0 m1 m2 (m1 + m2) + 10 m1^2 (-1 + m2^2) + 2 m0^2 (-5 + 5 m1^2 - 4 m1 m2 + 5 m2^2))
+    double energy = 1.0 / 30.0 * (15.0 + 3 * m[0] * m[0] * m[0] * m[0] + 3 * m[1] * m[1] * m[1] * m[1] - 10 * m[2] * m[2] +
+                                  3 * m[2] * m[2] * m[2] * m[2] - 8 * m[0] * m[1] * m[2] * (m[1] + m[2]) +
+                                  10 * m[1] * m[1] * (-1 + m[2] * m[2]) +
+                                  2 * m[0] * m[0] * (-5 + 5 * m[1] * m[1] - 4 * m[1] * m[2] + 5 * m[2] * m[2]));
+    energy *= m_face_area[face] * m_youngs * m_thickness / 4;
+
+    if(deriv) {
+        // 1/15 (6 m0^3 - 4 m1 m2 (m1 + m2) + 2 m0 (-5 + 5 m1^2 - 4 m1 m2 + 5 m2^2))
+        (*deriv)[0] = 1.0 / 15.0 * (6 * m[0] * m[0] * m[0] - 4 * m[1] * m[2] * (m[1] + m[2]) +
+                                    2 * m[0] * (-5 + 5 * m[1] * m[1] - 4 * m[1] * m[2] + 5 * m[2] * m[2]));
+
+        // 2/15 (3 m1^3 - 2 m0 m2 (m0 + m2) + m1 (-5 + 5 m0^2 - 4 m0 m2 + 5 m2^2))
+        (*deriv)[1] = 2.0 / 15.0 * (3 * m[1] * m[1] * m[1] - 2 * m[0] * m[2] * (m[0] + m[2]) +
+                                    m[1] * (-5 + 5 * m[0] * m[0] - 4 * m[0] * m[2] + 5 * m[2] * m[2]));
+
+        // 1/15 (-4 m0 m1 (m0 + m1) + 2 (-5 + 5 m0^2 - 4 m0 m1 + 5 m1^2) m2 + 6 m2^3)
+        (*deriv)[2] = 1.0 / 15.0 * (-4 * m[0] * m[1] * (m[0] + m[1]) +
+                                    2 * (-5 + 5 * m[0] * m[0] - 4 * m[0] * m[1] + 5 * m[1] * m[1]) * m[2] +
+                                    6 * m[2] * m[2] * m[2]);
+
+        (*deriv) *= m_face_area[face] * m_youngs * m_thickness / 4;
+    }
+
+    if(hessian) {
+        // H(0, 0) = 2/15 (-5 + 9 m0^2 + 5 m1^2 - 4 m1 m2 + 5 m2^2)
+        (*hessian)(0, 0) = 2.0 / 15.0 * (-5 + 9 * m[0] * m[0] + 5 * m[1] * m[1] - 4 * m[1] * m[2] + 5 * m[2] * m[2]);
+
+        // H(0, 1) = 1/15 (20 m0 m1 - 8 (m0 + m1) m2 - 4 m2^2)
+        (*hessian)(0, 1) = 1.0 / 15.0 * (20 * m[0] * m[1] - 8 * (m[0] + m[1]) * m[2] - 4 * m[2] * m[2]);
+
+        // H(0, 2) = -(4/15) (2 m0 m1 + m1^2 - 5 m0 m2 + 2 m1 m2)
+        (*hessian)(0, 2) = -(4.0 / 15.0) * (2 * m[0] * m[1] + m[1] * m[1] - 5 * m[0] * m[2] + 2 * m[1] * m[2]);
+
+        // H(1, 0) = H(0, 1)
+        (*hessian)(1, 0) = (*hessian)(0, 1);
+
+        // H(1, 1) = 2/15 (-5 + 5 m0^2 + 9 m1^2 - 4 m0 m2 + 5 m2^2)
+        (*hessian)(1, 1) = 2.0 / 15.0 * (-5 + 5 * m[0] * m[0] + 9 * m[1] * m[1] - 4 * m[0] * m[2] + 5 * m[2] * m[2]);
+
+        // H(1, 2) = -(4/15) (m0^2 - 5 m1 m2 + 2 m0 (m1 + m2))
+        (*hessian)(1, 2) = -(4.0 / 15.0) * (m[0] * m[0] - 5 * m[1] * m[2] + 2 * m[0] * (m[1] + m[2]));
+
+        // H(2, 0) = H(0, 2)
+        (*hessian)(2, 0) = (*hessian)(0, 2);
+
+        // H(2, 1) = H(1, 2)
+        (*hessian)(2, 1) = (*hessian)(1, 2);
+
+        // H(2, 2) = 2/15 (-5 + 5 m0^2 - 4 m0 m1 + 5 m1^2 + 9 m2^2)
+        (*hessian)(2, 2) = 2.0 / 15.0 * (-5 + 5 * m[0] * m[0] - 4 * m[0] * m[1] + 5 * m[1] * m[1] + 9 * m[2] * m[2]);
+
+        if(is_proj) {
+            proj_sym_matrix(*hessian, HessianProjectType::kMaxZero);
+        }
+
+        (*hessian) *= m_face_area[face] * m_youngs * m_thickness / 4;
+    }
+
+    return energy;
+
 
     for (int i = 0; i < m_quad_points.size(); i++) {
         double u = m_quad_points[i].u;
@@ -147,11 +210,21 @@ double ExtraEnergyTerms::compute_magnitude_compression_energy(const Eigen::Vecto
     }
 
     int nfaces = mesh.nFaces();
+
+    std::vector<double> energies(nfaces);
+    std::vector<Eigen::Vector3d> face_derivs(nfaces);
+    std::vector<Eigen::Matrix<double, 3, 3>> face_hessians(nfaces);
+
+    tbb::parallel_for(0, nfaces, [&](int i) {
+        energies[i] =
+            compute_magnitude_compression_energy_perface(
+             edge_dofs, mesh, i, deriv ? &face_derivs[i] : nullptr, hessian ? &face_hessians[i] : nullptr, is_proj);
+    });
+
     for (int fid = 0; fid < nfaces; fid++) {
-        Eigen::Vector3d face_deriv;
-        Eigen::Matrix<double, 3, 3> face_hessian;
-        double face_energy = compute_magnitude_compression_energy_perface(
-            edge_dofs, mesh, fid, deriv ? &face_deriv : nullptr, hessian ? &face_hessian : nullptr, is_proj);
+        Eigen::Vector3d& face_deriv = face_derivs[fid];
+        Eigen::Matrix<double, 3, 3>& face_hessian = face_hessians[fid];
+        double face_energy = energies[fid];
         energy += face_energy;
         if (deriv) {
             for (int j = 0; j < 3; j++) {
@@ -217,7 +290,36 @@ double ExtraEnergyTerms::compute_vector_perp_tangent_energy_perface(const Eigen:
     }
 
     Eigen::Matrix2d abar_inv = abars[face].inverse();
-    abar_inv = abar_inv.transpose() * abar_inv;
+
+    // exact formula, since it is a quadratic function of u,v
+    // F = int_{0 <= u + v <= 1} (2u + 2v -1, 1-2u, 1-2v) K (2u + 2v -1, 1-2u, 1-2v)^T du dv * face_area * shear * thickness / 2
+    //   = 1/6 (K(0, 0) + K(1, 1) + K(2, 2)) * face_area * shear * thickness / 2
+    //   = 1/6 Tr(K) * face_area * shear * thickness / 2
+    // K = N^Tdr Ibar_inv * dr^TN, N = [n0, n1, n2], dr = [b0, b1]
+    // Let Ibar_inv = [a00, a01; a10, a11]
+    // K_ij = a00 (b0^Tni) (b0^Tnj) + a11 (b1^Tni) (b1^Tnj) + a01 (b0^Tni) (b1^Tnj) + a10 (b1^Tni) (b0^Tnj)
+    for(int i = 0; i < 3; i++) {
+        double Kii = abar_inv(0, 0) * ni_b0[i] * ni_b0[i] + abar_inv(1, 1) * ni_b1[i] * ni_b1[i] + (abar_inv(0, 1) + abar_inv(1, 0)) * ni_b0[i] * ni_b1[i];
+        energy += Kii / 6.0 * m_face_area[face] * m_shear * m_thickness / 2.0;
+        if(deriv) {
+            Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs> dKii;
+            dKii = 2 * abar_inv(0, 0) * dni_b0[i] * ni_b0[i] + 2 * abar_inv(1, 1) * dni_b1[i] * ni_b1[i] +  (abar_inv(0, 1) + abar_inv(1, 0))* (dni_b0[i] * ni_b1[i] + ni_b0[i] * dni_b1[i]);
+            (*deriv) += dKii / 6.0 * m_face_area[face] * m_shear * m_thickness / 2.0;;
+        }
+        if(hessian) {
+            Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> hKii;
+            hKii = 2 * abar_inv(0, 0) * (hni_b0[i] * ni_b0[i] + dni_b0[i].transpose() * dni_b0[i]) + 2 * abar_inv(1, 1) * (hni_b1[i] * ni_b1[i] + dni_b1[i].transpose() * dni_b1[i]) + (abar_inv(0, 1) + abar_inv(1, 0)) * (hni_b0[i] * ni_b1[i] + hni_b1[i] * ni_b0[i] + dni_b0[i].transpose() * dni_b1[i] + dni_b1[i].transpose() * dni_b0[i]);
+            (*hessian) += hKii / 6.0 * m_face_area[face] * m_shear * m_thickness / 2.0;
+        }
+    }
+
+    if (hessian && is_proj) {
+        proj_sym_matrix(*hessian, HessianProjectType::kMaxZero);
+    }
+
+    return energy;
+
+
 
     for (int i = 0; i < m_quad_points.size(); i++) {
         double u = m_quad_points[i].u;
@@ -230,7 +332,7 @@ double ExtraEnergyTerms::compute_vector_perp_tangent_energy_perface(const Eigen:
         Eigen::Vector2d vec;
         vec << n_b0, n_b1;
 
-        energy += w * m_face_area[face] * vec.dot(abar_inv * vec);
+        energy += w * vec.dot(abar_inv * vec);
 
         if (deriv || hessian) {
             Eigen::Vector3d bary;
@@ -240,20 +342,20 @@ double ExtraEnergyTerms::compute_vector_perp_tangent_energy_perface(const Eigen:
             Eigen::VectorXd dn_b1 = (bary[0] * dni_b1[0] + bary[1] * dni_b1[1] + bary[2] * dni_b1[2]).transpose();
 
             if (deriv) {
-                (*deriv) += w * m_face_area[face] * 2.0 * abar_inv(0, 0) * n_b0 * dn_b0;
-                (*deriv) += w * m_face_area[face] * abar_inv(0, 1) * (n_b0 * dn_b1 + n_b1 * dn_b0);
-                (*deriv) += w * m_face_area[face] * abar_inv(1, 0) * (n_b1 * dn_b0 + n_b0 * dn_b1);
-                (*deriv) += w * m_face_area[face] * 2.0 * abar_inv(1, 1) * n_b1 * dn_b1;
+                (*deriv) += w * 2.0 * abar_inv(0, 0) * n_b0 * dn_b0;
+                (*deriv) += w * abar_inv(0, 1) * (n_b0 * dn_b1 + n_b1 * dn_b0);
+                (*deriv) += w * abar_inv(1, 0) * (n_b1 * dn_b0 + n_b0 * dn_b1);
+                (*deriv) += w * 2.0 * abar_inv(1, 1) * n_b1 * dn_b1;
             }
 
             if (hessian) {
                 Eigen::MatrixXd hn_b0 = bary[0] * hni_b0[0] + bary[1] * hni_b0[1] + bary[2] * hni_b0[2];
                 Eigen::MatrixXd hn_b1 = bary[0] * hni_b1[0] + bary[1] * hni_b1[1] + bary[2] * hni_b1[2];
 
-                (*hessian) += w * m_face_area[face] * 2.0 * abar_inv(0, 0) * (dn_b0 * dn_b0.transpose() + n_b0 * hn_b0);
-                (*hessian) += w * m_face_area[face] * abar_inv(0, 1) * (dn_b0 * dn_b1.transpose() + n_b0 * hn_b1 + dn_b1 * dn_b0.transpose() + n_b1 * hn_b0);
-                (*hessian) += w * m_face_area[face] * abar_inv(1, 0) * (dn_b0 * dn_b1.transpose() + n_b0 * hn_b1 + dn_b1 * dn_b0.transpose() + n_b1 * hn_b0);
-                (*hessian) += w * m_face_area[face] * 2.0 * abar_inv(1, 1) * (dn_b1 * dn_b1.transpose() + n_b1 * hn_b1);
+                (*hessian) += w * 2.0 * abar_inv(0, 0) * (dn_b0 * dn_b0.transpose() + n_b0 * hn_b0);
+                (*hessian) += w * abar_inv(0, 1) * (dn_b0 * dn_b1.transpose() + n_b0 * hn_b1 + dn_b1 * dn_b0.transpose() + n_b1 * hn_b0);
+                (*hessian) += w * abar_inv(1, 0) * (dn_b0 * dn_b1.transpose() + n_b0 * hn_b1 + dn_b1 * dn_b0.transpose() + n_b1 * hn_b0);
+                (*hessian) += w * 2.0 * abar_inv(1, 1) * (dn_b1 * dn_b1.transpose() + n_b1 * hn_b1);
             }
         }
     }
@@ -261,6 +363,7 @@ double ExtraEnergyTerms::compute_vector_perp_tangent_energy_perface(const Eigen:
     if (hessian && is_proj) {
         proj_sym_matrix(*hessian, HessianProjectType::kMaxZero);
     }
+
     return energy;
 }
 
@@ -286,12 +389,20 @@ double ExtraEnergyTerms::compute_vector_perp_tangent_energy(const Eigen::MatrixX
 
     constexpr int nedgedofs = MidedgeAngleGeneralFormulation::numExtraDOFs;
 
-    for (int i = 0; i < nfaces; i++) {
-        Eigen::VectorXd face_deriv;
-        Eigen::MatrixXd face_hess;
+    std::vector<double> energies(nfaces);
+    std::vector<Eigen::VectorXd> face_derivs(nfaces);
+    std::vector<Eigen::MatrixXd> face_hessians(nfaces);
 
-        double face_energy = compute_vector_perp_tangent_energy_perface(cur_pos, edge_dofs, mesh, abars, i, deriv ? &face_deriv : nullptr, hessian ? &face_hess : nullptr, is_proj);
-        energy += face_energy;
+    tbb::parallel_for(0, nfaces, [&](int i) {
+        energies[i] =
+            compute_vector_perp_tangent_energy_perface(cur_pos, edge_dofs, mesh, abars, i, deriv ? &face_derivs[i] : nullptr, hessian ? &face_hessians[i] : nullptr, is_proj);
+    });
+
+    for (int i = 0; i < nfaces; i++) {
+        Eigen::VectorXd& face_deriv = face_derivs[i];
+        Eigen::MatrixXd& face_hess = face_hessians[i];
+
+        energy += energies[i];
 
         if (deriv) {
             for (int j = 0; j < 3; j++) {
@@ -385,7 +496,7 @@ double ExtraEnergyTerms::compute_magnitude_sq_change_energy_perface(const Eigen:
     }
 
     Eigen::Matrix2d abar_inv = abars[face].inverse();
-    abar_inv = abar_inv.transpose() * abar_inv;
+    // abar_inv = abar_inv.transpose() * abar_inv;
 
     for (int i = 0; i < m_quad_points.size(); i++) {
         double u = m_quad_points[i].u;
@@ -447,12 +558,24 @@ double ExtraEnergyTerms::compute_magnitude_sq_change_energy(const Eigen::VectorX
         hessian->clear();
     }
 
+    std::vector<double> energies(mesh.nFaces());
+    std::vector<Eigen::Vector3d> face_derivs(mesh.nFaces());
+    std::vector<Eigen::Matrix<double, 3, 3>> face_hessians(mesh.nFaces());
+
+    tbb::parallel_for(0, (int)(mesh.nFaces()), [&](int i) {
+        energies[i] =
+            compute_magnitude_sq_change_energy_perface(
+            edge_dofs, mesh, abars, i, deriv ? &face_derivs[i] : nullptr, hessian ? &face_hessians[i] : nullptr, is_proj);
+    });
+
     int nfaces = mesh.nFaces();
     for (int fid = 0; fid < nfaces; fid++) {
-        Eigen::Vector3d face_deriv;
-        Eigen::Matrix<double, 3, 3> face_hessian;
-        double face_energy = compute_magnitude_sq_change_energy_perface(
-            edge_dofs, mesh, abars, fid, deriv ? &face_deriv : nullptr, hessian ? &face_hessian : nullptr, is_proj);
+
+        double face_energy = energies[fid];
+
+        Eigen::Vector3d &face_deriv = face_derivs[fid];
+        Eigen::Matrix<double, 3, 3> &face_hessian = face_hessians[fid];
+
         energy += face_energy;
         if (deriv) {
             for (int j = 0; j < 3; j++) {

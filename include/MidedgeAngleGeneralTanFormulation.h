@@ -121,14 +121,6 @@ public:
                                     const Eigen::MatrixXd& curPos);
 
     /*
-     * Initialize the edge face basis sign, which is used for all the computation
-     *
-     * @param[in] mesh:             the mesh connectivity
-     * @param[in] curPos:           the current vertex positions
-     */
-    static void initializeEdgeFaceBasisSign(const MeshConnectivity& mesh, const Eigen::MatrixXd& curPos);
-
-    /*
      * Compute the second fundamental form for the specific face
      *
      * @param[in] mesh:             the mesh connectivity
@@ -207,7 +199,7 @@ public:
 
 public:
     /*
-     * The relationships between two vectors with the rotation axis ehat
+     * The relationships between two vectors with the axis face normal
      */
     enum class VectorRelationship {
         kSameDirection = 0,
@@ -216,6 +208,14 @@ public:
         kNegativeOrientation = 3,
         kUndefined = 4
     };
+
+    /*
+     * Get relationship between the edge and face basis (two adjacent faces)
+     *
+     * @param[in] mesh:             the mesh connectivity
+     * @param[in] eid:              the edge id
+     */
+    static std::vector<VectorRelationship> get_edge_face_basis_relationship(const MeshConnectivity& mesh, int eid);
 
     /*
      * Compute ni^T bj
@@ -273,9 +273,5 @@ public:
                                Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
                                Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian);
 
-    /*
-     * The edge face basis sign
-     */
-    static std::vector<std::array<VectorRelationship, 2>> m_edge_face_basis_sign;
 };
 };  // namespace LibShell

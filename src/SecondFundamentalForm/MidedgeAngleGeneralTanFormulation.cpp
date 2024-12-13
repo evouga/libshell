@@ -39,8 +39,6 @@ static void TestFuncGradHessian(
 namespace LibShell {
 
 // Define the static member variable
-std::vector<std::array<MidedgeAngleGeneralTanFormulation::VectorRelationship, 2>>
-    MidedgeAngleGeneralTanFormulation::m_edge_face_basis_sign;
 constexpr int MidedgeAngleGeneralTanFormulation::numExtraDOFs;
 
 // ni^T bj = cot(σ) / cos(ζ) (bj^T ei) / |ei| + tan(ζ) s_ij * |bj x ei| / |ei|,
@@ -67,7 +65,8 @@ double MidedgeAngleGeneralTanFormulation::compute_nibj(const MeshConnectivity& m
         hessian->setZero();
     }
 
-    VectorRelationship& vector_relationship = m_edge_face_basis_sign[2 * eid + efid][j];
+    std::vector<VectorRelationship> vector_relationships = get_edge_face_basis_relationship(mesh, eid);
+    VectorRelationship& vector_relationship = vector_relationships[2 * efid + j];
     assert(vector_relationship != VectorRelationship::kUndefined);
     
     double sigma = edgeDOFs(eid * numExtraDOFs + 1);
@@ -473,10 +472,6 @@ Eigen::Matrix2d MidedgeAngleGeneralTanFormulation::secondFundamentalForm(
     Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs>* derivative,
     std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>>* hessian) {
 
-    if(m_edge_face_basis_sign.size() != 2 * mesh.nEdges()) {
-        initializeEdgeFaceBasisSign(mesh, curPos);
-    }
-
     if (derivative) {
         derivative->setZero();
     }
@@ -550,13 +545,10 @@ void MidedgeAngleGeneralTanFormulation::initializeExtraDOFs(Eigen::VectorXd& ext
     int nedges = mesh.nEdges();
     extraDOFs.resize(numExtraDOFs * nedges);
     extraDOFs.setZero();
-    m_edge_face_basis_sign.clear();
 
     for (int i = 0; i < nedges; i++) {
         extraDOFs[numExtraDOFs * i + 1] = M_PI_2;   // pi / 2, namely perpendicular to the edge
     }
-
-    initializeEdgeFaceBasisSign(mesh, curPos);
 }
 
 std::vector<Eigen::Vector3d> MidedgeAngleGeneralTanFormulation::get_face_edge_normals(const MeshConnectivity& mesh,
@@ -594,51 +586,59 @@ std::vector<Eigen::Vector3d> MidedgeAngleGeneralTanFormulation::get_face_edge_no
     return face_edge_normals;
 }
 
+std::vector<MidedgeAngleGeneralTanFormulation::VectorRelationship>
+MidedgeAngleGeneralTanFormulation::get_edge_face_basis_relationship(const MeshConnectivity& mesh, int eid) {
+    std::vector<VectorRelationship> basis_sign = {};
+    Eigen::Matrix<VectorRelationship, 2, 3> face_basis_edge_relationship;
+    face_basis_edge_relationship.row(0) << VectorRelationship::kPositiveOrientation,
+        VectorRelationship::kNegativeOrientation, VectorRelationship::kSameDirection;
+    face_basis_edge_relationship.row(1) << VectorRelationship::kPositiveOrientation,
+        VectorRelationship::kOppositeDirection, VectorRelationship::kNegativeOrientation;
 
-void MidedgeAngleGeneralTanFormulation::initializeEdgeFaceBasisSign(const MeshConnectivity& mesh,
-                                                                 const Eigen::MatrixXd& curPos) {
-    int nedges = mesh.nEdges();
-    m_edge_face_basis_sign.clear();
+    for (int j = 0; j < 2; j++) {
+        int fid = mesh.edgeFace(eid, j);
 
-    for (int i = 0; i < nedges; i++) {
-        Eigen::Vector3d e = curPos.row(mesh.edgeVertex(i, 1)) - curPos.row(mesh.edgeVertex(i, 0));
-        for (int j = 0; j < 2; j++) {
-            int fid = mesh.edgeFace(i, j);
-            std::array<VectorRelationship, 2> basis_sign = {VectorRelationship::kUndefined,
-                                                            VectorRelationship::kUndefined};
-            if (fid == -1) {
-                m_edge_face_basis_sign.push_back(basis_sign);
-                continue;
+        if (fid == -1) {
+            basis_sign.push_back(VectorRelationship::kUndefined);
+            basis_sign.push_back(VectorRelationship::kUndefined);
+            continue;
+        }
+
+        int feid = -1;
+        for (int k = 0; k < 3; k++) {
+            if (mesh.faceEdge(fid, k) == eid) {
+                feid = k;
+                break;
             }
+        }
+        assert(feid != -1);
 
-            std::vector<Eigen::Vector3d> bks(2);
-            for (int k = 1; k <= 2; k++) {
-                bks[k - 1] = curPos.row(mesh.faceVertex(fid, k)) - curPos.row(mesh.faceVertex(fid, 0));
-            }
-            Eigen::Vector3d face_normal = bks[0].cross(bks[1]);
+        for (int k = 0; k < 2; k++) {
+            VectorRelationship res = VectorRelationship::kUndefined;
 
-            // ToDo: Add sanity check for really tiny faces
-            if (face_normal.norm()) {
-                face_normal.normalize();
-            }
-
-            for (int k = 0; k < 2; k++) {
-                std::array<int, 2> vids = {mesh.faceVertex(fid, 0), mesh.faceVertex(fid, k + 1)};
-
-                if (vids[0] == mesh.edgeVertex(i, 0) && vids[1] == mesh.edgeVertex(i, 1)) {
-                    basis_sign[k] = VectorRelationship::kSameDirection;
-                } else if (vids[0] == mesh.edgeVertex(i, 1) && vids[1] == mesh.edgeVertex(i, 0)) {
-                    basis_sign[k] = VectorRelationship::kOppositeDirection;
-                } else {
-                    Eigen::Vector3d vk = bks[k].cross(e);
-                    basis_sign[k] = (vk.dot(face_normal) > 0) ? VectorRelationship::kPositiveOrientation
-                                                              : VectorRelationship::kNegativeOrientation;
+            VectorRelationship edge_base_relationship = face_basis_edge_relationship(k, feid);
+            if (mesh.faceEdgeOrientation(fid, feid) == 1) {
+                if (edge_base_relationship == VectorRelationship::kSameDirection) {
+                    res = VectorRelationship::kOppositeDirection;
                 }
+                if (edge_base_relationship == VectorRelationship::kOppositeDirection) {
+                    res = VectorRelationship::kSameDirection;
+                }
+                if (edge_base_relationship == VectorRelationship::kPositiveOrientation) {
+                    res = VectorRelationship::kNegativeOrientation;
+                }
+                if (edge_base_relationship == VectorRelationship::kNegativeOrientation) {
+                    res = VectorRelationship::kPositiveOrientation;
+                }
+            } else {
+                res = edge_base_relationship;
             }
 
-            m_edge_face_basis_sign.push_back(basis_sign);
+            basis_sign.push_back(res);
         }
     }
+
+    return basis_sign;
 }
 
 void MidedgeAngleGeneralTanFormulation::get_per_edge_face_sigma_zeta(const MeshConnectivity& mesh,
