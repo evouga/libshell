@@ -8,6 +8,9 @@ void makeSphere(double radius, double triangleArea,Eigen::MatrixXd &V, Eigen::Ma
     int verts = 2.0 * M_PI * radius * radius / triangleArea;
     verts = std::max(verts, 4);
     sphereFromSamples(verts, V, F);
+    for(int i = 0; i < F.rows(); i++) {
+        std::swap(F(i, 0), F(i, 2));
+    }
     V *= radius;
 }
 

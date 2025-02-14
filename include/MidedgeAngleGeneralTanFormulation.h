@@ -19,6 +19,11 @@ class MeshConnectivity;
  *
  * The second fundamental form (II) is given as:
  *
+ * n = (2 u + 2 v - 1) n0 - (1 - 2 u) n1 - (1 - 2 v) n2,
+ * n = m(u, v) d(u, v)
+ * m(u, v) = (2 u + 2 v - 1) m0 - (1 - 2 u) m1 - (1 - 2 v) m2,
+ * d(u, v) = (2 u + 2 v - 1) d0 - (1 - 2 u) d1 - (1 - 2 v) d2,
+ *
  *   II = -2 * [(n1 - n0)^T(x1 - x0), (n1 - n0)^T(x2 - x0);
  *             (n2 - n0)^T(x1 - x0), (n2 - n0)^T(x2 - x0)]
  *
@@ -70,6 +75,7 @@ class MeshConnectivity;
  *   ni^T bj = mi cos(σ) (bj^T ei) / |ei| + mi sin(σ) sin(ζ) s_ij * |bj x ei| / |ei|,
  *           = mi cos(σ) (bj^T ei) / |ei| + mi sin(σ) sin(ζ) s_ij * h_i (if bj is not parallel to ei),
  *           = mi cos(σ) |ei| * sign(bj^T ei) (if bj is parallel to ei),
+ *
  *
  * where:
  *   - s_ij = sign(nf ⋅ (bj x ei)) (assumes no triangle flip).

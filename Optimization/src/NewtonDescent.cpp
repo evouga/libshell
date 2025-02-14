@@ -154,7 +154,7 @@ void NewtonSolver(
         // switch to the actual hessian when close to convergence
         if (is_swap) {
             // this is just some experience value, you can change it
-            if ((f - fnew) / f < 1e-5 || delta_x.norm() < 1e-5 || grad.norm() < 1e-4) {
+            if ((f - fnew) / f < 1e-4 || delta_x.norm() < 1e-5 || grad.norm() < 1e-4) {
                 is_proj = false;
             }
         }
@@ -203,7 +203,6 @@ void TestFuncGradHessian(
     std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *, Eigen::SparseMatrix<double> *, bool)> obj_Func,
     const Eigen::VectorXd &x0) {
     Eigen::VectorXd dir = x0;
-    dir(0) = 0;
     dir.setRandom();
 
     Eigen::VectorXd grad;

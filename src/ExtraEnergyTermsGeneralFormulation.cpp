@@ -1,93 +1,20 @@
 //
 // Created by Zhen Chen on 12/8/24.
 //
-#include "../include/ExtraEnergyTerms.h"
+#include "../include/ExtraEnergyTermsGeneralFormulation.h"
 #include "../include/types.h"
 
 #include <iostream>
 #include <tbb/parallel_for.h>
 
-static void TestFuncGradHessian(
-    std::function<double(const Eigen::VectorXd &, Eigen::VectorXd *, Eigen::SparseMatrix<double> *, bool)> obj_Func,
-    const Eigen::VectorXd &x0) {
-    Eigen::VectorXd dir = x0;
-    dir.setRandom();
-
-    Eigen::VectorXd grad;
-    Eigen::SparseMatrix<double> H;
-
-    double f = obj_Func(x0, &grad, &H, false);
-    std::cout << "energy: " << f << ", gradient L2-norm: " << grad.norm() << ", hessian L2-norm: " << H.norm() << std::endl;
-
-    for (int i = 3; i < 10; i++) {
-        double eps = std::pow(0.1, i);
-        Eigen::VectorXd x = x0 + eps * dir;
-        Eigen::VectorXd grad1;
-        double f1 = obj_Func(x, &grad1, nullptr, false);
-
-        std::cout << "eps: " << eps << std::endl;
-        std::cout << "energy - gradient: " << (f1 - f) / eps - grad.dot(dir) << std::endl;
-        std::cout << "gradient - hessian: " << ((grad1 - grad) / eps - H * dir).norm() << std::endl;
-    }
-}
-
 namespace LibShell {
 
-template <class DerivedA>
-static void proj_sym_matrix(Eigen::MatrixBase<DerivedA>& A, const HessianProjectType& projType) {
-    // no projection
-    if (projType == HessianProjectType::kNone) {
-        return;
-    }
-    Eigen::SelfAdjointEigenSolver<DerivedA> eigenSolver(A);
-    if (eigenSolver.eigenvalues()[0] >= 0) {
-        return;
-    }
-
-    using T = typename DerivedA::Scalar;
-    Eigen::Matrix<T, -1, 1> D = eigenSolver.eigenvalues();
-    for (int i = 0; i < A.rows(); ++i) {
-        if (D[i] < 0) {
-            if (projType == HessianProjectType::kMaxZero) {
-                D[i] = 0;
-            } else if (projType == HessianProjectType::kAbs) {
-                D[i] = -D[i];
-            } else {
-                D[i] = 0;
-            }
-        } else {
-            break;
-        }
-    }
-    A = eigenSolver.eigenvectors() * D.asDiagonal() * eigenSolver.eigenvectors().transpose();
-}
-
-void ExtraEnergyTerms::initialization(const Eigen::MatrixXd& rest_pos,
-                                      const MeshConnectivity& mesh,
-                                      double youngs,
-                                      double shear,
-                                      double thickness,
-                                      int quad_oder) {
-    m_youngs = youngs;
-    m_shear = shear;
-    m_thickness = thickness;
-    m_quad_points = build_quadrature_points(quad_oder);
-
-    m_face_area.resize(mesh.nFaces());
-    for (int f = 0; f < mesh.nFaces(); f++) {
-        Eigen::Vector3d e1 = rest_pos.row(mesh.faceVertex(f, 1)) - rest_pos.row(mesh.faceVertex(f, 0));
-        Eigen::Vector3d e2 = rest_pos.row(mesh.faceVertex(f, 2)) - rest_pos.row(mesh.faceVertex(f, 0));
-        m_face_area[f] = 0.5 * e1.cross(e2).norm();
-    }
-}
-
-double ExtraEnergyTerms::compute_magnitude_compression_energy_perface(const Eigen::VectorXd& edge_dofs,
+double ExtraEnergyTermsGeneralFormulation::compute_magnitude_compression_energy_perface(const Eigen::VectorXd& edge_dofs,
                                                                       const MeshConnectivity& mesh,
                                                                       int face,
-                                                                      Eigen::Vector3d* deriv,
-                                                                      Eigen::Matrix<double, 3, 3>* hessian,
-                                                                      bool is_proj) {
-    double sum = 0;
+                                                                      Eigen::VectorXd* deriv,
+                                                                      Eigen::MatrixXd* hessian,
+                                                                      bool is_proj)  {
     std::vector<double> m(3);
 
     for (int i = 0; i < 3; i++) {
@@ -98,11 +25,11 @@ double ExtraEnergyTerms::compute_magnitude_compression_energy_perface(const Eige
     }
 
     if (deriv) {
-        deriv->setZero();
+        deriv->setZero(3);
     }
 
     if (hessian) {
-        hessian->setZero();
+        hessian->setZero(3, 3);
     }
 
     // m = (2u + 2v - 1) m0 + (1 - 2u) m1 + (1 - 2v) m2
@@ -166,41 +93,13 @@ double ExtraEnergyTerms::compute_magnitude_compression_energy_perface(const Eige
     }
 
     return energy;
-
-
-    for (int i = 0; i < m_quad_points.size(); i++) {
-        double u = m_quad_points[i].u;
-        double v = m_quad_points[i].v;
-        double w = m_quad_points[i].weight * m_face_area[face] * m_youngs * m_thickness / 4;
-
-        double mag = (2 * u + 2 * v - 1) * m[0] + (1 - 2 * u) * m[1] + (1 - 2 * v) * m[2];
-        sum += w * (mag * mag - 1) * (mag * mag - 1);
-
-        if (deriv || hessian) {
-            Eigen::Vector3d dmag;
-            dmag << 2 * u + 2 * v - 1, 1 - 2 * u, 1 - 2 * v;
-
-            if (deriv) {
-                (*deriv) += 4 * w * (mag * mag - 1) * mag * dmag;
-            }
-
-            if (hessian) {
-                (*hessian) += 4 * w * (3 * mag * mag - 1) * dmag * dmag.transpose();
-            }
-        }
-    }
-
-    if (hessian && is_proj) {
-        proj_sym_matrix(*hessian, HessianProjectType::kMaxZero);
-    }
-    return sum;
 }
 
-double ExtraEnergyTerms::compute_magnitude_compression_energy(const Eigen::VectorXd& edge_dofs,
+double ExtraEnergyTermsGeneralFormulation::compute_magnitude_compression_energy(const Eigen::VectorXd& edge_dofs,
                                                               const MeshConnectivity& mesh,
                                                               Eigen::VectorXd* deriv,
                                                               std::vector<Eigen::Triplet<double>>* hessian,
-                                                              bool is_proj) {
+                                                              bool is_proj)  {
     double energy = 0;
     if (deriv) {
         deriv->setZero(edge_dofs.size());
@@ -212,8 +111,8 @@ double ExtraEnergyTerms::compute_magnitude_compression_energy(const Eigen::Vecto
     int nfaces = mesh.nFaces();
 
     std::vector<double> energies(nfaces);
-    std::vector<Eigen::Vector3d> face_derivs(nfaces);
-    std::vector<Eigen::Matrix<double, 3, 3>> face_hessians(nfaces);
+    std::vector<Eigen::VectorXd> face_derivs(nfaces);
+    std::vector<Eigen::MatrixXd> face_hessians(nfaces);
 
     tbb::parallel_for(0, nfaces, [&](int i) {
         energies[i] =
@@ -222,8 +121,8 @@ double ExtraEnergyTerms::compute_magnitude_compression_energy(const Eigen::Vecto
     });
 
     for (int fid = 0; fid < nfaces; fid++) {
-        Eigen::Vector3d& face_deriv = face_derivs[fid];
-        Eigen::Matrix<double, 3, 3>& face_hessian = face_hessians[fid];
+        Eigen::VectorXd& face_deriv = face_derivs[fid];
+        Eigen::MatrixXd& face_hessian = face_hessians[fid];
         double face_energy = energies[fid];
         energy += face_energy;
         if (deriv) {
@@ -254,14 +153,14 @@ double ExtraEnergyTerms::compute_magnitude_compression_energy(const Eigen::Vecto
     return energy;
 }
 
-double ExtraEnergyTerms::compute_vector_perp_tangent_energy_perface(const Eigen::MatrixXd& cur_pos,
+double ExtraEnergyTermsGeneralFormulation::compute_vector_perp_tangent_energy_perface(const Eigen::MatrixXd& cur_pos,
                                                                     const Eigen::VectorXd& edge_dofs,
                                                                     const MeshConnectivity& mesh,
                                                                     const std::vector<Eigen::Matrix2d>& abars,
                                                                     int face,
                                                                     Eigen::VectorXd* deriv,
                                                                     Eigen::MatrixXd* hessian,
-                                                                    bool is_proj) {
+                                                                    bool is_proj)  {
     std::vector<double> ni_b0(3);
     std::vector<double> ni_b1(3);
 
@@ -318,62 +217,15 @@ double ExtraEnergyTerms::compute_vector_perp_tangent_energy_perface(const Eigen:
     }
 
     return energy;
-
-
-
-    for (int i = 0; i < m_quad_points.size(); i++) {
-        double u = m_quad_points[i].u;
-        double v = m_quad_points[i].v;
-        double w = m_quad_points[i].weight * m_face_area[face] * m_shear * m_thickness / 2;
-
-        double n_b0 = (2 * u + 2 * v - 1) * ni_b0[0] + (1 - 2 * u) * ni_b0[1] + (1 - 2 * v) * ni_b0[2];
-        double n_b1 = (2 * u + 2 * v - 1) * ni_b1[0] + (1 - 2 * u) * ni_b1[1] + (1 - 2 * v) * ni_b1[2];
-
-        Eigen::Vector2d vec;
-        vec << n_b0, n_b1;
-
-        energy += w * vec.dot(abar_inv * vec);
-
-        if (deriv || hessian) {
-            Eigen::Vector3d bary;
-            bary << 2 * u + 2 * v - 1, 1 - 2 * u, 1 - 2 * v;
-
-            Eigen::VectorXd dn_b0 = (bary[0] * dni_b0[0] + bary[1] * dni_b0[1] + bary[2] * dni_b0[2]).transpose();
-            Eigen::VectorXd dn_b1 = (bary[0] * dni_b1[0] + bary[1] * dni_b1[1] + bary[2] * dni_b1[2]).transpose();
-
-            if (deriv) {
-                (*deriv) += w * 2.0 * abar_inv(0, 0) * n_b0 * dn_b0;
-                (*deriv) += w * abar_inv(0, 1) * (n_b0 * dn_b1 + n_b1 * dn_b0);
-                (*deriv) += w * abar_inv(1, 0) * (n_b1 * dn_b0 + n_b0 * dn_b1);
-                (*deriv) += w * 2.0 * abar_inv(1, 1) * n_b1 * dn_b1;
-            }
-
-            if (hessian) {
-                Eigen::MatrixXd hn_b0 = bary[0] * hni_b0[0] + bary[1] * hni_b0[1] + bary[2] * hni_b0[2];
-                Eigen::MatrixXd hn_b1 = bary[0] * hni_b1[0] + bary[1] * hni_b1[1] + bary[2] * hni_b1[2];
-
-                (*hessian) += w * 2.0 * abar_inv(0, 0) * (dn_b0 * dn_b0.transpose() + n_b0 * hn_b0);
-                (*hessian) += w * abar_inv(0, 1) * (dn_b0 * dn_b1.transpose() + n_b0 * hn_b1 + dn_b1 * dn_b0.transpose() + n_b1 * hn_b0);
-                (*hessian) += w * abar_inv(1, 0) * (dn_b0 * dn_b1.transpose() + n_b0 * hn_b1 + dn_b1 * dn_b0.transpose() + n_b1 * hn_b0);
-                (*hessian) += w * 2.0 * abar_inv(1, 1) * (dn_b1 * dn_b1.transpose() + n_b1 * hn_b1);
-            }
-        }
-    }
-
-    if (hessian && is_proj) {
-        proj_sym_matrix(*hessian, HessianProjectType::kMaxZero);
-    }
-
-    return energy;
 }
 
-double ExtraEnergyTerms::compute_vector_perp_tangent_energy(const Eigen::MatrixXd& cur_pos,
+double ExtraEnergyTermsGeneralFormulation::compute_vector_perp_tangent_energy(const Eigen::MatrixXd& cur_pos,
                                                             const Eigen::VectorXd& edge_dofs,
                                                             const MeshConnectivity& mesh,
                                                             const std::vector<Eigen::Matrix2d> &abars,
                                                             Eigen::VectorXd* deriv,
                                                             std::vector<Eigen::Triplet<double>>* hessian,
-                                                            bool is_proj) {
+                                                            bool is_proj)  {
     double energy = 0;
     int nverts = cur_pos.rows();
     int nedges = mesh.nEdges();
@@ -470,13 +322,13 @@ double ExtraEnergyTerms::compute_vector_perp_tangent_energy(const Eigen::MatrixX
     return energy;
 }
 
-double ExtraEnergyTerms::compute_magnitude_sq_change_energy_perface(const Eigen::VectorXd& edge_dofs,
+double ExtraEnergyTermsGeneralFormulation::compute_magnitude_sq_change_energy_perface(const Eigen::VectorXd& edge_dofs,
                                                                     const MeshConnectivity& mesh,
                                                                     const std::vector<Eigen::Matrix2d>& abars,
                                                                     int face,
-                                                                    Eigen::Vector3d* deriv,
-                                                                    Eigen::Matrix<double, 3, 3>* hessian,
-                                                                    bool is_proj) {
+                                                                    Eigen::VectorXd* deriv,
+                                                                    Eigen::MatrixXd* hessian,
+                                                                    bool is_proj)  {
     double sum = 0;
     std::vector<double> m(3);
 
@@ -488,11 +340,11 @@ double ExtraEnergyTerms::compute_magnitude_sq_change_energy_perface(const Eigen:
     }
 
     if (deriv) {
-        deriv->setZero();
+        deriv->setZero(3);
     }
 
     if (hessian) {
-        hessian->setZero();
+        hessian->setZero(3, 3);
     }
 
     Eigen::Matrix2d abar_inv = abars[face].inverse();
@@ -544,12 +396,12 @@ double ExtraEnergyTerms::compute_magnitude_sq_change_energy_perface(const Eigen:
     return sum;
 }
 
-double ExtraEnergyTerms::compute_magnitude_sq_change_energy(const Eigen::VectorXd& edge_dofs,
+double ExtraEnergyTermsGeneralFormulation::compute_magnitude_sq_change_energy(const Eigen::VectorXd& edge_dofs,
                                                             const MeshConnectivity& mesh,
                                                             const std::vector<Eigen::Matrix2d>& abars,
                                                             Eigen::VectorXd* deriv,
                                                             std::vector<Eigen::Triplet<double>>* hessian,
-                                                            bool is_proj) {
+                                                            bool is_proj)  {
     double energy = 0;
     if (deriv) {
         deriv->setZero(edge_dofs.size());
@@ -559,8 +411,8 @@ double ExtraEnergyTerms::compute_magnitude_sq_change_energy(const Eigen::VectorX
     }
 
     std::vector<double> energies(mesh.nFaces());
-    std::vector<Eigen::Vector3d> face_derivs(mesh.nFaces());
-    std::vector<Eigen::Matrix<double, 3, 3>> face_hessians(mesh.nFaces());
+    std::vector<Eigen::VectorXd> face_derivs(mesh.nFaces());
+    std::vector<Eigen::MatrixXd> face_hessians(mesh.nFaces());
 
     tbb::parallel_for(0, (int)(mesh.nFaces()), [&](int i) {
         energies[i] =
@@ -573,8 +425,8 @@ double ExtraEnergyTerms::compute_magnitude_sq_change_energy(const Eigen::VectorX
 
         double face_energy = energies[fid];
 
-        Eigen::Vector3d &face_deriv = face_derivs[fid];
-        Eigen::Matrix<double, 3, 3> &face_hessian = face_hessians[fid];
+        Eigen::VectorXd &face_deriv = face_derivs[fid];
+        Eigen::MatrixXd &face_hessian = face_hessians[fid];
 
         energy += face_energy;
         if (deriv) {
@@ -605,9 +457,9 @@ double ExtraEnergyTerms::compute_magnitude_sq_change_energy(const Eigen::VectorX
     return energy;
 }
 
-void ExtraEnergyTerms::test_compute_magnitude_compression_energy_perface(const MeshConnectivity& mesh,
+void ExtraEnergyTermsGeneralFormulation::test_compute_magnitude_compression_energy_perface(const MeshConnectivity& mesh,
                                                                          const Eigen::VectorXd& edge_dofs,
-                                                                         int face) {
+                                                                         int face)  {
     auto to_variables = [&](const Eigen::VectorXd& cur_edge_dofs) {
         Eigen::VectorXd vars(3);
         vars.setZero();
@@ -635,8 +487,8 @@ void ExtraEnergyTerms::test_compute_magnitude_compression_energy_perface(const M
 
     auto func = [&](const Eigen::VectorXd& x, Eigen::VectorXd* deriv, Eigen::SparseMatrix<double>* hessian, bool is_proj) {
         from_variable(x, cur_edge_dofs);
-        Eigen::Vector3d dense_deriv;
-        Eigen::Matrix3d dense_hess;
+        Eigen::VectorXd dense_deriv;
+        Eigen::MatrixXd dense_hess;
         double val = compute_magnitude_compression_energy_perface(
             cur_edge_dofs, mesh, face, deriv ? &dense_deriv : nullptr, hessian ? &dense_hess : nullptr, false);
         if(deriv) {
@@ -660,8 +512,8 @@ void ExtraEnergyTerms::test_compute_magnitude_compression_energy_perface(const M
     TestFuncGradHessian(func, vars);
 }
 
-void ExtraEnergyTerms::test_compute_magnitude_compression_energy(const MeshConnectivity& mesh,
-                                                                 const Eigen::VectorXd& edge_dofs) {
+void ExtraEnergyTermsGeneralFormulation::test_compute_magnitude_compression_energy(const MeshConnectivity& mesh,
+                                                                 const Eigen::VectorXd& edge_dofs)  {
     auto to_variables = [&](const Eigen::VectorXd& cur_edge_dofs) {
         Eigen::VectorXd vars = cur_edge_dofs;
         return vars;
@@ -690,11 +542,11 @@ void ExtraEnergyTerms::test_compute_magnitude_compression_energy(const MeshConne
     TestFuncGradHessian(func, vars);
 }
 
-void ExtraEnergyTerms::test_compute_vector_perp_tangent_energy_perface(const MeshConnectivity& mesh,
+void ExtraEnergyTermsGeneralFormulation::test_compute_vector_perp_tangent_energy_perface(const MeshConnectivity& mesh,
 const std::vector<Eigen::Matrix2d>& abars,
                                                                        const Eigen::MatrixXd& cur_pos,
                                                                        const Eigen::VectorXd& edge_dofs,
-                                                                       int face) {
+                                                                       int face)  {
     constexpr int numExtraDOFs = MidedgeAngleGeneralFormulation::numExtraDOFs;
     auto to_variables = [&](const Eigen::MatrixXd& pos, const Eigen::VectorXd& cur_edge_dofs) {
         Eigen::VectorXd vars(18 + 3 * numExtraDOFs);
@@ -760,7 +612,7 @@ const std::vector<Eigen::Matrix2d>& abars,
     TestFuncGradHessian(func, vars);
 }
 
-void ExtraEnergyTerms::test_compute_vector_perp_tangent_energy(const MeshConnectivity& mesh,
+void ExtraEnergyTermsGeneralFormulation::test_compute_vector_perp_tangent_energy(const MeshConnectivity& mesh,
                                                                const std::vector<Eigen::Matrix2d>& abars,
                                                                const Eigen::MatrixXd& cur_pos,
                                                                const Eigen::VectorXd& edge_dofs) {
@@ -809,10 +661,10 @@ void ExtraEnergyTerms::test_compute_vector_perp_tangent_energy(const MeshConnect
 }
 
 
-void ExtraEnergyTerms::test_compute_magnitude_sq_change_energy_perface(const MeshConnectivity& mesh,
+void ExtraEnergyTermsGeneralFormulation::test_compute_magnitude_sq_change_energy_perface(const MeshConnectivity& mesh,
                                                                        const std::vector<Eigen::Matrix2d>& abars,
                                                                          const Eigen::VectorXd& edge_dofs,
-                                                                         int face) {
+                                                                         int face)  {
     auto to_variables = [&](const Eigen::VectorXd& cur_edge_dofs) {
         Eigen::VectorXd vars(3);
         vars.setZero();
@@ -840,8 +692,8 @@ void ExtraEnergyTerms::test_compute_magnitude_sq_change_energy_perface(const Mes
 
     auto func = [&](const Eigen::VectorXd& x, Eigen::VectorXd* deriv, Eigen::SparseMatrix<double>* hessian, bool is_proj) {
         from_variable(x, cur_edge_dofs);
-        Eigen::Vector3d dense_deriv;
-        Eigen::Matrix3d dense_hess;
+        Eigen::VectorXd dense_deriv;
+        Eigen::MatrixXd dense_hess;
         double val = compute_magnitude_sq_change_energy_perface(
             cur_edge_dofs, mesh, abars, face, deriv ? &dense_deriv : nullptr, hessian ? &dense_hess : nullptr, false);
         if(deriv) {
@@ -865,9 +717,9 @@ void ExtraEnergyTerms::test_compute_magnitude_sq_change_energy_perface(const Mes
     TestFuncGradHessian(func, vars);
 }
 
-void ExtraEnergyTerms::test_compute_magnitude_sq_change_energy(const MeshConnectivity& mesh,
+void ExtraEnergyTermsGeneralFormulation::test_compute_magnitude_sq_change_energy(const MeshConnectivity& mesh,
                                                                const std::vector<Eigen::Matrix2d>& abars,
-                                                                 const Eigen::VectorXd& edge_dofs) {
+                                                                 const Eigen::VectorXd& edge_dofs)  {
     auto to_variables = [&](const Eigen::VectorXd& cur_edge_dofs) {
         Eigen::VectorXd vars = cur_edge_dofs;
         return vars;
@@ -895,8 +747,5 @@ void ExtraEnergyTerms::test_compute_magnitude_sq_change_energy(const MeshConnect
 
     TestFuncGradHessian(func, vars);
 }
-
-template void proj_sym_matrix(Eigen::MatrixBase<Eigen::Matrix<double, 3, 3>>& symA, const HessianProjectType& projType);
-template void proj_sym_matrix(Eigen::MatrixBase<Eigen::MatrixXd>& symA, const HessianProjectType& projType);
 
 }  // namespace LibShell

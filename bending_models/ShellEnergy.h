@@ -61,7 +61,8 @@ class ShellEnergy {
 public:
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const = 0;
@@ -76,12 +77,15 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_BENDING;
+        if (withStretching)
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_STRETCHING;
         return LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
@@ -101,13 +105,19 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_BENDING;
+        }
+
         return LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -126,13 +136,18 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending) {
+            LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -151,13 +166,18 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                    bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -176,13 +196,18 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                    bool withStretching,
+                                    bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -202,14 +227,20 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |=
+                LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |=
                 LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -228,13 +259,19 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                    bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |=
+        LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -253,13 +290,20 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        if (withBending) {
+            whichTerms |=
+        LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_BENDING;
+        }
+
         return LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -278,13 +322,19 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_BENDING;
+        }
+
         return LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -303,13 +353,19 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                    bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -328,13 +384,18 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -353,13 +414,18 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                    bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -378,14 +444,20 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                    bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
-        int whichTerms = LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_BENDING;
-        if (!bendingOnly)
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |=
+                LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
             whichTerms |=
                 LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_STRETCHING;
+        }
         return LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
@@ -414,7 +486,8 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
@@ -425,26 +498,29 @@ public:
             derivative->resize(3 * nverts);
             derivative->setZero();
         }
-        if (!bendingOnly)
+        if (withStretching) {
             result += LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::elasticEnergy(
                 mesh_, curPos, curEdgeDOFs, mat_, restState_,
                 LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_STRETCHING, derivative,
                 hessian, proj_type);
-        Eigen::VectorXd displacement(3 * nverts);
-        for (int i = 0; i < nverts; i++) {
-            for (int j = 0; j < 3; j++) {
-                displacement[3 * i + j] = curPos(i, j) - restPos_(i, j);
+        }
+        if (withBending) {
+            Eigen::VectorXd displacement(3 * nverts);
+            for (int i = 0; i < nverts; i++) {
+                for (int j = 0; j < 3; j++) {
+                    displacement[3 * i + j] = curPos(i, j) - restPos_(i, j);
+                }
             }
-        }
 
-        double bendingEnergy = 0.5 * displacement.transpose() * bendingM_ * displacement;
-        result += bendingEnergy;
+            double bendingEnergy = 0.5 * displacement.transpose() * bendingM_ * displacement;
+            result += bendingEnergy;
 
-        if (derivative) {
-            *derivative += bendingM_ * displacement;
-        }
-        if (hessian) {
-            for (auto it : bendingMcoeffs_) hessian->push_back(it);
+            if (derivative) {
+                *derivative += bendingM_ * displacement;
+            }
+            if (hessian) {
+                for (auto it : bendingMcoeffs_) hessian->push_back(it);
+            }
         }
 
         return result;
@@ -558,7 +634,8 @@ public:
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
-                                 bool bendingOnly,
+                                 bool withStretching,
+                                    bool withBending,
                                  Eigen::VectorXd* derivative,  // positions, then thetas
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
@@ -570,30 +647,34 @@ public:
             derivative->setZero();
         }
 
-        if (!bendingOnly)
+        if (withStretching) {
             result += LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::elasticEnergy(
                 mesh_, curPos, curEdgeDOFs, mat_, restState_,
                 LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_STRETCHING, derivative,
                 hessian, proj_type);
+        }
 
-        Eigen::VectorXd displacement(3 * nverts);
-        for (int i = 0; i < nverts; i++) {
-            for (int j = 0; j < 3; j++) {
-                displacement[3 * i + j] = curPos(i, j);
+        if(withBending) {
+            Eigen::VectorXd displacement(3 * nverts);
+            for (int i = 0; i < nverts; i++) {
+                for (int j = 0; j < 3; j++) {
+                    displacement[3 * i + j] = curPos(i, j);
+                }
             }
+
+            double bendingEnergy = 0.5 * displacement.transpose() * bendingM_ * displacement;
+            result += bendingEnergy;
+
+            if (derivative) {
+                *derivative += bendingM_ * displacement;
+            }
+            if (hessian) {
+                for (auto it : bendingMcoeffs_) hessian->push_back(it);
+            }
+
+            return result;
         }
 
-        double bendingEnergy = 0.5 * displacement.transpose() * bendingM_ * displacement;
-        result += bendingEnergy;
-
-        if (derivative) {
-            *derivative += bendingM_ * displacement;
-        }
-        if (hessian) {
-            for (auto it : bendingMcoeffs_) hessian->push_back(it);
-        }
-
-        return result;
     }
 
     const LibShell::MeshConnectivity& mesh_;

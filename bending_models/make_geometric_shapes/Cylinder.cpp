@@ -40,15 +40,29 @@ void makeCylinder(bool regular, double radius, double height, double triangleAre
                 V(idx, 2) = flatV(idx, 1);
                 if (i > 0 && j > 0)
                 {
-                    int idxm1m1 = (i - 1) * W + (j - 1);
-                    int idxm1m0 = (i - 1) * W + j;
-                    F(curface, 0) = idxm1m1;
-                    F(curface, 1) = idxm1m0;
-                    F(curface, 2) = idx;
-                    int idxm0m1 = i * W + (j - 1);
-                    F(curface + 1, 0) = idxm1m1;
-                    F(curface + 1, 1) = idx;
-                    F(curface + 1, 2) = idxm0m1;
+                    if((curface / 2) % 2 == 0) {
+                        int idxm1m1 = (i - 1) * W + (j - 1);
+                        int idxm1m0 = (i - 1) * W + j;
+                        F(curface, 0) = idxm1m1;
+                        F(curface, 1) = idxm1m0;
+                        F(curface, 2) = idx;
+                        int idxm0m1 = i * W + (j - 1);
+                        F(curface + 1, 0) = idxm1m1;
+                        F(curface + 1, 1) = idx;
+                        F(curface + 1, 2) = idxm0m1;
+                    } else {
+                        int idxm1m1 = (i - 1) * W + (j - 1);
+                        int idxm1m0 = (i - 1) * W + j;
+                        int idxm0m1 = i * W + (j - 1);
+
+                        F(curface, 0) = idxm1m1;
+                        F(curface, 1) = idxm1m0;
+                        F(curface, 2) = idxm0m1;
+
+                        F(curface + 1, 0) = idxm1m0;
+                        F(curface + 1, 1) = idx;
+                        F(curface + 1, 2) = idxm0m1;
+                    }
                     curface += 2;
                 }
             }
