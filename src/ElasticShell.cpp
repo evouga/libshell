@@ -160,15 +160,16 @@ double ElasticShell<SFF>::elasticEnergy(const MeshConnectivity& mesh,
             bend_hessians.resize(nfaces);
         }
 
-
-        tbb::parallel_for(0, nfaces, [&](int i) {
+       tbb::parallel_for(0, nfaces, [&](int i) {
+        // for(int i = 0; i < nfaces; i++) {
             bend_energies[i] =
                 mat.bendingEnergy(mesh, curPos, extraDOFs, restState, i, derivative ? &bend_derivs[i] : nullptr,
                                   hessian ? &bend_hessians[i] : nullptr);
             if(hessian) {
                 projSymMatrix(bend_hessians[i], projType);
             }
-        });
+        }
+        );
 
         for (int i = 0; i < nfaces; i++) {
             result += bend_energies[i];

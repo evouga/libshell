@@ -23,6 +23,17 @@ double angle(const Eigen::Vector3d& v,
              const Eigen::Vector3d& axis,
              Eigen::Matrix<double, 1, 9>* derivative,  // v, w
              Eigen::Matrix<double, 9, 9>* hessian) {
+    // sanity check
+    if(!v.norm() || !w.norm() || !axis.norm()) {
+        if(derivative) {
+            derivative->setZero();
+        }
+        if(hessian) {
+            hessian->setZero();
+        }
+        return 0;
+    }
+
     double theta = 2.0 * atan2((v.cross(w).dot(axis) / axis.norm()), v.dot(w) + v.norm() * w.norm());
 
     if (derivative) {
@@ -48,6 +59,99 @@ double angle(const Eigen::Vector3d& v,
 
     return theta;
 }
+
+double cosTriangleAngle(const MeshConnectivity& mesh,
+                        const Eigen::MatrixXd& curPos,
+                        int face,
+                        int vid,
+                        Eigen::Matrix<double, 1, 9>* derivative,
+                        Eigen::Matrix<double, 9, 9>* hessian) {
+    Eigen::Vector3d e0 = curPos.row(mesh.faceVertex(face, (vid + 1) % 3)).transpose() -
+                         curPos.row(mesh.faceVertex(face, vid)).transpose();
+    Eigen::Vector3d e1 = curPos.row(mesh.faceVertex(face, (vid + 2) % 3)).transpose() -
+                         curPos.row(mesh.faceVertex(face, vid)).transpose();
+
+    Eigen::Vector3d de0_norm, de1_norm;
+    Eigen::Matrix3d d2e0_norm, d2e1_norm;
+
+    double e0_norm = vec_norm(e0, (derivative || hessian) ? &de0_norm : nullptr,
+                                 hessian ? &d2e0_norm : nullptr);
+    double e1_norm = vec_norm(e1, (derivative || hessian) ? &de1_norm : nullptr,
+                                 hessian ? &d2e1_norm : nullptr);
+
+    double e0_dot_e1 = e0.dot(e1);
+    double e0e1_norm = e0_norm * e1_norm;
+
+    double cos = e0_dot_e1 / e0e1_norm;
+
+    if(derivative || hessian) {
+        Eigen::Matrix<double, 1, 9> e0_norm_deriv;
+        e0_norm_deriv.setZero();
+        e0_norm_deriv.block<1, 3>(0, 3 * vid) = -de0_norm.transpose();
+        e0_norm_deriv.block<1, 3>(0, 3 * ((vid + 1) % 3)) = de0_norm.transpose();
+
+        Eigen::Matrix<double, 1, 9> e1_norm_deriv;
+        e1_norm_deriv.setZero();
+        e1_norm_deriv.block<1, 3>(0, 3 * vid) = -de1_norm.transpose();
+        e1_norm_deriv.block<1, 3>(0, 3 * ((vid + 2) % 3)) = de1_norm.transpose();
+
+        Eigen::Matrix<double, 1, 9> e0e1_norm_deriv = e0_norm * e1_norm_deriv + e1_norm * e0_norm_deriv;
+        Eigen::Matrix<double, 1, 9> e0_dot_e1_deriv;
+        e0_dot_e1_deriv.block<1, 3>(0, 3 * vid) = -(e0 + e1).transpose();
+        e0_dot_e1_deriv.block<1, 3>(0, 3 * ((vid + 1) % 3)) = e1.transpose();
+        e0_dot_e1_deriv.block<1, 3>(0, 3 * ((vid + 2) % 3)) = e0.transpose();
+
+        // cos = e0_dot_e1 / e0e1_norm
+        if (derivative) {
+            *derivative = (e0e1_norm * e0_dot_e1_deriv - e0_dot_e1 * e0e1_norm_deriv) / (e0e1_norm * e0e1_norm);
+        }
+
+        if(hessian) {
+            Eigen::Matrix<double, 9, 9> e0_norm_hess;
+            e0_norm_hess.setZero();
+            e0_norm_hess.block<3, 3>(3 * vid, 3 * vid) = d2e0_norm;
+            e0_norm_hess.block<3, 3>(3 * vid, 3 * ((vid + 1) % 3)) = -d2e0_norm;
+            e0_norm_hess.block<3, 3>(3 * ((vid + 1) % 3), 3 * vid) = -d2e0_norm;
+            e0_norm_hess.block<3, 3>(3 * ((vid + 1) % 3), 3 * ((vid + 1) % 3)) = d2e0_norm;
+
+            Eigen::Matrix<double, 9, 9> e1_norm_hess;
+            e1_norm_hess.setZero();
+            e1_norm_hess.block<3, 3>(3 * vid, 3 * vid) = d2e1_norm;
+            e1_norm_hess.block<3, 3>(3 * vid, 3 * ((vid + 2) % 3)) = -d2e1_norm;
+            e1_norm_hess.block<3, 3>(3 * ((vid + 2) % 3), 3 * vid) = -d2e1_norm;
+            e1_norm_hess.block<3, 3>(3 * ((vid + 2) % 3), 3 * ((vid + 2) % 3)) = d2e1_norm;
+
+            Eigen::Matrix<double, 9, 9> e0e1_norm_hess = e0_norm * e1_norm_hess + e1_norm * e0_norm_hess;
+            e0e1_norm_hess += e0_norm_deriv.transpose() * e1_norm_deriv +
+                              e1_norm_deriv.transpose() * e0_norm_deriv;
+
+            Eigen::Matrix<double, 9, 9> e0_dot_e1_hess;
+            Eigen::Matrix3d id = Eigen::Matrix3d::Identity();
+            e0_dot_e1_hess.setZero();
+            e0_dot_e1_hess.block<3, 3>(3 * vid, 3 * vid) = 2 * id;
+            e0_dot_e1_hess.block<3, 3>(3 * vid, 3 * ((vid + 1) % 3)) = -id;
+            e0_dot_e1_hess.block<3, 3>(3 * vid, 3 * ((vid + 2) % 3)) = -id;
+
+            e0_dot_e1_hess.block<3, 3>(3 * ((vid + 1) % 3), 3 * vid) = -id;
+            e0_dot_e1_hess.block<3, 3>(3 * ((vid + 1) % 3), 3 * ((vid + 2) % 3)) = id;
+
+            e0_dot_e1_hess.block<3, 3>(3 * ((vid + 2) % 3), 3 * vid) = -id;
+            e0_dot_e1_hess.block<3, 3>(3 * ((vid + 2) % 3), 3 * ((vid + 1) % 3)) = id;
+
+            // cos = e0_dot_e1 / e0e1_norm
+            *hessian = -1 / (e0e1_norm * e0e1_norm) * (e0e1_norm_deriv.transpose() * e0_dot_e1_deriv +
+                                                  e0_dot_e1_deriv.transpose() * e0e1_norm_deriv + e0_dot_e1 * e0e1_norm_hess);
+            (*hessian) += 2 * e0_dot_e1 / (e0e1_norm * e0e1_norm * e0e1_norm) * (e0e1_norm_deriv.transpose() * e0e1_norm_deriv);
+            (*hessian) += 1.0 / e0e1_norm * e0_dot_e1_hess;
+        }
+    }
+
+    // Clamp cos to [-1, 1] to avoid NaN from acos
+    cos = std::max(-1.0, std::min(1.0, cos));
+
+    return cos;
+}
+
 
 Eigen::Vector3d faceNormal(const MeshConnectivity& mesh,
                            const Eigen::MatrixXd& curPos,
@@ -92,6 +196,7 @@ Eigen::Vector3d faceNormal(const MeshConnectivity& mesh,
 
     return n;
 }
+
 
 double triangleAltitude(const MeshConnectivity& mesh,
                         const Eigen::MatrixXd& curPos,
@@ -309,6 +414,16 @@ double edgeTheta(const MeshConnectivity& mesh,
 double vec_norm(const Eigen::Vector3d& v, Eigen::Vector3d* derivative, Eigen::Matrix3d* hessian) {
     double vnorm = v.norm();
 
+    if(vnorm == 0) {
+        if(derivative) {
+            derivative->setZero();
+        }
+        if(hessian) {
+            hessian->setZero();
+        }
+        return 0;
+    }
+
     if (derivative) {
         *derivative = v.normalized();
     }
@@ -320,5 +435,44 @@ double vec_norm(const Eigen::Vector3d& v, Eigen::Vector3d* derivative, Eigen::Ma
 
     return vnorm;
 }
+
+Eigen::Vector3d normalizedVector(const Eigen::Vector3d& v,
+                                 Eigen::Matrix3d* derivative,
+                                 std::vector<Eigen::Matrix3d>* hessian) {
+    if (derivative) {
+        derivative->setZero();
+    }
+    if(hessian) {
+        hessian->resize(3, Eigen::Matrix3d::Zero());
+    }
+
+    Eigen::Vector3d norm_deriv;
+    Eigen::Matrix3d norm_hess;
+    double vnorm = vec_norm(v, derivative || hessian ? &norm_deriv : nullptr,
+                            hessian ? &norm_hess : nullptr);
+    if(!vnorm) {
+        return Eigen::Vector3d::Zero();
+    }
+
+    Eigen::Vector3d vhat = v / vnorm;
+    if (derivative) {
+        for(int i = 0; i < 3; i++) {
+            derivative->row(i) = -v[i] / vnorm / vnorm * norm_deriv.transpose();
+            (*derivative)(i, i) += 1.0 / vnorm;
+        }
+    }
+
+    if (hessian) {
+        for(int i = 0; i < 3; i++) {
+            Eigen::Vector3d ei(0, 0, 0);
+            ei[i] = 1.0;
+            (*hessian)[i] = 2 * v[i] / vnorm / vnorm / vnorm * norm_deriv * norm_deriv.transpose() - v[i] / vnorm / vnorm * norm_hess;
+            (*hessian)[i] += -1 / vnorm / vnorm * (ei * norm_deriv.transpose() + norm_deriv * ei.transpose());
+        }
+    }
+
+    return vhat;
+}
+
 
 };  // namespace LibShell

@@ -1,6 +1,8 @@
 #ifndef GEOMETRYDERIVATIVES_H
 #define GEOMETRYDERIVATIVES_H
 
+#include "../include/MeshConnectivity.h"
+
 #include <Eigen/Core>
 #include <vector>
 
@@ -22,6 +24,16 @@ double angle(const Eigen::Vector3d& v,
              const Eigen::Vector3d& axis,
              Eigen::Matrix<double, 1, 9>* derivative,  // v, w, a
              Eigen::Matrix<double, 9, 9>* hessian);
+
+/*
+ * The cosine of the angle of the triangle at vertex vid of the face.
+ */
+double cosTriangleAngle(const MeshConnectivity& mesh,
+                     const Eigen::MatrixXd& curPos,
+                     int face,
+                     int vid,
+                     Eigen::Matrix<double, 1, 9>* derivative,
+                     Eigen::Matrix<double, 9, 9>* hessian);
 
 /*
  * Normal vector perpendcular to a face, and with magnitude equal to double the face area.
@@ -69,6 +81,11 @@ double edgeTheta(const MeshConnectivity& mesh,
  * Compute the norm of the vector.
  */
 double vec_norm(const Eigen::Vector3d& v, Eigen::Vector3d* derivative, Eigen::Matrix3d* hessian);
+
+/*
+ * Compute the normalized vector.
+ */
+Eigen::Vector3d normalizedVector(const Eigen::Vector3d& v, Eigen::Matrix3d* derivative, std::vector<Eigen::Matrix3d>* hessian);
 
 };  // namespace LibShell
 

@@ -349,12 +349,13 @@ public:
     StVKS2DirectorSinShellEnergy(const LibShell::MeshConnectivity& mesh, const LibShell::RestState& restState)
         : mesh_(mesh),
           restState_(restState),
-          mat_() {}
+          mat_() {
+    }
 
     virtual double elasticEnergy(const Eigen::MatrixXd& curPos,
                                  const Eigen::VectorXd& curEdgeDOFs,
                                  bool withStretching,
-                                    bool withBending,
+                                 bool withBending,
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {

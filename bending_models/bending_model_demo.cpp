@@ -18,6 +18,7 @@
 #include "../include/ExtraEnergyTermsTanFormulation.h"
 
 #include "../Optimization/include/NewtonDescent.h"
+#include "../src/GeometryDerivatives.h"
 #include "igl/boundary_loop.h"
 #include "igl/null.h"
 
@@ -42,6 +43,8 @@
 
 polyscope::SurfaceMesh* surface_mesh;
 polyscope::PointCloud* pt_mesh;
+
+bool is_include_III = true;
 
 void lameParameters(double youngs, double poisson, double& alpha, double& beta) {
     alpha = youngs * poisson / (1.0 - poisson * poisson);
@@ -209,23 +212,36 @@ void optimizeEdgeDOFs(ShellEnergy& energy,
         }
 
         if (extra_energy_terms || edgeDOFs.size() == 4 * edge_area.size()) {
-            Eigen::VectorXd mag_comp_deriv, direct_perp_deriv;
-            std::vector<Eigen::Triplet<double>> mag_comp_triplets, direct_perp_triplets;
+            Eigen::VectorXd mag_comp_deriv, direct_perp_deriv, III_deriv;
+            std::vector<Eigen::Triplet<double>> mag_comp_triplets, direct_perp_triplets, III_triplets;
 
             double mag_comp = extra_energy_terms->compute_magnitude_compression_energy(
                 edge_dofs, mesh, grad ? &mag_comp_deriv : nullptr, hessian ? &mag_comp_triplets : nullptr, psd_proj);
             double direct_perp = extra_energy_terms->compute_vector_perp_tangent_energy(
                 cur_pos, edge_dofs, mesh, abars, grad ? &direct_perp_deriv : nullptr,
                 hessian ? &direct_perp_triplets : nullptr, psd_proj);
+            double III = extra_energy_terms->compute_thirdFundamentalForm_energy(cur_pos, edge_dofs, mesh, abars, grad ? &III_deriv : nullptr,
+                hessian ? &III_triplets : nullptr, psd_proj);
+
             total_energy += mag_comp;
             total_energy += direct_perp;
+
+            if(is_include_III) {
+                total_energy += III;
+            }
+
 
             if (grad) {
                 *grad += (PE * mag_comp_deriv);
                 *grad += P * direct_perp_deriv;
+
+                if(is_include_III) {
+                    *grad += P * III_deriv;
+                }
+
             }
             if (hessian) {
-                Eigen::SparseMatrix<double> mag_comp_hess, direct_perp_hess;
+                Eigen::SparseMatrix<double> mag_comp_hess, direct_perp_hess, III_hess;
 
                 mag_comp_hess.resize(edge_dofs.size(), edge_dofs.size());
                 mag_comp_hess.setFromTriplets(mag_comp_triplets.begin(), mag_comp_triplets.end());
@@ -235,9 +251,18 @@ void optimizeEdgeDOFs(ShellEnergy& energy,
                 direct_perp_hess.setFromTriplets(direct_perp_triplets.begin(), direct_perp_triplets.end());
                 direct_perp_hess = P * direct_perp_hess * PT;
 
+                III_hess.resize(edge_dofs.size() + 3 * cur_pos.rows(), edge_dofs.size() + 3 * cur_pos.rows());
+                III_hess.setFromTriplets(III_triplets.begin(), III_triplets.end());
+                III_hess = P * III_hess * PT;
+
                 *hessian += mag_comp_hess;
 
                 *hessian += direct_perp_hess;
+
+                if(is_include_III) {
+                    *hessian += III_hess;
+                }
+
             }
         }
 
@@ -254,9 +279,14 @@ void optimizeEdgeDOFs(ShellEnergy& energy,
             extra_energy_terms->compute_magnitude_compression_energy(edgeDOFs, mesh, nullptr, nullptr, false);
         double direct_perp = extra_energy_terms->compute_vector_perp_tangent_energy(cur_pos, edgeDOFs, mesh, abars,
                                                                                     nullptr, nullptr, false);
+        double III_term = extra_energy_terms->compute_thirdFundamentalForm_energy(cur_pos, edgeDOFs, mesh, abars, nullptr,
+                                                                                   nullptr, false);
+        extra_energy_terms->test_compute_thirdFundamentalForm_energy(mesh, abars, cur_pos, edgeDOFs);
+        extra_energy_terms->test_compute_vector_perp_tangent_energy(mesh, abars, cur_pos, edgeDOFs);
 
         std::cout << "||m^2 - 1||^2: " << mag_comp << std::endl;
         std::cout << "direct perp: " << direct_perp << std::endl;
+        std::cout << "III: " << III_term << std::endl;
     }
 
     Eigen::VectorXd x = convert_edge_dofs_2_var(edgeDOFs);
@@ -275,8 +305,12 @@ void optimizeEdgeDOFs(ShellEnergy& energy,
             extra_energy_terms->compute_magnitude_compression_energy(edgeDOFs, mesh, nullptr, nullptr, false);
         double direct_perp = extra_energy_terms->compute_vector_perp_tangent_energy(cur_pos, edgeDOFs, mesh, abars,
                                                                                     nullptr, nullptr, false);
+        double III_term = extra_energy_terms->compute_thirdFundamentalForm_energy(cur_pos, edgeDOFs, mesh, abars, nullptr,
+                                                                                   nullptr, false);
+
         std::cout << "||m^2 - 1||^2: " << mag_comp << std::endl;
         std::cout << "direct perp: " << direct_perp << std::endl;
+        std::cout << "III: " << III_term << std::endl;
     }
 }
 
@@ -391,24 +425,36 @@ void optimizeFullDOFs(ShellEnergy& energy,
         }
 
         if (extra_energy_terms || nedgedofs == 4 * edge_area.size()) {
-            Eigen::VectorXd mag_comp_deriv, direct_perp_deriv;
-            std::vector<Eigen::Triplet<double>> mag_comp_triplets, direct_perp_triplets;
+            Eigen::VectorXd mag_comp_deriv, direct_perp_deriv, III_deriv;
+            std::vector<Eigen::Triplet<double>> mag_comp_triplets, direct_perp_triplets, III_triplets;
 
             double mag_comp = extra_energy_terms->compute_magnitude_compression_energy(
             edge_dofs, mesh, grad ? &mag_comp_deriv : nullptr, hessian ? &mag_comp_triplets : nullptr, psd_proj);
             double direct_perp = extra_energy_terms->compute_vector_perp_tangent_energy(
                 pos, edge_dofs, mesh, abars, grad ? &direct_perp_deriv : nullptr,
                 hessian ? &direct_perp_triplets : nullptr, psd_proj);
+            double III = extra_energy_terms->compute_thirdFundamentalForm_energy(pos, edge_dofs, mesh, abars, grad ? &III_deriv : nullptr,
+                hessian ? &III_triplets : nullptr, psd_proj);
+
             total_energy += mag_comp;
             total_energy += direct_perp;
+
+            if(is_include_III) {
+                total_energy += III;
+            }
+
 
             if (grad) {
                 Eigen::VectorXd full_mag_comp_deriv = Eigen::VectorXd::Zero(nfulldofs);
                 full_mag_comp_deriv.segment(nposdofs, nedgedofs) = mag_comp_deriv;
                 *grad += P * (direct_perp_deriv + full_mag_comp_deriv);
+
+                if(is_include_III) {
+                    *grad += P * III_deriv;
+                }
             }
             if (hessian) {
-                Eigen::SparseMatrix<double> mag_comp_hess, direct_perp_hess;
+                Eigen::SparseMatrix<double> mag_comp_hess, direct_perp_hess, III_hess;
 
                 std::vector<Eigen::Triplet<double>> full_mag_comp_triplets;
                 for(int i = 0; i < mag_comp_triplets.size(); i++) {
@@ -421,12 +467,20 @@ void optimizeFullDOFs(ShellEnergy& energy,
 
                 direct_perp_hess.resize(edge_dofs.size() + 3 * cur_pos.rows(), edge_dofs.size() + 3 * cur_pos.rows());
                 direct_perp_hess.setFromTriplets(direct_perp_triplets.begin(), direct_perp_triplets.end());
-
                 direct_perp_hess = P * direct_perp_hess * PT;
+
+                III_hess.resize(edge_dofs.size() + 3 * cur_pos.rows(), edge_dofs.size() + 3 * cur_pos.rows());
+                III_hess.setFromTriplets(III_triplets.begin(), III_triplets.end());
+                III_hess = P * III_hess * PT;
 
                 *hessian += mag_comp_hess;
 
                 *hessian += direct_perp_hess;
+
+                if(is_include_III) {
+                    *hessian += III_hess;
+                }
+
             }
         }
 
@@ -445,9 +499,12 @@ void optimizeFullDOFs(ShellEnergy& energy,
             extra_energy_terms->compute_magnitude_compression_energy(cur_edge_dofs, mesh, nullptr, nullptr, false);
         double direct_perp = extra_energy_terms->compute_vector_perp_tangent_energy(cur_pos, cur_edge_dofs, mesh, abars,
                                                                                     nullptr, nullptr, false);
+        double III_term = extra_energy_terms->compute_thirdFundamentalForm_energy(cur_pos, cur_edge_dofs, mesh, abars, nullptr,
+                                                                                   nullptr, false);
 
         std::cout << "||m^2 - 1||^2: " << mag_comp << std::endl;
         std::cout << "direct perp: " << direct_perp << std::endl;
+        std::cout << "III: " << III_term << std::endl;
     }
 
     Eigen::VectorXd x = convert_pos_edge_dofs_2_var(cur_pos, cur_edge_dofs);
@@ -468,8 +525,11 @@ void optimizeFullDOFs(ShellEnergy& energy,
             extra_energy_terms->compute_magnitude_compression_energy(cur_edge_dofs, mesh, nullptr, nullptr, false);
         double direct_perp = extra_energy_terms->compute_vector_perp_tangent_energy(cur_pos, cur_edge_dofs, mesh, abars,
                                                                                     nullptr, nullptr, false);
+        double III_term = extra_energy_terms->compute_thirdFundamentalForm_energy(cur_pos, cur_edge_dofs, mesh, abars, nullptr,
+                                                                                   nullptr, false);
         std::cout << "||m^2 - 1||^2: " << mag_comp << std::endl;
         std::cout << "direct perp: " << direct_perp << std::endl;
+        std::cout << "III: " << III_term << std::endl;
     }
 }
 
@@ -558,7 +618,7 @@ void optimizeUnitS1Model(const LibShell::MeshConnectivity& mesh,
             std::cout << "============= Optimizing edge direction (S1 Sin) =========== " << std::endl;
             extra_energy_terms_s1 =
                 std::make_shared<LibShell::ExtraEnergyTermsSinFormulation>();
-            extra_energy_terms_s1->initialization(rest_pos, mesh, young, shear, thickness, 3);
+            extra_energy_terms_s1->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
             s1_dir_energy_model = std::make_shared<StVKS1DirectorSinShellEnergy>(mesh, s1_dir_rest_state);
 
             optimizeFullDOFs(*s1_dir_energy_model, s1_dir_rest_state.abars, mesh, edge_area, s1_dir_cur_pos,
@@ -579,7 +639,7 @@ void optimizeUnitS1Model(const LibShell::MeshConnectivity& mesh,
             std::cout << "============= Optimizing edge direction (S1 Tan) =========== " << std::endl;
             extra_energy_terms_s1 =
             std::make_shared<LibShell::ExtraEnergyTermsTanFormulation>();
-            extra_energy_terms_s1->initialization(rest_pos, mesh, young, shear, thickness, 3);
+            extra_energy_terms_s1->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
             s1_dir_energy_model = std::make_shared<StVKS1DirectorTanShellEnergy>(mesh, s1_dir_rest_state);
 
             optimizeFullDOFs(*s1_dir_energy_model, s1_dir_rest_state.abars, mesh, edge_area, s1_dir_cur_pos, s1_dir_edge_dofs, extra_energy_terms_s1, &fixed_vert_set);
@@ -740,7 +800,7 @@ void optimizeS2Model(const LibShell::MeshConnectivity& mesh,
             std::cout << "============= Optimizing edge direction (S2 Sin) =========== " << std::endl;
             extra_energy_terms =
                 std::make_shared<LibShell::ExtraEnergyTermsGeneralSinFormulation>();
-            extra_energy_terms->initialization(rest_pos, mesh, young, shear, thickness, 3);
+            extra_energy_terms->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
             stvk_s2_dir_energy_model = std::make_shared<StVKS2DirectorSinShellEnergy>(mesh, s2_dir_rest_state);
 
             optimizeFullDOFs(*stvk_s2_dir_energy_model, s2_dir_rest_state.abars, mesh, edge_area, s2_dir_cur_pos,
@@ -760,7 +820,7 @@ void optimizeS2Model(const LibShell::MeshConnectivity& mesh,
             std::cout << "============= Optimizing edge direction (S2 Tan) =========== " << std::endl;
             extra_energy_terms =
                 std::make_shared<LibShell::ExtraEnergyTermsGeneralTanFormulation>();
-            extra_energy_terms->initialization(rest_pos, mesh, young, shear, thickness, 3);
+            extra_energy_terms->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
             stvk_s2_dir_energy_model = std::make_shared<StVKS2DirectorTanShellEnergy>(mesh, s2_dir_rest_state);
 
             optimizeFullDOFs(*stvk_s2_dir_energy_model, s2_dir_rest_state.abars, mesh, edge_area, s2_dir_cur_pos,
@@ -906,7 +966,7 @@ Energies meassureEnergy(const LibShell::MeshConnectivity& mesh,
                        const Eigen::MatrixXd& cur_pos,
                        double thickness,
                        double young,
-                       double poissons,
+                       double poisson,
                        bool with_gui = true) {
     Energies result;
 
@@ -930,8 +990,8 @@ Energies meassureEnergy(const LibShell::MeshConnectivity& mesh,
     // set uniform thicknesses
     rest_state.thicknesses.resize(mesh.nFaces(), thickness);
     double lame_alpha, lame_beta;
-    lameParameters(young, poissons, lame_alpha, lame_beta);
-    double shear = young / (2.0 * (1.0 + poissons));
+    lameParameters(young, poisson, lame_alpha, lame_beta);
+    double shear = young / (2.0 * (1.0 + poisson));
     rest_state.lameAlpha.resize(mesh.nFaces(), lame_alpha);
     rest_state.lameBeta.resize(mesh.nFaces(), lame_beta);
 
@@ -1010,7 +1070,7 @@ Energies meassureEnergy(const LibShell::MeshConnectivity& mesh,
     std::cout << "============= Optimizing edge direction (S1 Sin) =========== " << std::endl;
     std::shared_ptr<LibShell::ExtraEnergyTermsSinFormulation> extra_energy_terms_s1_sin =
         std::make_shared<LibShell::ExtraEnergyTermsSinFormulation>();
-    extra_energy_terms_s1_sin->initialization(rest_pos, mesh, young, shear, thickness, 3);
+    extra_energy_terms_s1_sin->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
     optimizeEdgeDOFs(stvk_s1_dir_sin_energy_model, s1_dir_rest_state.abars, cur_pos, mesh, edge_area,
 s1_dir_sin_edge_dofs, extra_energy_terms_s1_sin);
     double perp_sin = extra_energy_terms_s1_sin->compute_vector_perp_tangent_energy(
@@ -1026,7 +1086,7 @@ s1_dir_sin_edge_dofs, extra_energy_terms_s1_sin);
     std::cout << "============= Optimizing edge direction (S1 Tan) =========== " << std::endl;
     std::shared_ptr<LibShell::ExtraEnergyTermsTanFormulation> extra_energy_terms_s1_tan =
     std::make_shared<LibShell::ExtraEnergyTermsTanFormulation>();
-    extra_energy_terms_s1_tan->initialization(rest_pos, mesh, young, shear, thickness, 3);
+    extra_energy_terms_s1_tan->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
     // optimizeEdgeDOFs(stvk_s1_dir_tan_energy_model, s1_dir_rest_state.abars, cur_pos, mesh, edge_area, s1_dir_tan_edge_dofs, extra_energy_terms_s1_tan);
     double perp_tan = extra_energy_terms_s1_tan->compute_vector_perp_tangent_energy(
         cur_pos, s1_dir_tan_edge_dofs, mesh, s1_dir_rest_state.abars, nullptr, nullptr, false);
@@ -1042,7 +1102,7 @@ s1_dir_sin_edge_dofs, extra_energy_terms_s1_sin);
     std::cout << "============= Optimizing edge direction (General S1 dir, Compressive) =========== " << std::endl;
     std::shared_ptr<LibShell::ExtraEnergyTermsGeneralFormulation> extra_energy_terms_general_s1 =
         std::make_shared<LibShell::ExtraEnergyTermsGeneralFormulation>();
-    extra_energy_terms_general_s1->initialization(rest_pos, mesh, young, shear, thickness, 3);
+    extra_energy_terms_general_s1->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
     std::unordered_set<int> fixed_edge_dofs;
     for(int i = 0; i < mesh.nEdges(); i++) {
         fixed_edge_dofs.insert(LibShell::MidedgeAngleGeneralFormulation::numExtraDOFs * i + 1);
@@ -1066,7 +1126,7 @@ s1_dir_sin_edge_dofs, extra_energy_terms_s1_sin);
     std::cout << "============= Optimizing edge direction (General dir) =========== " << std::endl;
     std::shared_ptr<LibShell::ExtraEnergyTermsGeneralFormulation> extra_energy_terms =
         std::make_shared<LibShell::ExtraEnergyTermsGeneralFormulation>();
-    extra_energy_terms->initialization(rest_pos, mesh, young, shear, thickness, 3);
+    extra_energy_terms->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
     // optimizeEdgeDOFs(stvk_general_dir_energy_model, s2_dir_rest_state.abars, cur_pos, mesh, edge_area,
                      // general_dir_edge_dofs, extra_energy_terms);
     double mag_comp =
@@ -1086,7 +1146,7 @@ s1_dir_sin_edge_dofs, extra_energy_terms_s1_sin);
     std::cout << "============= Optimizing edge direction (S2 Sin) =========== " << std::endl;
     std::shared_ptr<LibShell::ExtraEnergyTermsGeneralSinFormulation> extra_energy_terms_sin =
         std::make_shared<LibShell::ExtraEnergyTermsGeneralSinFormulation>();
-    extra_energy_terms_sin->initialization(rest_pos, mesh, young, shear, thickness, 3);
+    extra_energy_terms_sin->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
 
     optimizeEdgeDOFs(stvk_s2_dir_sin_energy_model, s2_dir_rest_state.abars, cur_pos, mesh, edge_area,
                      s2_dir_sin_edge_dofs, extra_energy_terms_sin);
@@ -1104,7 +1164,7 @@ s1_dir_sin_edge_dofs, extra_energy_terms_s1_sin);
     std::cout << "============= Optimizing edge direction (S2 Tan) =========== " << std::endl;
     std::shared_ptr<LibShell::ExtraEnergyTermsGeneralTanFormulation> extra_energy_terms_tan =
         std::make_shared<LibShell::ExtraEnergyTermsGeneralTanFormulation>();
-    extra_energy_terms_tan->initialization(rest_pos, mesh, young, shear, thickness, 3);
+    extra_energy_terms_tan->initialization(rest_pos, mesh, young, shear, thickness, poisson, 3);
 
     // optimizeEdgeDOFs(stvk_s2_dir_tan_energy_model, s2_dir_rest_state.abars, cur_pos, mesh, edge_area,
     //                  s2_dir_tan_edge_dofs, extra_energy_terms_tan);
@@ -1433,6 +1493,66 @@ struct InputArgs {
 };
 
 int main(int argc, char* argv[]) {
+    // {
+    //     // Test the function
+    //     Eigen::MatrixXd V(3, 3), rest_V;
+    //     V << 0, 0, 0,
+    //         1, 0, 0,
+    //         0, 1, 0;
+    //     Eigen::MatrixXi F(1, 3);
+    //     F << 0, 1, 2;
+    //
+    //     LibShell::MeshConnectivity mesh(F);
+    //     Eigen::VectorXd edge_dofs;
+    //     LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(edge_dofs, mesh, V);
+    //     edge_dofs.setRandom();
+    //     // LibShell::MidedgeAngleGeneralSinFormulation::test_compute_ninj(mesh, V, edge_dofs, 0, 0, 1);
+    //     // LibShell::MidedgeAngleGeneralSinFormulation::test_compute_ninj(mesh, V, edge_dofs, 0, 1, 0);
+    //
+    //     LibShell::MidedgeAngleGeneralSinFormulation::test_third_fund_form(mesh, V, edge_dofs, 0);
+    //
+    //
+    //     double r = 0.05;
+    //     double h = 0.1;
+    //     double a = 0.02;
+    //     makeCylinder(false, r, h, a * 6.0 / 4 * M_PI * r * h, rest_V, V,
+    //                  F, 6.0 / 4 * M_PI);
+    //     mesh = LibShell::MeshConnectivity(F);
+    //     LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(edge_dofs, mesh, V);
+    //     edge_dofs.setRandom();
+    //
+    //     auto is_interior_face = [&mesh](int face_id) {
+    //         for(int i = 0; i < 3; i++) {
+    //             int eid = mesh.faceEdge(face_id, i);
+    //             if(mesh.edgeFace(eid, 0) == -1 || mesh.edgeFace(eid, 1) == -1) {
+    //                 return false;
+    //             }
+    //         }
+    //         return true;
+    //     };
+    //
+    //     int interior_face_id = std::rand() % mesh.nFaces();
+    //     while(!is_interior_face(interior_face_id)) {
+    //         interior_face_id = std::rand() % mesh.nFaces();
+    //     }
+    //     int bnd_face_id = std::rand() % mesh.nFaces();
+    //     while(is_interior_face(bnd_face_id)) {
+    //         bnd_face_id = std::rand() % mesh.nFaces();
+    //     }
+    //     LibShell::MidedgeAngleGeneralSinFormulation::test_third_fund_form(mesh, V, edge_dofs, interior_face_id);
+    //     LibShell::MidedgeAngleGeneralSinFormulation::test_third_fund_form(mesh, V, edge_dofs, bnd_face_id);
+    //
+    //     // std::cout << "Test interior face: " << interior_face_id << std::endl;
+    //     // LibShell::MidedgeAngleGeneralSinFormulation::test_compute_ninj(mesh, V, edge_dofs, interior_face_id, 0, 1);
+    //     // LibShell::MidedgeAngleGeneralSinFormulation::test_compute_ninj(mesh, V, edge_dofs, interior_face_id, 2, 1);
+    //     // LibShell::MidedgeAngleGeneralSinFormulation::test_compute_ninj(mesh, V, edge_dofs, interior_face_id, 0, 2);
+    //     //
+    //     // std::cout << "Test boundary face: " << bnd_face_id << std::endl;
+    //     // LibShell::MidedgeAngleGeneralSinFormulation::test_compute_ninj(mesh, V, edge_dofs, bnd_face_id, 0, 1);
+    //     // LibShell::MidedgeAngleGeneralSinFormulation::test_compute_ninj(mesh, V, edge_dofs, bnd_face_id, 2, 1);
+    //     // LibShell::MidedgeAngleGeneralSinFormulation::test_compute_ninj(mesh, V, edge_dofs, bnd_face_id, 0, 2);
+    //     return EXIT_SUCCESS;
+    // }
     InputArgs args;
     CLI::App app{"Shell Energy Model"};
     app.add_option("-t,--thickness", args.thickness, "Thickness of the shell");
@@ -1523,6 +1643,8 @@ int main(int argc, char* argv[]) {
                     }
                 }
 
+                ImGui::Checkbox("Include III", &is_include_III);
+
                 if (ImGui::Button("Remake Sphere", ImVec2(-1, 0))) {
                     double actual_triangle_area = triangle_area * 4 * M_PI * sphere_radius * sphere_radius;
                     makeSphere(sphere_radius, actual_triangle_area, origV, F);
@@ -1597,6 +1719,8 @@ int main(int argc, char* argv[]) {
                         thickness = 0.001;
                     }
                 }
+
+                ImGui::Checkbox("Include III", &is_include_III);
 
                 if (ImGui::Button("Remake Cylinder", ImVec2(-1, 0))) {
                     double actual_triangle_area = triangle_area * 6.0 / 4 * M_PI * cylinder_radius * cylinder_height;

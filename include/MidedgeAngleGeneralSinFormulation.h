@@ -143,6 +143,16 @@ public:
                          // oppositeEdge(face,i)
         std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>>* hessian);
 
+    static Eigen::Matrix2d thirdFundamentalForm(
+        const MeshConnectivity& mesh,
+        const Eigen::MatrixXd& curPos,
+        const Eigen::VectorXd& extraDOFs,
+        int face,
+        Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs>*
+            derivative,  // F(face, i), then the three vertices opposite F(face,i), then the thetas on
+                         // oppositeEdge(face,i)
+        std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>>* hessian);
+
     /*
      * Test function of ni^Tbj computation
      * @param[in] mesh:             the mesh connectivity
@@ -153,6 +163,21 @@ public:
      * @param[in] j:                the index for basis, in {0, 1}
      */
     static void test_compute_nibj(const MeshConnectivity& mesh,
+                                  const Eigen::MatrixXd& curPos,
+                                  const Eigen::VectorXd& edgeDOFs,
+                                  int face,
+                                  int i,
+                                  int j);
+    /*
+     * Test function of ni^nj computation
+     * @param[in] mesh:             the mesh connectivity
+     * @param[in] curPos:           the current vertex position
+     * @param[in] extraDOFs:        the current edge dofs
+     * @param[in] face:             the face id
+     * @param[in] i:                the index for edge normal, in {0, 1, 2}
+     * @param[in] j:                the index for edge normal, in {0, 1, 2}
+     */
+    static void test_compute_ninj(const MeshConnectivity& mesh,
                                   const Eigen::MatrixXd& curPos,
                                   const Eigen::VectorXd& edgeDOFs,
                                   int face,
@@ -170,6 +195,18 @@ public:
                                       const Eigen::MatrixXd& curPos,
                                       const Eigen::VectorXd& edgeDOFs,
                                       int face);
+
+    /*
+     * Test function of second fundamental form computation
+     * @param[in] mesh:             the mesh connectivity
+     * @param[in] curPos:           the current vertex position
+     * @param[in] extraDOFs:        the current edge dofs
+     * @param[in] face:             the face id, where we want to compute the second fundamental form
+     */
+    static void test_third_fund_form(const MeshConnectivity& mesh,
+                                     const Eigen::MatrixXd& curPos,
+                                     const Eigen::VectorXd& edgeDOFs,
+                                     int face);
 
     /*
      * Get per edge face sigma and zeta, for the general tan formulation, the magnitude mi = 1 / (sin(σ) cos(ζ))
@@ -191,6 +228,17 @@ public:
                                              double& sigma,
                                              double& zeta);
 
+    /*
+     * Get per face edge normal, for the general sin formulation, the magnitude mi = 1, di = cos(σ) ê + sin(σ) cos(ζ) nf
+     * + sin(σ) sin(ζ) (ê x nf)
+     *
+     * @param[in] mesh:              the mesh connectivity
+     * @param[in] curPos:            the current vertex position
+     * @param[in] extraDOFs:         the current edge dofs
+     * @param[in] face:              the face id
+     *
+     * @return:                      the face edge normals
+     */
     static std::vector<Eigen::Vector3d> get_face_edge_normals(const MeshConnectivity& mesh,
                                                               const Eigen::MatrixXd& curPos,
                                                               const Eigen::VectorXd& edgeDOFs,
@@ -269,6 +317,39 @@ public:
                                const Eigen::VectorXd& edgeDOFs,
                                int face,
                                int i,
+                               Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
+                               Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian);
+
+    /*
+     * Compute ni^T nj
+     *
+     * @param[in] mesh:             the mesh connectivity
+     * @param[in] curPos:           the current vertex position
+     * @param[in] extraDOFs:        the current edge dofs
+     * @param[in] face:             the face id, where we want to compute the second fundamental form
+     * @param[in] i:                the index for edge normal, in {0, 1, 2}
+     * @param[in] j:                the index for edge normal, in {0, 1, 2}
+     *
+     * @param[out] derivative:      the derivative of ni^T nj
+     * @param[out] hessian:         the hessian of ni^T nj
+     *
+     * @return:                     ni^T nj
+     *
+     * @note:
+     * ni = mi[cos(σi) êi + sin(σi) cos(ζi) nf + sin(σi) sin(ζi) (êi x nf)]
+     *    = ai êi + bi nf + ci (êi x nf)
+     * nj = aj êj + bj nf + cj (êj x nf)
+     *
+     * Let wij be the rotation angle from êi to êj with nf as the rotation axis.
+     * Then:
+     * ni^T nj = (ai aj + ci cj) cos(wij) + bi bj + (ai cj - aj ci) sin(wij)
+     */
+    static double compute_ninj(const MeshConnectivity& mesh,
+                               const Eigen::MatrixXd& curPos,
+                               const Eigen::VectorXd& edgeDOFs,
+                               int face,
+                               int i,
+                               int j,
                                Eigen::Matrix<double, 1, 18 + 3 * numExtraDOFs>* derivative,
                                Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs>* hessian);
 

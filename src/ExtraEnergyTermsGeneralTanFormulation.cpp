@@ -391,4 +391,66 @@ void ExtraEnergyTermsGeneralTanFormulation::test_compute_magnitude_sq_change_ene
                                                                  const Eigen::VectorXd& edge_dofs)  {
 }
 
+double ExtraEnergyTermsGeneralTanFormulation::compute_thirdFundamentalForm_energy(
+    const Eigen::MatrixXd& cur_pos,
+    const Eigen::VectorXd& edge_dofs,
+    const MeshConnectivity& mesh,
+    const std::vector<Eigen::Matrix2d>& abars,
+    Eigen::VectorXd* deriv,
+    std::vector<Eigen::Triplet<double>>* hessian,
+    bool is_proj) {
+    double energy = 0;
+    int nverts = cur_pos.rows();
+    int nedges = mesh.nEdges();
+    int nfaces = mesh.nFaces();
+
+    if (deriv) {
+        deriv->setZero(3 * nverts + m_sff.numExtraDOFs * nedges);
+    }
+
+    if (hessian) {
+        hessian->clear();
+    }
+
+    return energy;
+}
+
+double ExtraEnergyTermsGeneralTanFormulation::compute_thirdFundamentalForm_energy_perface(
+    const Eigen::MatrixXd& cur_pos,
+    const Eigen::VectorXd& edge_dofs,
+    const MeshConnectivity& mesh,
+    const std::vector<Eigen::Matrix2d>& abars,
+    int face,
+    Eigen::VectorXd* derivative,
+    Eigen::MatrixXd* hessian,
+    bool is_proj) {
+    // h^5 / 320 ||Ibar^{-1}III||_SV^2
+    double dA = std::sqrt(abars[face].determinant()) / 2;
+    double coeff = std::pow(m_thickness, 5) / 320.0;
+    double energy = 0;
+    if (derivative) {
+        derivative->setZero(18 + 3 * m_sff.numExtraDOFs);
+    }
+    if (hessian) {
+        hessian->setZero(18 + 3 * m_sff.numExtraDOFs, 18 + 3 * m_sff.numExtraDOFs);
+    }
+
+    return energy;
+}
+
+void ExtraEnergyTermsGeneralTanFormulation::test_compute_thirdFundamentalForm_energy_perface(
+    const MeshConnectivity& mesh,
+    const std::vector<Eigen::Matrix2d>& abars,
+    const Eigen::MatrixXd& cur_pos,
+    const Eigen::VectorXd& edge_dofs,
+    int face) {}
+
+
+void ExtraEnergyTermsGeneralTanFormulation::test_compute_thirdFundamentalForm_energy(
+    const MeshConnectivity& mesh,
+    const std::vector<Eigen::Matrix2d>& abars,
+    const Eigen::MatrixXd& cur_pos,
+    const Eigen::VectorXd& edge_dofs) {}
+
+
 }  // namespace LibShell

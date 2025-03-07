@@ -12,9 +12,18 @@ igl_include(restricted triangle)
 
 file(GLOB SRCFILES quickhull/*.cpp quickhull/*.hpp make_geometric_shapes/*.cpp make_geometric_shapes/*.h ShellEnergy/*.h QuadraticExpansionBending.h QuadraticExpansionBending.cpp )	  
 
-add_executable(bending_models main.cpp ${SRCFILES})
+add_executable(bending_models bending_model_demo.cpp ${SRCFILES})
 # other dependencies
 target_link_libraries(bending_models ${PROJECT_NAME}
+            optimization
+            igl::core
+            igl_restricted::triangle
+            polyscope
+            CLI11::CLI11)
+
+add_executable(trash_can trash_can_demo.cpp ${SRCFILES})
+# other dependencies
+target_link_libraries(trash_can ${PROJECT_NAME}
             optimization
             igl::core
             igl_restricted::triangle

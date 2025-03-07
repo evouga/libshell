@@ -66,10 +66,12 @@ void ExtraEnergyTermsBase::initialization(const Eigen::MatrixXd& rest_pos,
                                       double youngs,
                                       double shear,
                                       double thickness,
+                                      double poisson,
                                       int quad_oder) {
     m_youngs = youngs;
     m_shear = shear;
     m_thickness = thickness;
+    m_poisson = poisson;
     m_quad_points = build_quadrature_points(quad_oder);
 
     m_face_area.resize(mesh.nFaces());
@@ -79,6 +81,44 @@ void ExtraEnergyTermsBase::initialization(const Eigen::MatrixXd& rest_pos,
         m_face_area[f] = 0.5 * e1.cross(e2).norm();
     }
 }
+
+double ExtraEnergyTermsBase::compute_thirdFundamentalForm_energy(const Eigen::MatrixXd& cur_pos,
+                                                                 const Eigen::VectorXd& edge_dofs,
+                                                                 const MeshConnectivity& mesh,
+                                                                 const std::vector<Eigen::Matrix2d>& abars,
+                                                                 Eigen::VectorXd* deriv,
+                                                                 std::vector<Eigen::Triplet<double>>* hessian,
+                                                                 bool is_proj) {
+    return 0;
+}
+
+double ExtraEnergyTermsBase::compute_thirdFundamentalForm_energy_perface(const Eigen::MatrixXd& cur_pos,
+                                                                 const Eigen::VectorXd& edge_dofs,
+                                                                 const MeshConnectivity& mesh,
+                                                                 const std::vector<Eigen::Matrix2d>& abars,
+                                                                 int face,
+                                                                 Eigen::VectorXd* deriv,
+                                                                 Eigen::MatrixXd* hessian,
+                                                                 bool is_proj) {
+    return 0;
+}
+
+void ExtraEnergyTermsBase::test_compute_thirdFundamentalForm_energy(const MeshConnectivity& mesh,
+                                                                 const std::vector<Eigen::Matrix2d>& abars,
+                                                                 const Eigen::MatrixXd& cur_pos,
+                                                                 const Eigen::VectorXd& edge_dofs) {
+    // Test the third fundamental form energy computation
+}
+
+void ExtraEnergyTermsBase::test_compute_thirdFundamentalForm_energy_perface(const MeshConnectivity& mesh,
+                                                                 const std::vector<Eigen::Matrix2d>& abars,
+                                                                 const Eigen::MatrixXd& cur_pos,
+                                                                 const Eigen::VectorXd& edge_dofs,
+                                                                 int face) {
+    // Test the third fundamental form energy computation per face
+}
+
+
 
 template void ExtraEnergyTermsBase::proj_sym_matrix(Eigen::MatrixBase<Eigen::Matrix<double, 3, 3>>& symA, const HessianProjectType& projType);
 template void ExtraEnergyTermsBase::proj_sym_matrix(Eigen::MatrixBase<Eigen::MatrixXd>& symA, const HessianProjectType& projType);

@@ -66,7 +66,7 @@ void NewtonSolver(
 
     for (; i < num_iter; i++) {
         if (display_info) {
-            spdlog::debug("iter: {}", i);
+            spdlog::debug("iter: {}, ||x||: {}", i, x0.norm());
         }
 
         Timer<std::chrono::high_resolution_clock> local_timer;
@@ -109,12 +109,12 @@ void NewtonSolver(
             solver.compute(H);
             reg = std::max(2 * reg, 1e-16);
 
-            if (reg > 1e4 && is_proj_hess) {
-                spdlog::debug("reg is too large, use SPD hessian instead.");
-                reg = 1e-6;
-                is_proj = true;
-                f = obj_func(x0, &grad, &hessian, is_proj);
-            }
+            // if (reg > 1e4 && is_proj_hess) {
+            //     spdlog::debug("reg is too large, use SPD hessian instead.");
+            //     reg = 1e-6;
+            //     is_proj = true;
+            //     f = obj_func(x0, &grad, &hessian, is_proj);
+            // }
         }
 
         neg_grad = -grad;
@@ -139,9 +139,15 @@ void NewtonSolver(
             reg = 1e-8;
         }
 
+        if(delta_x.hasNaN()) {
+            spdlog::error("Descent direction has nan! Terminate the solver...");
+            return;
+        }
+
         x0 = x0 + rate * delta_x;
 
         double fnew = obj_func(x0, &grad, nullptr, is_proj);
+
         if (display_info) {
             spdlog::debug("line search rate : {}, actual hessian : {}, reg = {}", rate, !is_proj, reg);
             spdlog::debug("f_old: {}, f_new: {}, grad norm: {}, delta x: {}, delta_f: {}", f, fnew, grad.norm(),

@@ -23,15 +23,15 @@ void makeCylinder(bool regular, double radius, double height, double triangleAre
 
     if (regular)
     {
-        flatV.resize(W * H, 3);
-        V.resize(W * H, 3);
-        F.resize(2 * (W - 1) * (H - 1), 3);
+        flatV.resize((W + 1) * (H + 1), 3);
+        V.resize((W + 1) * (H + 1), 3);
+        F.resize(2 * W * H, 3);
         int curface = 0;
-        for (int i = 0; i < H; i++)
+        for (int i = 0; i <= H; i++)
         {
-            for (int j = 0; j < W; j++)
+            for (int j = 0; j <= W; j++)
             {
-                int idx = i * W + j;
+                int idx = i * (W + 1) + j;
                 flatV(idx, 0) = double(j) / double(W) * angle * radius;
                 flatV(idx, 1) = double(i) / double(H) * height;
                 flatV(idx, 2) = 0;
@@ -41,19 +41,19 @@ void makeCylinder(bool regular, double radius, double height, double triangleAre
                 if (i > 0 && j > 0)
                 {
                     if((curface / 2) % 2 == 0) {
-                        int idxm1m1 = (i - 1) * W + (j - 1);
-                        int idxm1m0 = (i - 1) * W + j;
+                        int idxm1m1 = (i - 1) * (W + 1) + (j - 1);
+                        int idxm1m0 = (i - 1) * (W + 1) + j;
                         F(curface, 0) = idxm1m1;
                         F(curface, 1) = idxm1m0;
                         F(curface, 2) = idx;
-                        int idxm0m1 = i * W + (j - 1);
+                        int idxm0m1 = i * (W + 1) + (j - 1);
                         F(curface + 1, 0) = idxm1m1;
                         F(curface + 1, 1) = idx;
                         F(curface + 1, 2) = idxm0m1;
                     } else {
-                        int idxm1m1 = (i - 1) * W + (j - 1);
-                        int idxm1m0 = (i - 1) * W + j;
-                        int idxm0m1 = i * W + (j - 1);
+                        int idxm1m1 = (i - 1) * (W + 1) + (j - 1);
+                        int idxm1m0 = (i - 1) * (W + 1) + j;
+                        int idxm0m1 = i * (W + 1) + (j - 1);
 
                         F(curface, 0) = idxm1m1;
                         F(curface, 1) = idxm1m0;
