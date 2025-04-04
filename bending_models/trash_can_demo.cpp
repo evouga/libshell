@@ -572,7 +572,7 @@ void update_rendering(polyscope::SurfaceMesh* cur_mesh, polyscope::PointCloud* p
         }
     }
 
-    auto bending_plot = surface_mesh->addFaceScalarQuantity("bending", bending_scalars);
+    auto bending_plot = cur_mesh->addFaceScalarQuantity("bending", bending_scalars);
     bending_plot->setMapRange({*std::min_element(bending_scalars.begin(), bending_scalars.end()),
                                      *std::max_element(bending_scalars.begin(), bending_scalars.end())});
 
@@ -582,10 +582,10 @@ void update_rendering(polyscope::SurfaceMesh* cur_mesh, polyscope::PointCloud* p
             cur_pos, edge_dofs, mesh, rest_state.abars, i, nullptr, nullptr, false));
         III_scalars.push_back(extra_energy_terms->compute_thirdFundamentalForm_energy_perface(cur_pos, edge_dofs, mesh, rest_state.abars, i, nullptr, nullptr, false));
     }
-    auto scalar_plot = surface_mesh->addFaceScalarQuantity("perp", perp_scalars);
+    auto scalar_plot = cur_mesh->addFaceScalarQuantity("perp", perp_scalars);
     scalar_plot->setMapRange({*std::min_element(perp_scalars.begin(), perp_scalars.end()),
                                      *std::max_element(perp_scalars.begin(), perp_scalars.end())});
-    auto III_plot = surface_mesh->addFaceScalarQuantity("III", III_scalars);
+    auto III_plot = cur_mesh->addFaceScalarQuantity("III", III_scalars);
     III_plot->setMapRange({*std::min_element(III_scalars.begin(), III_scalars.end()),
                                      *std::max_element(III_scalars.begin(), III_scalars.end())});
 

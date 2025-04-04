@@ -405,7 +405,7 @@ double ExtraEnergyTermsSinFormulation::compute_thirdFundamentalForm_energy(
     int nfaces = mesh.nFaces();
 
     if (deriv) {
-        deriv->setZero(3 * nverts + m_sff.numExtraDOFs * nedges);
+        deriv->setZero(3 * nverts + nedges);
     }
 
     if (hessian) {
@@ -429,10 +429,10 @@ double ExtraEnergyTermsSinFormulation::compute_thirdFundamentalForm_energy_perfa
     double coeff = std::pow(m_thickness, 5) / 320.0;
     double energy = 0;
     if (derivative) {
-        derivative->setZero(18 + 3 * m_sff.numExtraDOFs);
+        derivative->setZero(18 + 3);
     }
     if (hessian) {
-        hessian->setZero(18 + 3 * m_sff.numExtraDOFs, 18 + 3 * m_sff.numExtraDOFs);
+        hessian->setZero(18 + 3, 18 + 3);
     }
 
     return energy;

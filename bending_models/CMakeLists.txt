@@ -30,6 +30,24 @@ target_link_libraries(trash_can ${PROJECT_NAME}
             polyscope
             CLI11::CLI11)
 
+add_executable(twisted_cylinder twisted_cylinder_demo.cpp ${SRCFILES})
+# other dependencies
+target_link_libraries(twisted_cylinder ${PROJECT_NAME}
+            optimization
+            igl::core
+            igl_restricted::triangle
+            polyscope
+            CLI11::CLI11)
+
+add_executable(pin_cloth pin_cloth.cpp ${SRCFILES})
+# other dependencies
+target_link_libraries(pin_cloth ${PROJECT_NAME}
+            optimization
+            igl::core
+            igl_restricted::triangle    
+            polyscope
+            CLI11::CLI11)
+
 # Use C++14
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 14)
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD_REQUIRED ON)

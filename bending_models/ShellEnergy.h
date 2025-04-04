@@ -143,7 +143,7 @@ public:
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const {
         int whichTerms = 0;
         if (withBending) {
-            LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_BENDING;
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_BENDING;
         }
         if (withStretching) {
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_STRETCHING;

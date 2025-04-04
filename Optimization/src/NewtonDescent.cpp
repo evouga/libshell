@@ -150,17 +150,19 @@ void NewtonSolver(
 
         if (display_info) {
             spdlog::debug("line search rate : {}, actual hessian : {}, reg = {}", rate, !is_proj, reg);
-            spdlog::debug("f_old: {}, f_new: {}, grad norm: {}, delta x: {}, delta_f: {}", f, fnew, grad.norm(),
-                          rate * delta_x.norm(), f - fnew);
+            spdlog::debug("f_old: {}, f_new: {}, grad norm: {}, newton dec: {}, delta_x : {}, delta_f: {}", f, fnew, grad.norm(),
+                          delta_x.norm(), rate * delta_x.norm(), f - fnew);
             spdlog::debug("timing info (in total seconds): ");
             spdlog::debug("assembling took: {}, LLT solver took: {}, line search took: {}\n", total_assembling_time,
                           total_solving_time, total_linesearch_time);
         }
 
+        double switch_tol = 1e-4;
+
         // switch to the actual hessian when close to convergence
         if (is_swap) {
             // this is just some experience value, you can change it
-            if ((f - fnew) / f < 1e-4 || delta_x.norm() < 1e-5 || grad.norm() < 1e-4) {
+            if (delta_x.norm() < switch_tol) {
                 is_proj = false;
             }
         }
