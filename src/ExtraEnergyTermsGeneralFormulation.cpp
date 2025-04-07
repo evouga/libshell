@@ -618,7 +618,7 @@ void ExtraEnergyTermsGeneralFormulation::test_compute_vector_perp_tangent_energy
                                                                const Eigen::VectorXd& edge_dofs) {
     int nedges = mesh.nEdges();
     int nverts = cur_pos.rows();
-    constexpr int numExtraDOFs = MidedgeAngleGeneralFormulation::numExtraDOFs;
+    static constexpr int numExtraDOFs = MidedgeAngleGeneralFormulation::numExtraDOFs;
     auto to_variables = [&](const Eigen::MatrixXd& pos, const Eigen::VectorXd& cur_edge_dofs) {
         Eigen::VectorXd vars(3 * nverts + numExtraDOFs * nedges);
         vars.setZero();

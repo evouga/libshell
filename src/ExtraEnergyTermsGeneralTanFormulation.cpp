@@ -266,7 +266,7 @@ const std::vector<Eigen::Matrix2d>& abars,
                                                                        const Eigen::MatrixXd& cur_pos,
                                                                        const Eigen::VectorXd& edge_dofs,
                                                                        int face)  {
-    constexpr int numExtraDOFs = MidedgeAngleGeneralTanFormulation::numExtraDOFs;
+    static constexpr int numExtraDOFs = MidedgeAngleGeneralTanFormulation::numExtraDOFs;
     auto to_variables = [&](const Eigen::MatrixXd& pos, const Eigen::VectorXd& cur_edge_dofs) {
         Eigen::VectorXd vars(18 + 3 * numExtraDOFs);
         vars.setZero();
@@ -337,7 +337,7 @@ void ExtraEnergyTermsGeneralTanFormulation::test_compute_vector_perp_tangent_ene
                                                                const Eigen::VectorXd& edge_dofs)  {
     int nedges = mesh.nEdges();
     int nverts = cur_pos.rows();
-    constexpr int numExtraDOFs = MidedgeAngleGeneralTanFormulation::numExtraDOFs;
+    static constexpr int numExtraDOFs = MidedgeAngleGeneralTanFormulation::numExtraDOFs;
     auto to_variables = [&](const Eigen::MatrixXd& pos, const Eigen::VectorXd& cur_edge_dofs) {
         Eigen::VectorXd vars(3 * nverts + numExtraDOFs * nedges);
         vars.setZero();

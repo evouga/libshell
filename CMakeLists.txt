@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(libshell)
 
-set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD 20)
 set(MSVC_RUNTIME "dynamic")
 set(LIBIGL_EIGEN_VERSION 3.3.7 CACHE STRING "Eigen version")
 
@@ -16,7 +16,9 @@ include(tbb)
 
 # Add your project files
 if(MSVC)
-	add_definitions(-DEIGEN_STRONG_INLINE=inline)
+    add_definitions(-DEIGEN_STRONG_INLINE=inline)
+    add_definitions(-D_USE_MATH_DEFINES )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
 endif()
 
 add_subdirectory(Optimization)
