@@ -41,10 +41,10 @@
 
 #include <CLI/CLI.hpp>
 
-enum class SFFModelType { kS1Sin, kS2Sin };
+enum class SFFModelType { kS1Sin, kS1Tan, kS2Sin };
 enum class MaterialType { kStVK, kNeoHookean };
 
-bool is_include_III = true;
+bool is_include_III = false;
 int num_iters = 200;
 
 void lameParameters(double youngs, double poisson, double& alpha, double& beta) {
@@ -340,6 +340,18 @@ std::pair<std::shared_ptr<ShellEnergy>, std::shared_ptr<LibShell::ExtraEnergyTer
             break;
         }
 
+        case SFFModelType::kS1Tan: {
+            LibShell::MidedgeAngleTanFormulation::initializeExtraDOFs(edge_dofs, cur_mesh, rest_pos);
+            extra_energy_terms = std::make_shared<LibShell::ExtraEnergyTermsTanFormulation>();
+            extra_energy_terms->initialization(rest_pos, rest_mesh, young, shear, thickness, poisson, 3);
+            if (material_type == MaterialType::kStVK) {
+                dir_energy_model = std::make_shared<StVKS1DirectorTanShellEnergy>(cur_mesh, rest_state);
+            } else if (material_type == MaterialType::kNeoHookean) {
+                dir_energy_model = std::make_shared<NeohookeanS1DirectorTanShellEnergy>(cur_mesh, rest_state);
+            }
+            break;
+        }
+
         case SFFModelType::kS2Sin: {
             LibShell::MidedgeAngleGeneralSinFormulation::initializeExtraDOFs(edge_dofs, cur_mesh, rest_pos);
             extra_energy_terms = std::make_shared<LibShell::ExtraEnergyTermsGeneralSinFormulation>();
@@ -381,6 +393,9 @@ void processFullModelOneStep(const LibShell::MeshConnectivity& rest_mesh,
         case SFFModelType::kS1Sin:
             std::cout << "============= Optimizing edge direction (S1 Sin) =========== " << std::endl;
             break;
+        case SFFModelType::kS1Tan:
+            std::cout << "============= Optimizing edge direction (S1 Tan) =========== " << std::endl;
+            break;
         case SFFModelType::kS2Sin:
             std::cout << "============= Optimizing edge direction (S2 Sin) =========== " << std::endl;
             break;
@@ -409,7 +424,9 @@ void update_rendering(polyscope::SurfaceMesh* cur_surface_mesh, polyscope::Point
     Eigen::VectorXd edge_dofs;
     std::string model_name;
     switch (model_type) {
-        case SFFModelType::kS1Sin: {
+        case SFFModelType::kS1Sin: 
+        case SFFModelType::kS1Tan: 
+        {
             edge_dofs.resize(2 * cur_mesh.nEdges());
             for (int i = 0; i < cur_mesh.nEdges(); i++) {
                 edge_dofs(2 * i) = cur_edge_dofs(i);
@@ -431,33 +448,27 @@ void update_rendering(polyscope::SurfaceMesh* cur_surface_mesh, polyscope::Point
             get_face_edge_normal_vectors(cur_pos, cur_mesh, edge_dofs);
 
     // draw energy terms
-    std::vector<double> bending_scalars;
-    switch (model_type) {
-        case SFFModelType::kS1Sin: {
-            std::shared_ptr<StVKS1DirectorSinShellEnergy> subPtr = std::static_pointer_cast<StVKS1DirectorSinShellEnergy>(stvk_dir_energy_model);
-            for (int i = 0; i < cur_mesh.nFaces(); i++) {
-                double s1_bending = subPtr->mat_.bendingEnergy(cur_mesh, cur_pos, edge_dofs, rest_state, i, nullptr, nullptr);
-                bending_scalars.push_back(s1_bending);
-            }
-            break;
-        }
-        case SFFModelType::kS2Sin: {
-            std::shared_ptr<StVKS1DirectorTanShellEnergy> subPtr = std::static_pointer_cast<StVKS1DirectorTanShellEnergy>(stvk_dir_energy_model);
-            for (int i = 0; i < cur_mesh.nFaces(); i++) {
-                double s1_bending = subPtr->mat_.bendingEnergy(cur_mesh, cur_pos, edge_dofs, rest_state, i, nullptr, nullptr);
-                bending_scalars.push_back(s1_bending);
-            }
-            break;
-        }
-        default: {
-            bending_scalars.resize(cur_mesh.nFaces(), 0);
-            break;
-        }
-    }
-
+    std::vector<double> bending_scalars = stvk_dir_energy_model->elasticEnergyPerElement(cur_pos, cur_edge_dofs, false, true);
+    std::vector<double> stretching_scalars =
+        stvk_dir_energy_model->elasticEnergyPerElement(cur_pos, cur_edge_dofs, true, false);
+    
     auto bending_plot = cur_surface_mesh->addFaceScalarQuantity("bending", bending_scalars);
     bending_plot->setMapRange({*std::min_element(bending_scalars.begin(), bending_scalars.end()),
                                      *std::max_element(bending_scalars.begin(), bending_scalars.end())});
+
+    auto stretching_plot = cur_surface_mesh->addFaceScalarQuantity("stretching", stretching_scalars);
+    stretching_plot->setMapRange({*std::min_element(stretching_scalars.begin(), stretching_scalars.end()),
+                                  *std::max_element(stretching_scalars.begin(), stretching_scalars.end())});
+
+    Eigen::VectorXd bderiv;
+    stvk_dir_energy_model->elasticEnergy(cur_pos, cur_edge_dofs, false, true, &bderiv, NULL);
+    Eigen::MatrixXd bvertderiv(cur_pos.rows(), 3);
+    for (int i = 0; i < cur_pos.rows(); i++) {
+        for (int j = 0; j < 3; j++) {
+            bvertderiv(i, j) = bderiv[3 * i + j];
+        }
+    }
+    cur_surface_mesh->addVertexVectorQuantity("b. deriv", bvertderiv);
 
     std::vector<double> perp_scalars, III_scalars;
     for (int i = 0; i < cur_mesh.nFaces(); i++) {
@@ -477,14 +488,28 @@ void update_rendering(polyscope::SurfaceMesh* cur_surface_mesh, polyscope::Point
 }
 
 struct InputArgs {
-    double thickness = 0.01;
+    double thickness = 1.0;
     double triangle_area = 0.002;
     double poisson = 0.3;
-    int sff_model = 0;  // 0 for s1 and 2 for s2
-    int material = 0;   // 0 for StVK and 1 for NeoHookean
+    int sff_model = 1;  // 0 for s1 and 2 for s2
+    int material = 1;   // 0 for StVK and 1 for NeoHookean
     bool delaunlay_mesh = false;
     double twist_angle = 10;
 };
+
+SFFModelType parseModelType(int type)
+{
+    if (type == 0)
+        return SFFModelType::kS1Sin;
+    else if (type == 1)
+        return SFFModelType::kS1Tan;
+    else if (type == 2)
+        return SFFModelType::kS2Sin;
+    else {
+        assert(!"Illegal model type");
+        exit(-1);
+    }
+}
 
 int main(int argc, char* argv[]) {
     InputArgs args;
@@ -502,7 +527,7 @@ int main(int argc, char* argv[]) {
     if (args.triangle_area > 0) {
         triangle_area = args.triangle_area;
     }
-    double thickness = 0.01;
+    double thickness = 1.0;
     if (args.thickness > 0) {
         thickness = args.thickness;
     }
@@ -512,14 +537,16 @@ int main(int argc, char* argv[]) {
         twist_angle = args.twist_angle;
     }
 
-    SFFModelType sff_type = args.sff_model == 0 ? SFFModelType::kS1Sin : SFFModelType::kS2Sin;
+    SFFModelType sff_type = parseModelType(args.sff_model);
+    
     MaterialType material_type = args.material == 0 ? MaterialType::kStVK : MaterialType::kNeoHookean;
 
     double cylinder_radius = 0.2;
     double cylinder_height = 1;
 
     // set up material parameters
-    double young = 1e7;
+    double young = 1;
+    //1e7;
     double poisson = 0.3;
     if (args.poisson > 0 && args.poisson < 1) {
         poisson = args.poisson;
@@ -562,6 +589,10 @@ int main(int argc, char* argv[]) {
         switch (sff_type) {
             case SFFModelType::kS1Sin: {
                 model_name = "S1 sin ";
+                break;
+            }
+            case SFFModelType::kS1Tan: {
+                model_name = "S1 tan ";
                 break;
             }
             case SFFModelType::kS2Sin: {
@@ -664,8 +695,8 @@ int main(int argc, char* argv[]) {
             rolledV = rolledV_init;
         }
 
-        if (ImGui::Combo("Bending Type", &args.sff_model, "S1 Sin\0S2 Sin\0")) {
-            sff_type = args.sff_model == 0 ? SFFModelType::kS1Sin : SFFModelType::kS2Sin;
+        if (ImGui::Combo("Bending Type", &args.sff_model, "S1 Sin\0S1 Tan\0S2 Sin\0")) {
+            sff_type = parseModelType(args.sff_model);
             initialize_all();
             initialize_rendering();
             update_rendering(init_surface_mesh, init_pt_mesh, dir_energy_model, extra_energy_terms, cur_mesh, rest_state, rolledV,

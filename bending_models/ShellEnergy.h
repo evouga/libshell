@@ -66,6 +66,12 @@ public:
                                  Eigen::VectorXd* derivative,
                                  std::vector<Eigen::Triplet<double>>* hessian,
                                  LibShell::HessianProjectType proj_type = LibShell::HessianProjectType::kNone) const = 0;
+
+    virtual std::vector<double> elasticEnergyPerElement(
+        const Eigen::MatrixXd& curPos,
+        const Eigen::VectorXd& curEdgeDOFs,
+        bool withStretching,
+        bool withBending) const = 0;
 };
 
 class NeohookeanShellEnergy : public ShellEnergy {
@@ -89,6 +95,20 @@ public:
             whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_STRETCHING;
         return LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+        const Eigen::VectorXd& curEdgeDOFs,
+        bool withStretching,
+        bool withBending) const
+    {
+        int whichTerms = 0;
+        if (withBending)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_BENDING;
+        if (withStretching)
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_STRETCHING;
+        return LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
     }
 
     const LibShell::MeshConnectivity& mesh_;
@@ -122,6 +142,22 @@ public:
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
 
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withStretching) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_BENDING;
+        }
+
+        return LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
+    }
+
     const LibShell::MeshConnectivity& mesh_;
     const LibShell::RestState& restState_;
     LibShell::NeoHookeanMaterial<LibShell::MidedgeAngleSinFormulation> mat_;
@@ -150,6 +186,21 @@ public:
         }
         return LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
     }
 
     const LibShell::MeshConnectivity& mesh_;
@@ -182,6 +233,22 @@ public:
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
 
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |=
+                LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
+    }
+
     const LibShell::MeshConnectivity& mesh_;
     const LibShell::RestState& restState_;
     LibShell::NeoHookeanMaterial<LibShell::MidedgeAngleGeneralSinFormulation> mat_;
@@ -210,6 +277,22 @@ public:
         }
         return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |=
+                LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
     }
 
     const LibShell::MeshConnectivity& mesh_;
@@ -245,6 +328,22 @@ public:
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
 
+     virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |=
+                LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
+     }
+
     const LibShell::MeshConnectivity& mesh_;
     const LibShell::RestState& restState_;
     LibShell::NeoHookeanMaterial<LibShell::MidedgeAngleCompressiveFormulation> mat_;
@@ -274,6 +373,21 @@ public:
         }
         return LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+     virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAverageFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
     }
 
     const LibShell::MeshConnectivity& mesh_;
@@ -308,6 +422,22 @@ public:
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
 
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withStretching) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::EnergyTerm::ET_BENDING;
+        }
+
+        return LibShell::ElasticShell<LibShell::MidedgeAngleSinFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
+    }
+
     const LibShell::MeshConnectivity& mesh_;
     const LibShell::RestState& restState_;
     LibShell::StVKMaterial<LibShell::MidedgeAngleSinFormulation> mat_;
@@ -337,6 +467,22 @@ public:
 
         return LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withStretching) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::EnergyTerm::ET_BENDING;
+        }
+
+        return LibShell::ElasticShell<LibShell::MidedgeAngleTanFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
     }
 
     const LibShell::MeshConnectivity& mesh_;
@@ -371,6 +517,23 @@ public:
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
 
+     virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |=
+                LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralSinFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
+    }
+
     const LibShell::MeshConnectivity& mesh_;
     const LibShell::RestState& restState_;
     LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralSinFormulation> mat_;
@@ -399,6 +562,22 @@ public:
         }
         return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |=
+                LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralTanFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
     }
 
     const LibShell::MeshConnectivity& mesh_;
@@ -431,6 +610,21 @@ public:
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
     }
 
+     virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAngleGeneralFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
+    }
+
     const LibShell::MeshConnectivity& mesh_;
     const LibShell::RestState& restState_;
     LibShell::StVKMaterial<LibShell::MidedgeAngleGeneralFormulation> mat_;
@@ -461,6 +655,22 @@ public:
         }
         return LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::elasticEnergy(
             mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms, derivative, hessian, proj_type);
+    }
+
+     virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        int whichTerms = 0;
+        if (withBending) {
+            whichTerms |= LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_BENDING;
+        }
+        if (withStretching) {
+            whichTerms |=
+                LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::EnergyTerm::ET_STRETCHING;
+        }
+        return LibShell::ElasticShell<LibShell::MidedgeAngleCompressiveFormulation>::elasticEnergyPerElement(
+            mesh_, curPos, curEdgeDOFs, mat_, restState_, whichTerms);
     }
 
     const LibShell::MeshConnectivity& mesh_;
@@ -525,6 +735,14 @@ public:
         }
 
         return result;
+    }
+
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        // not implement
+        exit(-1);
     }
 
     const LibShell::MeshConnectivity& mesh_;
@@ -676,6 +894,14 @@ public:
             return result;
         }
 
+    }
+
+    virtual std::vector<double> elasticEnergyPerElement(const Eigen::MatrixXd& curPos,
+                                                        const Eigen::VectorXd& curEdgeDOFs,
+                                                        bool withStretching,
+                                                        bool withBending) const {
+        // not implement
+        exit(-1);
     }
 
     const LibShell::MeshConnectivity& mesh_;
