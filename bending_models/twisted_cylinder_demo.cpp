@@ -491,7 +491,7 @@ struct InputArgs {
     double thickness = 1.0;
     double triangle_area = 0.002;
     double poisson = 0.3;
-    int sff_model = 1;  // 0 for s1 and 2 for s2
+    int sff_model = 0;  // 0 for s1 and 2 for s2
     int material = 1;   // 0 for StVK and 1 for NeoHookean
     bool delaunlay_mesh = false;
     double twist_angle = 10;
