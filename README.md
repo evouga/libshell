@@ -8,21 +8,23 @@ The shell's current pose is represented as a triangle mesh, as well as, optional
 
 ## Bending Options
 
-Three options are implemented for how the bending energy is discretized, all based on Grinspun et al's discrete shape operator:
+Three options are implemented for how the bending energy is discretized, all based on Grinspun et al.'s discrete shape operator:
 
 * MidedgeAngleSinFormulation: bending energy is roughly sin(theta/2) for edge turning angle theta.
 
 * MidedgeAngleTanFormulation: energy is roughly tan(theta/2) instead. The main difference of this formulation from the previous one is that the bending energy diverges for 180-degree bent hinges.
 
-* MidedgeAverageFormulation: eschews the normal directors of Grinspun et al completely, instead assuming that the normal direction on an edge is always the mean of the neighboring face normals.
+* MidedgeAngleThetaFormulation: the version originally described in Grinspun et al.'s paper, though less geometrically principled than either of the above.
+
+* MidedgeAverageFormulation: eschews the normal directors of Grinspun et al. completely, instead assuming that the normal direction on an edge is always the mean of the neighboring face normals.
 
 For more details see:
 
-* Grinpsun et al "Computing discrete shape operators on general meshes"; 
+* Grinpsun et al. "Computing discrete shape operators on general meshes"; 
 
-* Weischedel et al "A discrete geometric view on shear-deformable shell models";
+* Weischedel et al. "A discrete geometric view on shear-deformable shell models";
 
-* Chen et al "Physical simulation of environmentally induced thin shell deformation".
+* Chen et al. "Physical simulation of environmentally induced thin shell deformation".
 
 ## Material Model
 

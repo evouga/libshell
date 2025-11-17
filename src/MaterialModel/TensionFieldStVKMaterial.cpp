@@ -5,6 +5,7 @@
 #include <Eigen/Dense>
 #include "../../include/MidedgeAngleSinFormulation.h"
 #include "../../include/MidedgeAngleTanFormulation.h"
+#include "../../include/MidedgeAngleThetaFormulation.h"
 #include "../../include/MidedgeAverageFormulation.h"
 #include "../../include/RestState.h"
 
@@ -197,6 +198,7 @@ namespace LibShell {
     // instantiations
     template class TensionFieldStVKMaterial<MidedgeAngleSinFormulation>;
     template class TensionFieldStVKMaterial<MidedgeAngleTanFormulation>;
+    template class TensionFieldStVKMaterial<MidedgeAngleThetaFormulation>;
     template class TensionFieldStVKMaterial<MidedgeAverageFormulation>;
 
 };

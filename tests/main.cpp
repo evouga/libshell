@@ -6,6 +6,7 @@
 #include "../include/ElasticShell.h"
 #include "../include/MidedgeAngleTanFormulation.h"
 #include "../include/MidedgeAngleSinFormulation.h"
+#include "../include/MidedgeAngleThetaFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
 #include "../include/StVKMaterial.h"
 #include "../include/BilayerStVKMaterial.h"
@@ -18,7 +19,7 @@
 std::default_random_engine rng;
 
 const int nummats = 4;
-const int numsff = 3;    
+const int numsff = 4;    
 
 
 template<class SFF>
@@ -425,6 +426,9 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
                 case 2:
                     getHessian<LibShell::MidedgeAverageFormulation>(mesh, restPos, thicknesses, i, lameAlpha, lameBeta, hessians[i*numsff + j]);
                     break;
+                case 3:
+                    getHessian<LibShell::MidedgeAngleThetaFormulation>(mesh, restPos, thicknesses, i, lameAlpha, lameBeta, hessians[i * numsff + j]);
+                    break;
                 default:
                     assert(false);
                 }                
@@ -449,7 +453,7 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
                         if (idx2 <= idx1)
                             continue;
                         std::string matnames[] = { "Neohk", "StVK" };
-                        std::string sffnames[] = { "Tan", "Sin", "Avg" };
+                        std::string sffnames[] = { "Tan", "Sin", "Avg", "Theta"};
                         std::cout << "(" << matnames[i] << ", " << sffnames[j] << ") vs (" << matnames[k] << ", " << sffnames[l] << "): ";
                         double diff = 0;
                         int nverts = restPos.rows();
@@ -483,10 +487,13 @@ void consistencyTests(const LibShell::MeshConnectivity &mesh, const Eigen::Matri
             case 2:
                 diff = bilayerTest<LibShell::MidedgeAverageFormulation>(mesh, restPos, thicknesses, lameAlpha, lameBeta);
                 break;
+            case 3:
+                diff = bilayerTest<LibShell::MidedgeAngleThetaFormulation>(mesh, restPos, thicknesses, lameAlpha, lameBeta);
+                break;
             default:
                 assert(false);
             }
-            std::string sffnames[] = { "Tan", "Sin", "Avg" };
+            std::string sffnames[] = { "Tan", "Sin", "Avg", "Theta"};
             std::cout << "  - " << sffnames[j] << ": " << diff << std::endl;
         }
     }
@@ -529,6 +536,10 @@ int main()
                 case 2:
                     std::cout << "MidedgeAverageFormulation, ";
                     differenceTest<LibShell::MidedgeAverageFormulation>(mesh, V, i, verbose);
+                    break;
+                case 3:
+                    std::cout << "MidedgeAngleThetaFormulation, ";
+                    differenceTest<LibShell::MidedgeAngleThetaFormulation>(mesh, V, i, verbose);
                     break;
                 default:
                     assert(false);

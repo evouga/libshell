@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 4.0)
+cmake_policy(SET CMP0169 OLD)
 project(libshell)
 
 set (CMAKE_CXX_STANDARD 11)
 set(MSVC_RUNTIME "dynamic")
-set(LIBIGL_EIGEN_VERSION 3.3.7 CACHE STRING "Eigen version")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -12,6 +12,7 @@ include(libigl)
 # Add your project files
 if(MSVC)
 	add_definitions(-DEIGEN_STRONG_INLINE=inline)
+	add_compile_options(/bigobj)
 endif()
 
 file(GLOB LIBFILES src/*.cpp src/SecondFundamentalForm/*.cpp src/MaterialModel/*.cpp)

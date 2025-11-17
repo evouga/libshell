@@ -13,6 +13,7 @@
 #include "../include/RestState.h"
 #include "../include/MidedgeAngleSinFormulation.h"
 #include "../include/MidedgeAngleTanFormulation.h"
+#include "../include/MidedgeAngleThetaFormulation.h"
 #include "../include/MidedgeAverageFormulation.h"
 
 namespace LibShell {
@@ -227,6 +228,7 @@ namespace LibShell {
     // instantions
     template class ElasticShell<MidedgeAngleSinFormulation>;
     template class ElasticShell<MidedgeAngleTanFormulation>;
+    template class ElasticShell<MidedgeAngleThetaFormulation>;
     template class ElasticShell<MidedgeAverageFormulation>;
 
     template void
