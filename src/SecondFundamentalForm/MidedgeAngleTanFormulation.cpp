@@ -110,6 +110,31 @@ namespace LibShell {
         return theta;
     }
 
+    static bool edgeDOFsValid(
+        const MeshConnectivity& mesh,
+        const Eigen::MatrixXd& curPos,
+        const Eigen::VectorXd& edgeThetas,
+        int face)
+    {
+        constexpr double PI = 3.1415926535898;
+
+        for (int i = 0; i < 3; i++)
+        {
+            Eigen::Matrix<double, 1, 9> hderiv;
+            Eigen::Matrix<double, 9, 9> hhess;
+            double altitude = triangleAltitude(mesh, curPos, face, i, NULL, NULL);
+
+            int edge = mesh.faceEdge(face, i);
+            double theta = edgeTheta(mesh, curPos, edge, NULL, NULL);
+
+            double orient = mesh.faceEdgeOrientation(face, i) == 0 ? 1.0 : -1.0;
+            double alpha = 0.5 * theta + orient * edgeThetas[edge];
+            if (alpha < -3.0 * PI / 4.0 || alpha > 3.0 * PI / 4.0 || std::cos(alpha) < 0.0)
+                return false;
+        }
+        return true;
+    }
+
     static Eigen::Vector3d secondFundamentalFormEntries(
         const MeshConnectivity& mesh,
         const Eigen::MatrixXd& curPos,
@@ -234,6 +259,17 @@ namespace LibShell {
         return II;
     }
 
+    bool MidedgeAngleTanFormulation::edgeDOFsValid(
+        const MeshConnectivity& mesh,
+        const Eigen::MatrixXd& curPos,
+        const Eigen::VectorXd& edgeThetas)
+    {
+        int nfaces = mesh.nFaces();
+        for (int i = 0; i < nfaces; i++)
+            if (!LibShell::edgeDOFsValid(mesh, curPos, edgeThetas, i))
+                return false;
+        return true;
+    }
 
     Eigen::Matrix2d MidedgeAngleTanFormulation::secondFundamentalForm(
         const MeshConnectivity& mesh,
