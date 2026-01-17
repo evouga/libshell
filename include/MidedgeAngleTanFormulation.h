@@ -27,7 +27,7 @@ namespace LibShell {
             Eigen::Matrix<double, 4, 18 + 3 * numExtraDOFs>* derivative, // F(face, i), then the three vertices opposite F(face,i), then the thetas on oppositeEdge(face,i)
             std::vector<Eigen::Matrix<double, 18 + 3 * numExtraDOFs, 18 + 3 * numExtraDOFs> >* hessian);
 
-        static bool MidedgeAngleTanFormulation::edgeDOFsValid(
+        static bool edgeDOFsValid(
             const MeshConnectivity& mesh,
             const Eigen::MatrixXd& curPos,
             const Eigen::VectorXd& extraDOFs);
