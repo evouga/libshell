@@ -1,6 +1,6 @@
 # LibShell
 
-This code implements the discrete shell energy, and its derivatives and Hessian.
+This code implements thin shell energies and their derivatives and Hessians.
 
 ## Kinematics
 
@@ -8,27 +8,21 @@ The shell's current pose is represented as a triangle mesh, as well as, optional
 
 ## Bending Options
 
-Three options are implemented for how the bending energy is discretized, all based on Grinspun et al.'s discrete shape operator:
+Four options are implemented for how the bending energy is discretized.
 
-* MidedgeAngleSinFormulation: bending energy is roughly sin(theta/2) for edge turning angle theta.
+* MidedgeAngleSinFormulation: bending energy is roughly sin(theta/2) for edge turning angle theta. This bending energy is the DCS energy (without the shear one-form term) described in Weischedel, _A Discrete Geometric View on Shear-deformable Shell Models_, 2012.
 
-* MidedgeAngleTanFormulation: energy is roughly tan(theta/2) instead. The main difference of this formulation from the previous one is that the bending energy diverges for 180-degree bent hinges.
+* MidedgeAngleTanFormulation: energy is roughly tan(theta/2) instead. The main difference of this formulation from the previous one is that the bending energy diverges for 180-degree bent hinges. This is the BAC model described in Chen et al., _Better Bending: Analysis, Construction and Verification of Discrete Bending Models for Kirchhoff-Love Shells_, SIGGRAPH 2026.
 
-* MidedgeAngleThetaFormulation: the version originally described in Grinspun et al.'s paper, though less geometrically principled than either of the above.
+* MidedgeAngleThetaFormulation: the Discrete Shape Operator-based bending energy described in Grinspun et al., _Computing Discrete Shape Operators on General Meshes_, CGF, 2006.
 
-* MidedgeAverageFormulation: eschews the normal directors of Grinspun et al. completely, instead assuming that the normal direction on an edge is always the mean of the neighboring face normals.
+* MidedgeAverageFormulation: eschews the normal directors of the models and instead assumes that the normal direction on an edge is always the mean of the neighboring face normals, as described in Chen et al., _Physical Simulation of Environmentally Induced Thin Shell Deformation_, SIGGRAPH 2018.
 
-For more details see:
-
-* Grinpsun et al. "Computing discrete shape operators on general meshes"; 
-
-* Weischedel et al. "A discrete geometric view on shear-deformable shell models";
-
-* Chen et al. "Physical simulation of environmentally induced thin shell deformation".
+All else being equal, and especially if simulating surfaces that might undergo large curvature in regions under-resolved by the discrete mesh, I recommend the `MidedgeAngleTanFormulation` as its energy barrier will prevent hinges from collapsing into the 180-degree bent state in those regions. For detailed experiments please see the _Better Bending_ paper cited above.
 
 ## Material Model
 
-Both a St. Venant-Kirchhoff and Neo-Hookean material model are implemented; you select these independently of the second fundamental form discretization by passing in a `MaterialModel` to the elastic energy computation. Each material model assumes uniform Lamé parameters over the entire surface (but you can specify different thicknesses for each triangle). 
+Both a St. Venant-Kirchhoff and Neo-Hookean material model are implemented (and can be chosen independently of the above options for how to discretize shell bending energy). Pass the desired `MaterialModel` to the elastic energy computation. Each material model assumes uniform Lamé parameters over the entire surface (but you can specify different thicknesses for each triangle). 
 
 For the St. Venant-Kirchhoff material, there is a bilayer implementation (where each half of the shell has a different thickness, Lamé constants, and strain-free state). See `BilayerStVKMaterial`.
 
